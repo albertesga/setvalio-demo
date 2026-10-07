@@ -218,6 +218,39 @@ export const IconFilm = (p) => (
   </Svg>
 )
 
+export const IconPause = (p) => (
+  <Svg {...p}>
+    <path d="M9 5v14M15 5v14" />
+  </Svg>
+)
+
+export const IconPlay = (p) => (
+  <Svg {...p}>
+    <path d="M7 5l12 7-12 7V5z" />
+  </Svg>
+)
+
+export const IconStop = (p) => (
+  <Svg {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+  </Svg>
+)
+
+export const IconMore = (p) => (
+  <Svg {...p}>
+    <circle cx="5" cy="12" r="1.2" />
+    <circle cx="12" cy="12" r="1.2" />
+    <circle cx="19" cy="12" r="1.2" />
+  </Svg>
+)
+
+export const IconArrowLeft = (p) => (
+  <Svg {...p}>
+    <path d="M19 12H5" />
+    <path d="M11 6l-6 6 6 6" />
+  </Svg>
+)
+
 // Claqueta — logotipo de marca.
 export const IconClaqueta = ({ size = 22, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true">

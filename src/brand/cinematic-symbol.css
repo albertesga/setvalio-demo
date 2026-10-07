@@ -1,0 +1,75 @@
+/* Composición orbital en 3D (CinematicSymbol). Las transformaciones las pone el
+   componente; aquí solo van la escena, las capas y el visor. */
+
+.flp-cine {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  container-type: inline-size;
+  perspective: 1100px;
+  /* Desde el centro del símbolo: en reposo la perspectiva no lo desplaza. */
+  perspective-origin: 49.7% 50.9%;
+}
+.flp-cine-escena,
+.flp-cine-simbolo,
+.flp-cine-gesto {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.flp-cine-escena { will-change: transform; }
+/* El diafragma gira alrededor del centro del símbolo, no del bloque. */
+.flp-cine-simbolo { transform-origin: 49.7% 50.9%; }
+
+.flp-cine-fondo {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--flp-radius-lg);
+  background: var(--flp-signal);
+}
+.flp-cine-capa {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Cada gesto son varias láminas: la de delante en carbón y los cantos un punto más
+   claros, para que se lea el grosor cuando la cámara se inclina. */
+.flp-cine-gesto .is-frente path { fill: var(--flp-carbon); }
+.flp-cine-gesto .is-canto path { fill: #262624; }
+
+/* Sombra: invisible en reposo (el logo no lleva sombra); aparece con el movimiento. */
+.flp-cine-sombra { opacity: 0; filter: blur(7px); }
+.flp-cine-sombra path { fill: var(--flp-carbon); }
+
+.flp-cine-orbitas path { fill: none; stroke: var(--flp-carbon); stroke-width: 1; opacity: 0.48; }
+
+/* Visor: esquinas de encuadre y datos de cámara en Geist Mono. */
+.flp-cine-visor { position: absolute; inset: 0; transform: translateZ(2px); }
+.flp-cine-visor path { fill: none; stroke: var(--flp-carbon); stroke-width: 3; }
+.flp-cine-etiqueta {
+  position: absolute;
+  color: var(--flp-carbon);
+  font-family: var(--flp-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.flp-cine-etiqueta.is-arriba { top: 7.6%; }
+.flp-cine-etiqueta.is-abajo { bottom: 7.6%; }
+.flp-cine-etiqueta.is-izquierda { left: 14.5%; }
+.flp-cine-etiqueta.is-derecha { right: 14.5%; }
+.flp-cine-etiqueta.is-abajo { font-variant-numeric: tabular-nums; }
+/* En bloques pequeños los datos del visor no caben: quedan solo las esquinas. */
+@container (max-width: 320px) {
+  .flp-cine-etiqueta { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flp-cine-escena,
+  .flp-cine-simbolo,
+  .flp-cine-gesto { transform: none !important; }
+}

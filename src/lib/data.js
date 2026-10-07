@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────
-// Datos de demostración — Setvalio
+// Datos de demostración — Filmpilot («La última función»)
 //
 // Todo el prototipo se alimenta de este módulo. Los totales por capítulo y del
 // proyecto se DERIVAN de las partidas (no se teclean por separado) para que las

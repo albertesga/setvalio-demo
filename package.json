@@ -1,18 +1,18 @@
 {
-  "name": "setvalio",
+  "name": "filmpilot",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Setvalio — control financiero para productoras de cine y televisión (prototipo)",
+  "description": "Filmpilot — un equipo de agentes para la producción de cine y televisión (prototipo)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:agentes": "node scripts/check-agentes.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "recharts": "^2.15.4"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
