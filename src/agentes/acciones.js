@@ -7,7 +7,7 @@
 import { r2, pendiente, totales, desviaciones, excepciones, dossier, tesoreria, informeDesactualizado } from './calculos.js'
 import { crearMundo } from './mundo.js'
 import { ALTERNATIVAS_POR_ID, resultadoLlamada } from './propuesta.js'
-import { riesgosAltos } from './rodaje.js'
+import { riesgosAltos, riesgo as riesgoDe, jornadaOriginal } from './rodaje.js'
 
 function clonar(m) {
   return JSON.parse(JSON.stringify(m))
@@ -189,7 +189,9 @@ export function reducir(m, accion) {
     }
 
     case 'borrador/crear': {
-      if (m.borradores[accion.borrador.id]) return m
+      // Un borrador descartado se puede volver a preparar; uno vigente no se duplica.
+      const previo = m.borradores[accion.borrador.id]
+      if (previo && previo.estado !== 'descartado') return m
       const n = clonar(m)
       n.borradores[accion.borrador.id] = { ...accion.borrador, estado: 'borrador' }
       return confirmar(n, accion, { tipo: 'borrador', id: accion.borrador.id })
@@ -227,35 +229,41 @@ export function reducir(m, accion) {
 
     // ── Riesgos de producción ─────────────────────────────────────────────
     case 'riesgo/mitigar': {
+      // Se puede cambiar el plan sin decisión previa, con una reserva aprobada o tras asumir el riesgo.
       const d0 = m.decisionesRiesgo[accion.riesgoId]
-      if (d0 && d0.estado !== 'reservado') return m
+      if (d0?.estado === 'mitigado') return m
       const n = clonar(m)
       const efectos = []
       if (accion.riesgoId === 'RG-1') {
-        // Cambia el contenido de las jornadas 18 y 19; cada una conserva su número y su fecha.
-        const a = n.rodaje.jornadas.find((j) => j.n === 18)
-        const b = n.rodaje.jornadas.find((j) => j.n === 19)
-        const campos = ['localizacion', 'tipo', 'franja', 'roles', 'nota']
-        for (const c of campos) [a[c], b[c]] = [b[c], a[c]]
-        efectos.push({ ambito: 'plan', id: 'J18', campo: 'localizacion', antes: b.localizacion, despues: a.localizacion })
+        // Intercambia el contenido de las dos jornadas; cada una conserva su número y su fecha.
+        const { jornada: ja, intercambio: jb } = n.rodaje.senales.lluvia
+        const a = n.rodaje.jornadas.find((j) => j.n === ja)
+        const b = n.rodaje.jornadas.find((j) => j.n === jb)
+        if (a.localizacion !== jornadaOriginal(ja).localizacion) return m
+        for (const c of ['localizacion', 'tipo', 'franja', 'roles', 'nota']) [a[c], b[c]] = [b[c], a[c]]
+        efectos.push({ ambito: 'plan', id: `J${ja}`, campo: 'localizacion', antes: b.localizacion, despues: a.localizacion })
+        // El riesgo desaparece: se libera la reserva si la había.
+        if (n.reservas[accion.riesgoId]) {
+          efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+          delete n.reservas[accion.riesgoId]
+        }
       } else if (accion.riesgoId === 'RG-5') {
+        // Replanificar reduce las horas extra, no las elimina: una reserva aprobada se mantiene.
         for (const j of n.rodaje.jornadas.filter((x) => n.rodaje.senales.noches.jornadas.includes(x.n))) {
           j.franja = 'Tarde-noche'
           j.nota = 'Citación más tardía para reducir horas extra'
         }
         efectos.push({ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' })
       } else return m
-      if (n.reservas[accion.riesgoId]) {
-        efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
-        delete n.reservas[accion.riesgoId]
-      }
-      n.decisionesRiesgo[accion.riesgoId] = { estado: 'mitigado', opcion: accion.opcion ?? null, por: accion.por ?? null }
+      n.decisionesRiesgo[accion.riesgoId] = { estado: 'mitigado', opcion: accion.opcion ?? null, por: accion.por ?? null, reservaMantenida: n.reservas[accion.riesgoId]?.importe ?? null }
       return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId }, efectos)
     }
 
     case 'riesgo/reservar': {
       const d0 = m.decisionesRiesgo[accion.riesgoId]
-      if (!(accion.importe > 0)) return m
+      const vigente = riesgoDe(m, accion.riesgoId)?.reserva
+      // Solo se reserva la cifra vigente: una tarjeta caducada no puede volver a un importe antiguo.
+      if (!(accion.importe > 0) || vigente == null || Math.abs(vigente - accion.importe) > 0.5) return m
       if (d0 && !(d0.estado === 'reservado' && Math.abs(d0.importe - accion.importe) > 0.5)) return m
       const n = clonar(m)
       const antes = n.reservas[accion.riesgoId]?.importe ?? 0
@@ -265,10 +273,17 @@ export function reducir(m, accion) {
     }
 
     case 'riesgo/aceptar': {
-      if (m.decisionesRiesgo[accion.riesgoId]) return m
+      const d0 = m.decisionesRiesgo[accion.riesgoId]
+      if (d0 && d0.estado !== 'reservado') return m
       const n = clonar(m)
+      const efectos = []
+      // Asumir con una reserva aprobada la libera.
+      if (n.reservas[accion.riesgoId]) {
+        efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+        delete n.reservas[accion.riesgoId]
+      }
       n.decisionesRiesgo[accion.riesgoId] = { estado: 'aceptado', por: accion.por ?? null }
-      return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId })
+      return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId }, efectos)
     }
 
     // ── Propuesta de presupuesto ──────────────────────────────────────────

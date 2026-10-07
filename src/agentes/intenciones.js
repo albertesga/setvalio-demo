@@ -168,7 +168,7 @@ export function extraerEntidades(texto, mundo) {
   if (mJ) e.jornada = Number(mJ[1])
   const RIESGO = [
     [/\b(lluvia|llover|llovera|llueve|lloviendo|meteo|meteorolog|chubasco|tormenta)|prevision del tiempo/, 'RG-1'],
-    [/\b(actriz|billete|vuelo|ausencia|no show|no se presente)/, 'RG-2'],
+    [/\b(actriz|ausencia|no show|no se presente)|(billete|vuelo).*(actriz|convocad)|(actriz|convocad).*(billete|vuelo)/, 'RG-2'],
     [/(permiso de rodaje|via publica|permiso municipal)/, 'RG-3'],
     [/(orden de rodaje|orden del dia|hoja de citacion|call sheet|citacion de manana)/, 'RG-4'],
     [/(horas extra|rodaje de noche|jornadas de noche|las noches)/, 'RG-5'],
@@ -213,7 +213,7 @@ export const LEXICO = {
     raices: { forecast: 3, cef: 3, previs: 2, cierre: 2, proyecc: 2, tesorer: 3, caja: 3, saldo: 2, liquidez: 3, cerra: 1, negativ: 1 },
   },
   cumplimiento: {
-    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal'],
+    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal', 'riesgos fiscales'],
     raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1 },
   },
   pedir_documentacion: {
@@ -228,7 +228,7 @@ export const LEXICO = {
   },
   riesgos: {
     frases: ['que riesgos', 'riesgos de rodaje', 'riesgos del rodaje', 'parte de riesgos', 'radar de riesgos', 'que puede salir mal', 'proximas jornadas', 'prevision del tiempo', 'va a llover', 'orden del dia', 'orden de rodaje', 'call sheet', 'hoja de citacion', 'horas extra de noche', 'via publica', 'cambio de localizacion', 'aviso a transportes', 'informe de riesgos'],
-    raices: { riesg: 3, radar: 3, lluv: 3, llov: 3, llue: 3, meteo: 3, citacion: 2, billete: 2, jornad: 1 },
+    raices: { riesg: 3, radar: 3, lluv: 3, llov: 3, llue: 3, meteo: 3, citacion: 2, jornad: 1 },
     entidades: { riesgo: 2, jornada: 2 },
   },
   presupuesto_nuevo: {
@@ -285,6 +285,10 @@ function puntuar(norm, tokens, entidades, mundo) {
     if (doc.impuesto?.tipo === 'IGIC') out.cumplimiento += 1
   }
   if (entidades.proveedor === 'Ferretería El Tornillo') out.revisar_gasto += 2
+  // Un riesgo concreto nombrado sin otra referencia (orden, documento) pesa más.
+  // (Un documento deducido del nombre del proveedor no cuenta: «permiso de rodaje en Las Palmas».)
+  const documentoExplicito = /\bf[\s-]*2026|\bg-\d/.test(norm)
+  if (entidades.riesgo && !entidades.oc && !(entidades.documento && documentoExplicito)) out.riesgos += 2
   // «Aprueba las horas extra de Eléctricos Prado» es una orden de compra, no un riesgo.
   if (entidades.oc && !/riesg/.test(norm)) out.riesgos = 0
   if (/riesgo fiscal|riesgos fiscales/.test(norm)) out.riesgos = 0
@@ -313,7 +317,10 @@ export function detectarIntencion(texto, mundo, contexto = {}) {
   const puntos = puntuar(norm, tokens, entidades, mundo)
 
   // «Manda el aviso…», «envía el informe de riesgos»: nunca se envía; se enseña el borrador.
-  if (entidades.accionExterna === 'enviar' && (entidades.riesgo || /riesg/.test(norm) || (contexto.ultimaIntencion === 'riesgos' && !/(factura|proveedor|informe semanal)/.test(norm)))) {
+  // Tras hablar de riesgos, solo «envíalo», «manda el aviso / el borrador / el mensaje» se refieren a ellos.
+  const otroObjeto = /(informe(?! de riesgos)|cost report|resumen|dossier|compra|factura|proveedor|presupuesto|correo al)/.test(norm)
+  const sobreAviso = /\b(envialo|enviala|mandalo|mandala)\b|(aviso|borrador|mensaje|recordatorio)/.test(norm)
+  if (entidades.accionExterna === 'enviar' && (entidades.riesgo || /riesg/.test(norm) || (contexto.ultimaIntencion === 'riesgos' && sobreAviso && !otroObjeto))) {
     const riesgo = entidades.riesgo ?? (/riesg/.test(norm) ? undefined : contexto.ultimasEntidades?.riesgo)
     return { intencion: 'riesgos', puntuacion: 9, entidades: { ...entidades, riesgo, quiereEnviar: true }, alternativas: [] }
   }

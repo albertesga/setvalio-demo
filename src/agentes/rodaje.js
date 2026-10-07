@@ -8,10 +8,11 @@
 // «día 15 de 30» son las jornadas hechas. Coincide con PERIODO (Rodaje 3 =
 // 25–31 may) y con CASHFLOW (Rodaje 4–6). No coinciden fechaInicioRodaje
 // '04/05/2026' de proyectos.js ni las facturas «semana 3»: aquí no se usan.
+//
+// Este módulo no importa calculos.js: calculos.js lo importa a él.
 
 import { CASHFLOW } from '../lib/data.js'
-import { t, v, diasEntre, fecha as fechaLarga } from './texto.js'
-import { pendiente } from './calculos.js'
+import { t, v, diasEntre, fecha as fechaLarga, formatear } from './texto.js'
 
 // Nombres de LOCALIZACIONES de src/screens/Coste.jsx (copiados: es JSX y Node no lo importa).
 export const LOCALIZACIONES = ['Madrid centro · interiores', 'Teatro Apolo · decorado', 'Exteriores Madrid', 'Canarias · scouting y bloque 2', 'Postproducción inicial']
@@ -45,15 +46,18 @@ export const METEO = {
 }
 
 export const SENALES = {
+  // El exterior de esta semana y el interior con el que se puede intercambiar.
+  lluvia: { jornada: 18, intercambio: 19, actualizacion: 0.9 },
   citacion: { jornada: 17, publicada: false, alerta: false },
   billete: { jornadas: [21, 22], rol: 'Actriz secundaria', contratoFirmado: true, emitido: false },
   permiso: { jornada: 23, solicitado: '2026-05-20', resuelto: false, organismo: 'Ayuntamiento de Las Palmas de Gran Canaria' },
   cambio: { jornada: 20, de: EXTERIORES, a: MADRID, avisados: ['Dirección', 'Arte'], sinAvisar: 'Transportes Madrid Film S.L.' },
-  noches: { jornadas: [24, 25], anteriores: [13, 14, 15], oc: 'OC-106', partida: '03.03' },
+  // OC-106 (28/05) paga las horas extra de las noches de las jornadas 12 a 14.
+  noches: { jornadas: [24, 25], anteriores: [12, 13, 14], oc: 'OC-106', partida: '03.03' },
 }
 
 // Umbrales de severidad (se citan en las reglas de cada respuesta).
-export const UMBRALES = { probabilidad: 0.7, exposicion: 20_000, diasUrgente: 5 }
+export const UMBRALES = { probabilidad: 0.7, diasAlta: 7, exposicion: 20_000, diasUrgente: 5 }
 
 export const TIPOS = {
   'RG-1': { tipo: 'Clima', agente: 'riesgos' },
@@ -73,6 +77,7 @@ export function crearRodaje() {
 }
 
 const r2 = (n) => Math.round(n * 100) / 100
+const pendiente = (p) => r2(p.cef - p.gastado - p.comprometido)
 
 /** Coste de una jornada de rodaje: pagos de su semana en la previsión de caja, entre cinco jornadas. */
 export function costeJornada(semana) {
@@ -81,60 +86,70 @@ export function costeJornada(semana) {
 }
 
 export const jornada = (m, n) => m.rodaje.jornadas.find((j) => j.n === n)
+export const jornadaOriginal = (n) => JORNADAS.find((j) => j.n === n)
 
-/** Lo que costaría repetir las horas extra de noche, contando la OC-106 si sigue en pie. */
-function excesoHorasExtra(m) {
-  const { oc, partida } = m.rodaje.senales.noches
+/** Horas extra de las noches que quedan: lo pagado por noche (OC-106) por las noches que faltan, menos el margen de su partida. */
+function horasExtra(m) {
+  const { oc, partida, anteriores, jornadas } = m.rodaje.senales.noches
   const o = m.ordenes[oc]
   const p = m.partidas[partida]
-  if (!o || !p) return 0
+  if (!o || !p) return { repetir: 0, margen: 0, exceso: 0 }
+  const repetir = r2((o.importe / anteriores.length) * jornadas.length)
   const yaConsumido = o.estado === 'Pendiente' || o.estado === 'Por llegar' ? o.importe : 0
-  const margen = Math.max(0, pendiente(p) - yaConsumido)
-  return r2(o.importe - Math.min(o.importe, margen))
+  const margen = r2(Math.max(0, pendiente(p) - yaConsumido))
+  return { repetir, margen, exceso: Math.round(repetir - Math.min(repetir, margen)) }
 }
 
 function severidad({ alerta, probabilidad, dias, exposicion }) {
   if (alerta) return 'alta'
-  if (probabilidad != null && probabilidad >= UMBRALES.probabilidad && dias <= 7) return 'alta'
+  if (probabilidad != null && probabilidad >= UMBRALES.probabilidad && dias <= UMBRALES.diasAlta) return 'alta'
   if ((exposicion ?? 0) >= UMBRALES.exposicion || dias <= UMBRALES.diasUrgente) return 'media'
   return 'baja'
 }
 
-const PESO = { alta: 0, media: 1, baja: 2 }
+const PESO = { alta: 0, media: 1, baja: 2, controlado: 3 }
+const etiquetaJ = (ns) => (ns.length > 1 ? `jornadas ${ns.join(' y ')}` : `jornada ${ns[0]}`)
 
 /** Evalúa los seis riesgos con el estado actual del mundo. */
 export function evaluarRiesgos(m) {
-  const { jornadas, meteo, senales } = m.rodaje
+  const { meteo, senales } = m.rodaje
   const hoy = m.corte.fecha
   const dec = m.decisionesRiesgo ?? {}
   const out = []
 
-  // RG-1 · lluvia en un exterior de día de esta semana.
-  const ext = jornadas.filter((j) => j.tipo === 'EXT' && j.semana === 'Rodaje 4')
-  const j1 = ext.sort((a, b) => (meteo[b.fecha] ?? 0) - (meteo[a.fecha] ?? 0))[0] ?? jornada(m, 18)
-  const p1 = meteo[j1.fecha] ?? 0
+  // RG-1 · lluvia en el exterior de esta semana. Se identifica por la jornada original.
+  const ll = senales.lluvia
+  const j1 = jornadaOriginal(ll.jornada)
+  const ji = jornadaOriginal(ll.intercambio)
+  const exterior = m.rodaje.jornadas.find((j) => j.localizacion === j1.localizacion && j.tipo === 'EXT' && j.semana === j1.semana) ?? jornada(m, j1.n)
+  const p1 = meteo[exterior.fecha] ?? 0
+  const pOriginal = meteo[j1.fecha] ?? 0
   const exp1 = costeJornada(j1.semana)
+  const mitigado1 = dec['RG-1']?.estado === 'mitigado'
   out.push({
     id: 'RG-1',
     jornadas: [j1.n],
     fecha: j1.fecha,
-    probabilidad: p1,
+    probabilidad: mitigado1 ? p1 : pOriginal,
     exposicion: exp1,
-    reserva: r2(Math.round(p1 * exp1)),
+    reserva: Math.round(pOriginal * exp1),
+    intercambio: ji.n,
     titulo: t('Lluvia en el exterior de la jornada {n}', { n: v(j1.n, 'num') }),
     senales: [
-      t('Previsión de ejemplo para el {f}: {p} de lluvia', { f: v(fechaLarga(j1.fecha)), p: v(p1, 'pct0') }),
-      t('Jornada {n}: {tipo} de {franja} en {loc} ({nota})', { n: v(j1.n, 'num'), tipo: v(j1.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j1.franja.toLowerCase()), loc: v(j1.localizacion), nota: v(j1.nota || 'sin nota') }),
+      t('Previsión de ejemplo para el {f}: {p} de lluvia', { f: v(fechaLarga(j1.fecha)), p: v(pOriginal, 'pct0') }),
+      t('Jornada {n}: exterior de {franja} en {loc} ({nota})', { n: v(j1.n, 'num'), franja: v(j1.franja.toLowerCase()), loc: v(j1.localizacion), nota: v(j1.nota) }),
       t('Una jornada de esa semana cuesta unos {c}: pagos previstos de la semana entre cinco jornadas', { c: v(exp1, 'eur') }),
     ],
     porQue: t('Si llueve, se pierde la jornada o se rueda con riesgo para el equipo y el material.'),
-    respuesta: t('Cambiar el orden con la jornada {n}, un interior con el decorado montado, sin coste.', { n: v(19, 'num') }),
+    respuesta: mitigado1
+      ? t('Orden cambiado: el exterior pasa a la jornada {n}, con un {p} de lluvia.', { n: v(exterior.n, 'num'), p: v(p1, 'pct0') })
+      : t('Cambiar el orden con la jornada {n} ({loc}, interior con el decorado montado), sin coste en la previsión.', { n: v(ji.n, 'num'), loc: v(ji.localizacion) }),
     decision: true,
   })
 
   // RG-2 · ausencia de la actriz secundaria en Canarias.
   const b = senales.billete
-  const exp2 = r2(b.jornadas.length * costeJornada('Rodaje 5'))
+  const exp2 = r2(b.jornadas.length * costeJornada(jornada(m, b.jornadas[0]).semana))
   out.push({
     id: 'RG-2',
     jornadas: [...b.jornadas],
@@ -144,11 +159,11 @@ export function evaluarRiesgos(m) {
     reserva: null,
     titulo: t('Actriz secundaria sin billete a Canarias'),
     senales: [
-      t('Convocada en las jornadas {a} y {b} del bloque de Canarias', { a: v(b.jornadas[0], 'num'), b: v(b.jornadas[1], 'num') }),
+      t('Convocada en las {j} del bloque de Canarias', { j: v(etiquetaJ(b.jornadas)) }),
       t('Contrato firmado; billete todavía sin emitir'),
-      t('Si no llega, se reprograman {n} de Canarias: unos {c}', { n: v(`${b.jornadas.length} jornadas`), c: v(exp2, 'eur') }),
+      t('Exposición máxima si no llega: el coste de esas jornadas, unos {c}', { c: v(exp2, 'eur') }),
     ],
-    porQue: t('Sin ella no se pueden rodar sus secuencias y el bloque de Canarias no se puede alargar.'),
+    porQue: t('Sin ella no se pueden rodar sus secuencias en Canarias y habría que reprogramarlas.'),
     respuesta: t('Pedir hoy a coordinación de producción que emita el billete.'),
     aviso: 'BOR-RG-2',
   })
@@ -165,7 +180,7 @@ export function evaluarRiesgos(m) {
     titulo: t('Permiso de vía pública pendiente'),
     senales: [
       t('Solicitado el {f} al {org}', { f: v(fechaLarga(pm.solicitado)), org: v(pm.organismo) }),
-      t('Sin resolución y la jornada {n} es en vía pública', { n: v(pm.jornada, 'num') }),
+      t('Sin resolución, y la jornada {n} es en vía pública', { n: v(pm.jornada, 'num') }),
       t('Impacto por estimar: depende del plan B de localización'),
     ],
     porQue: t('Sin permiso no se puede rodar en la calle: habría que cambiar de localización con poco margen.'),
@@ -186,7 +201,7 @@ export function evaluarRiesgos(m) {
     titulo: t('Orden del día de mañana sin publicar'),
     senales: [
       t('La orden del día de la jornada {n} todavía no está publicada', { n: v(ci.jornada, 'num') }),
-      ci.alerta ? t('Ya es por la tarde y el equipo no sabe la citación de mañana') : t('Suele publicarse por la tarde del día anterior'),
+      ci.alerta ? t('Ayudantía de dirección no ha confirmado a qué hora sale y el equipo no sabe su citación') : t('Suele publicarse la tarde anterior'),
     ],
     porQue: t('Sin la orden del día el equipo llega tarde o a otro sitio: se acumulan esperas y horas extra.'),
     respuesta: t('Recordárselo a ayudantía de dirección.'),
@@ -195,26 +210,29 @@ export function evaluarRiesgos(m) {
 
   // RG-5 · horas extra en las noches de Canarias.
   const no = senales.noches
-  const exp5 = excesoHorasExtra(m)
+  const he = horasExtra(m)
   const o = m.ordenes[no.oc]
   out.push({
     id: 'RG-5',
     jornadas: [...no.jornadas],
     fecha: jornada(m, no.jornadas[0]).fecha,
     probabilidad: null,
-    exposicion: exp5,
-    reserva: exp5 > 0 ? exp5 : null,
+    exposicion: he.exceso,
+    reserva: he.exceso > 0 ? he.exceso : null,
     titulo: t('Horas extra en las noches de Canarias'),
     senales: [
-      t('Las noches de las jornadas {a} a {b} ya generaron horas extra: {oc} de {prov} por {imp}', { a: v(no.anteriores[0], 'num'), b: v(no.anteriores[no.anteriores.length - 1], 'num'), oc: v(no.oc, 'id'), prov: v(o?.proveedor ?? ''), imp: v(o?.importe ?? 0, 'eur') }),
-      t('Hay otras dos noches programadas: jornadas {a} y {b}', { a: v(no.jornadas[0], 'num'), b: v(no.jornadas[1], 'num') }),
-      exp5 > 0
-        ? t('Si se repite, la partida {p} ya no tiene margen: subiría el coste estimado final {c}', { p: v(no.partida, 'id'), c: v(exp5, 'eur') })
-        : t('Si se repite, cabría en lo que queda previsto en la partida {p}', { p: v(no.partida, 'id') }),
+      t('Las noches de las {j} generaron horas extra: {oc} de {prov}, {imp}', { j: v(etiquetaJ([no.anteriores[0], no.anteriores[no.anteriores.length - 1]]).replace(' y ', ' a ')), oc: v(no.oc, 'id'), prov: v(o?.proveedor ?? ''), imp: v(o?.importe ?? 0, 'eur') }),
+      t('Quedan las noches de las {j}: al mismo ritmo, unos {rep}', { j: v(etiquetaJ(no.jornadas)), rep: v(he.repetir, 'eur') }),
+      he.exceso > 0
+        ? t('A la partida {p} le quedan {mar} previstos: el coste estimado final subiría {exc}', { p: v(no.partida, 'id'), mar: v(he.margen, 'eur'), exc: v(he.exceso, 'eur') })
+        : t('Cabría en lo que queda previsto en la partida {p}', { p: v(no.partida, 'id') }),
       t('Conviene revisar los descansos del equipo con el convenio'),
     ],
     porQue: t('Las noches seguidas alargan las jornadas: más horas extra y equipo cansado.'),
-    respuesta: t('Replanificar las noches con una citación más tardía, o reservar el coste en la previsión.'),
+    respuesta:
+      dec['RG-5']?.estado === 'mitigado'
+        ? t('Noches replanificadas con una citación más tardía: reduce las horas extra, no las elimina.')
+        : t('Replanificar las noches con una citación más tardía, o reservar el coste en la previsión.'),
     decision: true,
   })
 
@@ -241,9 +259,22 @@ export function evaluarRiesgos(m) {
     .map((r) => {
       const d = dec[r.id]
       const dias = diasEntre(hoy, r.fecha)
-      const estado = d?.estado ?? (r.aviso && m.borradores?.[r.aviso] ? 'aviso' : 'abierto')
-      const sev = severidad({ ...r, dias })
-      return { ...r, ...TIPOS[r.id], dias, severidad: estado === 'mitigado' || estado === 'aceptado' ? 'controlado' : sev, estado, decision: r.decision && !d, reservaAprobada: m.reservas?.[r.id]?.importe ?? null }
+      const borrador = r.aviso ? m.borradores?.[r.aviso] : null
+      const estado = d?.estado ?? (borrador && borrador.estado !== 'descartado' ? 'aviso' : 'abierto')
+      const base = severidad({ ...r, dias })
+      // Cambiar el orden elimina la lluvia; replanificar las noches solo la reduce; asumir no cambia la severidad.
+      const sev = estado === 'mitigado' ? (r.id === 'RG-1' ? 'controlado' : 'baja') : base
+      const reservaCorta = d?.estado === 'reservado' && r.reserva != null && Math.abs(d.importe - r.reserva) > 0.5
+      return {
+        ...r,
+        ...TIPOS[r.id],
+        dias,
+        severidad: sev,
+        estado,
+        decision: !!r.decision && (!d || reservaCorta),
+        reservaAprobada: m.reservas?.[r.id]?.importe ?? null,
+        reservaCorta,
+      }
     })
     .sort((a, b) => (PESO[a.severidad] ?? 3) - (PESO[b.severidad] ?? 3) || a.dias - b.dias)
 }
@@ -252,7 +283,7 @@ export function riesgo(m, id) {
   return evaluarRiesgos(m).find((r) => r.id === id)
 }
 
-/** Decisiones abiertas que llevan importe: van al panel de decisiones. */
+/** Decisiones abiertas con dinero en juego: van al panel de decisiones. */
 export function decisionesRiesgos(m) {
   return evaluarRiesgos(m)
     .filter((r) => r.decision && r.reserva)
@@ -263,14 +294,14 @@ export function decisionesRiesgos(m) {
       nivel: 'aprueba',
       rol: 'Producción ejecutiva',
       importe: r.reserva,
-      titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, jornada ${r.jornadas[0]}`,
-      entrada: r.id === 'RG-1' ? `¿Va a llover en la jornada ${r.jornadas[0]}?` : '¿Qué riesgo hay con las horas extra de noche?',
+      titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, ${etiquetaJ(r.jornadas)}${r.reservaCorta ? ' (reserva corta)' : ''}`,
+      entrada: PREGUNTA[r.id],
     }))
 }
 
-/** Riesgos altos aún abiertos (para badges y el informe). */
+/** Riesgos altos que no se han resuelto con un cambio de plan (los asumidos siguen contando). */
 export function riesgosAltos(m) {
-  return evaluarRiesgos(m).filter((r) => r.severidad === 'alta' && r.estado !== 'mitigado' && r.estado !== 'aceptado')
+  return evaluarRiesgos(m).filter((r) => r.severidad === 'alta')
 }
 
 // Pregunta que abre cada riesgo en la conversación.
@@ -282,3 +313,10 @@ export const PREGUNTA = {
   'RG-5': '¿Qué riesgo hay con las horas extra de noche?',
   'RG-6': 'Prepara el aviso a transportes por el cambio de localización de la jornada 20',
 }
+
+// Jornada → riesgo («¿y la jornada 23?»).
+export function riesgoDeJornada(m, n) {
+  return evaluarRiesgos(m).find((r) => r.jornadas.includes(n)) ?? null
+}
+
+export { formatear }

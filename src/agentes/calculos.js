@@ -10,6 +10,7 @@
 import { evaluarTerritorio } from '../lib/incentivos.js'
 import { POLITICAS, nivelOrden, confianzaBaja, ROLES } from './politicas.js'
 import { diasEntre } from './texto.js'
+import { riesgo as riesgoDe, riesgosAltos } from './rodaje.js'
 
 export const r2 = (n) => Math.round(n * 100) / 100
 
@@ -304,10 +305,16 @@ export function estadoDecision(mundo, ref) {
     }
     case 'riesgo': {
       const d = mundo.decisionesRiesgo?.[ref.id]
+      const actual = riesgoDe(mundo, ref.id)
+      // Una tarjeta con una reserva que ya no es la vigente (la previsión cambió) se cierra.
+      const caducada = ref.reserva !== undefined && actual?.reserva != null && Math.abs(ref.reserva - actual.reserva) > 0.5
+      if (d?.estado === 'mitigado') return { estado: 'mitigado', por: d.por }
+      if (d?.estado === 'aceptado') return ref.soloCambiarPlan ? { estado: 'pendiente', aceptadoPor: d.por } : { estado: 'aceptado', por: d.por }
+      if (caducada) return { estado: 'desactualizada' }
       if (!d) return { estado: 'pendiente' }
-      // Una tarjeta nueva con otra reserva (la previsión cambió) vuelve a estar abierta.
-      if (d.estado === 'reservado' && ref.reserva !== undefined && Math.abs(d.importe - ref.reserva) > 0.5) return { estado: 'pendiente', reservaActual: d.importe, por: d.por }
-      return { estado: d.estado, por: d.por, importe: d.importe }
+      // Reserva aprobada distinta de la que propone esta tarjeta: se puede ajustar.
+      if (ref.reserva !== undefined && Math.abs(d.importe - ref.reserva) > 0.5) return { estado: 'pendiente', reservaActual: d.importe, por: d.por }
+      return { estado: 'reservado', por: d.por, importe: d.importe }
     }
     case 'borrador': {
       const b = mundo.borradores[ref.id]
@@ -329,5 +336,8 @@ export function informeDesactualizado(mundo, id) {
   if (!inf.resumen) return false
   const ex = excepciones(mundo)
   if (ex.length !== inf.resumen.decisiones || ex.filter((e) => e.nivel === 'aprueba').length !== inf.resumen.conAprobacion) return true
+  if (Math.abs((ahora.reservas ?? 0) - (inf.resumen.reservas ?? 0)) > 0.004) return true
+  const altos = riesgosAltos(mundo).map((r) => r.id).join(',')
+  if (inf.resumen.riesgosAltos && altos !== inf.resumen.riesgosAltos.map((r) => r.id).join(',')) return true
   return Math.abs(tesoreria(mundo).minimo.saldo - inf.resumen.cajaMinima.saldo) > 0.004
 }

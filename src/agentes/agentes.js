@@ -86,7 +86,7 @@ export const AGENTES = {
     nombre: 'Riesgos de producción',
     codigo: 'RG',
     rol: 'Vigila el plan de rodaje y avisa de lo que puede alterarlo.',
-    hace: 'Cruza el plan con el tiempo, convocatorias, permisos y órdenes del día; avisa con antelación, propone una respuesta y calcula el impacto. Cambiar el plan o reservar dinero lo decides tú.',
+    hace: 'Cruza el plan con el tiempo, convocatorias, permisos y órdenes del día; avisa con antelación, propone una respuesta y calcula el impacto. Cambiar el plan lo decide line producer; reservar dinero o asumir el riesgo, producción ejecutiva.',
     niveles: ['ejecuta', 'propone', 'aprueba'],
     exploratorio: true,
   },

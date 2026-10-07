@@ -4,6 +4,10 @@ import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja
 import { cuenta } from '../texto.js'
 import { optimizacion, totalesPropuesta, ALTERNATIVAS_POR_ID } from '../propuesta.js'
 import { componerComparacion, kpisPropuesta, textoDiferencia } from './presupuesto.js'
+import { AVISO_EXPLORATORIO } from './riesgos.js'
+import { jornadaOriginal } from '../rodaje.js'
+import { PERSONAS } from '../mundo.js'
+import { fecha as fechaLarga } from '../texto.js'
 
 function cambioCaja(antes, despues) {
   const a = c.tesoreria(antes)
@@ -11,21 +15,42 @@ function cambioCaja(antes, despues) {
   return a.semanas.some((s, i) => Math.abs(s.saldo - d.semanas[i].saldo) > 0.004)
 }
 
-// Aviso al equipo del cambio de orden de las jornadas 18 y 19 (se crea en el mismo turno: deshacer lo quita).
-function avisoCambioOrden() {
-  return {
-    id: 'BOR-CAMBIO-18-19',
-    canal: 'mensaje interno',
-    para: 'Equipo de rodaje · ayudantía de dirección',
-    ref: 'RG-1',
-    firma: 'Álvaro Ferrer · Line producer · La última función',
-    asunto: t('Cambio de orden: jornadas {a} y {b}', { a: v(18, 'num'), b: v(19, 'num') }),
-    cuerpo: [
-      t('Hola a todos:'),
-      t('Por la previsión de lluvia, el miércoles (jornada {a}) rodamos en el Teatro Apolo y el exterior de la azotea pasa al jueves (jornada {b}).', { a: v(18, 'num'), b: v(19, 'num') }),
-      t('Ayudantía de dirección publicará las órdenes del día con el cambio.'),
-    ],
-  }
+// Avisos del cambio de orden de jornadas: al equipo y a transportes. Se crean en el
+// mismo turno que el cambio, así que deshacerlo también los quita.
+function avisosCambioOrden(m) {
+  const { jornada: ja, intercambio: jb } = m.rodaje.senales.lluvia
+  const A = jornadaOriginal(ja)
+  const B = jornadaOriginal(jb)
+  const firma = `${PERSONAS.alvaro.nombre} · ${PERSONAS.alvaro.rol} · ${m.proyecto.titulo}`
+  const asunto = t('Cambio de orden: jornadas {a} y {b}', { a: v(ja, 'num'), b: v(jb, 'num') })
+  return [
+    {
+      id: 'BOR-CAMBIO-EQUIPO',
+      canal: 'mensaje interno',
+      para: 'Equipo de rodaje · ayudantía de dirección',
+      ref: 'RG-1',
+      firma,
+      asunto,
+      cuerpo: [
+        t('Hola a todos:'),
+        t('Por la previsión de lluvia, el {fa} (jornada {a}) rodamos en {locb} y el exterior de {loca} pasa al {fb} (jornada {b}).', { fa: v(fechaLarga(A.fecha)), a: v(ja, 'num'), locb: v(B.localizacion), loca: v(A.localizacion), fb: v(fechaLarga(B.fecha)), b: v(jb, 'num') }),
+        t('Ayudantía de dirección publicará las órdenes del día con el cambio. Confirmad disponibilidad del reparto y del decorado.'),
+      ],
+    },
+    {
+      id: 'BOR-CAMBIO-TRANSPORTE',
+      canal: 'email',
+      para: `${m.rodaje.senales.cambio.sinAvisar} · coordinación`,
+      ref: 'RG-1',
+      firma,
+      asunto,
+      cuerpo: [
+        t('Hola:'),
+        t('El {fa} los camiones van a {locb}, y el {fb} a {loca}.', { fa: v(fechaLarga(A.fecha)), locb: v(B.localizacion), fb: v(fechaLarga(B.fecha)), loca: v(A.localizacion) }),
+        t('Por favor, actualizad la hoja de ruta y confirmadnos las horas de llegada.'),
+      ],
+    },
+  ]
 }
 
 export const accion = {
@@ -108,13 +133,15 @@ export const accion = {
           paso('proveedores', t('Compara los precios confirmados'), { autonomia: 'propone', salida: (_, d) => t('Una elección por cada coste con alternativa') }),
         ]
       }
-      case 'riesgo/mitigar':
+      case 'riesgo/mitigar': {
+        const ll = m.rodaje.senales.lluvia
         return [
-          paso('riesgos', a.riesgoId === 'RG-1' ? t('Cambia el orden de las jornadas {a} y {b}', { a: v(18, 'num'), b: v(19, 'num') }) : t('Replanifica las noches con una citación más tardía'), { tipo: 'plan', acciones: [a], salida: t('Plan de rodaje actualizado') }),
-          ...(a.riesgoId === 'RG-1' ? [paso('riesgos', t('Redacta el aviso del cambio para el equipo'), { tipo: 'redaccion', autonomia: 'propone', acciones: [{ tipo: 'borrador/crear', borrador: avisoCambioOrden() }], salida: t('Borrador listo; no se envía') })] : []),
+          paso('riesgos', a.riesgoId === 'RG-1' ? t('Cambia el orden de las jornadas {a} y {b}', { a: v(ll.jornada, 'num'), b: v(ll.intercambio, 'num') }) : t('Replanifica las noches con una citación más tardía'), { tipo: 'plan', acciones: [a], salida: t('Plan de rodaje actualizado') }),
+          ...(a.riesgoId === 'RG-1' ? [paso('riesgos', t('Redacta los avisos del cambio para el equipo y para transportes'), { tipo: 'redaccion', autonomia: 'propone', acciones: avisosCambioOrden(m).map((borrador) => ({ tipo: 'borrador/crear', borrador })), salida: t('Borradores listos; no se envían') })] : []),
           paso('prevision', t('Recalcula la previsión'), { salida: (_, d) => t('Coste estimado final {cef}', { cef: v(c.totales(d).cef, 'eur') }) }),
           ...regInf,
         ]
+      }
       case 'riesgo/reservar':
         return [
           paso('excepciones', t('Registra la aprobación de la reserva'), { tipo: 'plan', acciones: [a], salida: t('{imp} reservados', { imp: v(a.importe, 'eur') }) }),
@@ -225,24 +252,67 @@ export const accion = {
         return { ...comp, sugerencias: comp.sugerencias.slice(0, 3) }
       }
       case 'riesgo/mitigar': {
+        bloques.push(AVISO_EXPLORATORIO)
+        const ll = despues.rodaje.senales.lluvia
+        const liberada = antes.reservas?.[a.riesgoId]?.importe && !despues.reservas?.[a.riesgoId]
         if (a.riesgoId === 'RG-1') {
-          bloques.push(texto(t('Cambio hecho por {por}: la jornada {a} pasa a ser el interior de {apolo} y el exterior se rueda en la jornada {b}, con un {p} de probabilidad de lluvia. El coste estimado final no cambia.', { por: v(por), a: v(18, 'num'), apolo: v(despues.rodaje.jornadas.find((j) => j.n === 18).localizacion), b: v(19, 'num'), p: v(despues.rodaje.meteo[despues.rodaje.jornadas.find((j) => j.n === 19).fecha] ?? 0, 'pct0') })))
+          const ja = despues.rodaje.jornadas.find((j) => j.n === ll.jornada)
+          const jb = despues.rodaje.jornadas.find((j) => j.n === ll.intercambio)
+          bloques.push(
+            texto(
+              t('Cambio hecho por {por}: la jornada {a} pasa a {loca} (interior) y el exterior se rueda en la jornada {b}, con un {p} de probabilidad de lluvia. {coste}', {
+                por: v(por),
+                a: v(ja.n, 'num'),
+                loca: v(ja.localizacion),
+                b: v(jb.n, 'num'),
+                p: v(despues.rodaje.meteo[jb.fecha] ?? 0, 'pct0'),
+                coste: liberada
+                  ? t('Se libera la reserva de {res}: el coste estimado final baja a {cef}.', { res: v(antes.reservas[a.riesgoId].importe, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
+                  : t('No cambia el coste estimado final; confirma con dirección, reparto y transporte.'),
+              }),
+            ),
+          )
           bloques.push({ tipo: 'plan' })
-          bloques.push({ tipo: 'borrador', id: 'BOR-CAMBIO-18-19' })
+          bloques.push({ tipo: 'borrador', id: 'BOR-CAMBIO-EQUIPO' })
+          bloques.push({ tipo: 'borrador', id: 'BOR-CAMBIO-TRANSPORTE' })
         } else {
-          bloques.push(texto(t('Noches replanificadas por {por} con una citación más tardía. La reserva no hace falta.', { por: v(por) })))
+          const mantenida = despues.reservas?.[a.riesgoId]?.importe
+          bloques.push(
+            texto(
+              mantenida
+                ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: la reserva de {res} se mantiene y el agente sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
+                : t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: el agente sigue vigilando.', { por: v(por) }),
+            ),
+          )
           bloques.push({ tipo: 'plan' })
         }
-        if (antes.reservas?.[a.riesgoId]) bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
+        if (liberada) bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
         break
       }
       case 'riesgo/reservar':
-        bloques.push(texto(t('Reserva de {imp} aprobada por {por}: el coste estimado final sube a {cef}. Ningún capítulo cambia; la reserva se ve aparte en la previsión.', { imp: v(a.importe, 'eur'), por: v(por), cef: v(c.totales(despues).cef, 'eur') })))
+        bloques.push(AVISO_EXPLORATORIO)
+        bloques.push(
+          texto(
+            antes.reservas?.[a.riesgoId]
+              ? t('Reserva ajustada por {por}: pasa de {ant} a {imp} y el coste estimado final queda en {cef}. Ningún capítulo cambia: la reserva aparece aparte en las desviaciones y en el informe semanal.', { por: v(por), ant: v(antes.reservas[a.riesgoId].importe, 'eur'), imp: v(a.importe, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
+              : t('Reserva de {imp} aprobada por {por}: el coste estimado final sube a {cef}. Ningún capítulo cambia: la reserva aparece aparte en las desviaciones y en el informe semanal.', { imp: v(a.importe, 'eur'), por: v(por), cef: v(c.totales(despues).cef, 'eur') }),
+          ),
+        )
         bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
         break
-      case 'riesgo/aceptar':
-        bloques.push(texto(t('Riesgo asumido por {por}: no cambia el plan ni la previsión. El agente lo seguirá vigilando.', { por: v(por) })))
+      case 'riesgo/aceptar': {
+        bloques.push(AVISO_EXPLORATORIO)
+        const liberada = antes.reservas?.[a.riesgoId]?.importe
+        bloques.push(
+          texto(
+            liberada
+              ? t('Riesgo asumido por {por}: se libera la reserva de {res} y el coste estimado final baja a {cef}. El agente lo sigue vigilando.', { por: v(por), res: v(liberada, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
+              : t('Riesgo asumido por {por}: no cambia el plan ni la previsión. El agente lo sigue vigilando y todavía se puede cambiar el plan.', { por: v(por) }),
+          ),
+        )
+        if (liberada) bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
         break
+      }
       case 'propuesta/noLlamar':
         bloques.push(texto(t('No se llama a nadie. Tienes la lista de alternativas y tus requisitos para pedir presupuesto tú.')))
         sugerencias.push(sug('Optimiza los proveedores de la propuesta'))

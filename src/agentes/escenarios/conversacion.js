@@ -51,7 +51,7 @@ export const ayuda = {
             { texto: t('Una compra de más de {imp} la aprueba line producer.', { imp: v(POLITICAS.umbralImporteOc, 'eur') }) },
             { texto: t('Si deja su capítulo por encima del {u}, la aprueba producción ejecutiva.', { u: v(POLITICAS.umbralDesviacion, 'pct0') }) },
             { texto: t('Lo fiscal lo valida el fiscalista. Los correos y los pagos nunca salen del asistente.') },
-            { texto: t('Riesgos de producción avisa sin que se lo pidas; cambiar el plan lo decide line producer y reservar dinero, producción ejecutiva.') },
+            { texto: t('Riesgos de producción avisa sin que se lo pidas. Cambiar el plan lo decide line producer; reservar dinero o asumir el riesgo, producción ejecutiva.') },
           ],
         },
       ],

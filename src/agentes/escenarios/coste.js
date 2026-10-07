@@ -56,7 +56,7 @@ export const informeSemanal = {
         autonomia: 'aprueba',
         salida: (_, d) => {
           const ex = c.excepciones(d)
-          return t('{n}: {a} con aprobación y {p} propuestas', { n: cuenta(ex.length, 'decisión', 'decisiones'), a: v(ex.filter((e) => e.nivel === 'aprueba').length, 'num'), p: v(ex.filter((e) => e.nivel === 'propone').length, 'num') })
+          return t('{n}: {a} con aprobación y {p} propuestas', { n: cuenta(ex.length, 'decisión de coste', 'decisiones de coste'), a: v(ex.filter((e) => e.nivel === 'aprueba').length, 'num'), p: v(ex.filter((e) => e.nivel === 'propone').length, 'num') })
         },
       }),
       paso('cumplimiento', t('Revisa elegibilidad y dossier fiscal'), {
@@ -196,13 +196,22 @@ export const explicarDesviacion = {
       const cerca = d.items.filter((x) => !x.fueraRango && x.desviacion > 0 && x.margenUmbral < 0.01 * x.presupuesto)
       const bloques = [
         texto(
-          t('Sobrecostes por {sobre} y ahorros por {ahorro}: neto {neto}. {n} fuera del umbral del {u}.', {
-            sobre: v(d.resumen.sobrecostes, 'eurSigned'),
-            ahorro: v(d.resumen.ahorros, 'eurSigned'),
-            neto: v(d.resumen.neto, 'eurSigned'),
-            n: cuenta(fuera.length, 'capítulo', 'capítulos'),
-            u: v(POLITICAS.umbralDesviacion, 'pct0'),
-          }),
+          d.resumen.reservas > 0
+            ? t('Sobrecostes por {sobre}, ahorros por {ahorro} y reservas de riesgos por {res}: neto {neto}. {n} fuera del umbral del {u}.', {
+                sobre: v(d.resumen.sobrecostes, 'eurSigned'),
+                ahorro: v(d.resumen.ahorros, 'eurSigned'),
+                res: v(d.resumen.reservas, 'eurSigned'),
+                neto: v(d.resumen.neto, 'eurSigned'),
+                n: cuenta(fuera.length, 'capítulo', 'capítulos'),
+                u: v(POLITICAS.umbralDesviacion, 'pct0'),
+              })
+            : t('Sobrecostes por {sobre} y ahorros por {ahorro}: neto {neto}. {n} fuera del umbral del {u}.', {
+                sobre: v(d.resumen.sobrecostes, 'eurSigned'),
+                ahorro: v(d.resumen.ahorros, 'eurSigned'),
+                neto: v(d.resumen.neto, 'eurSigned'),
+                n: cuenta(fuera.length, 'capítulo', 'capítulos'),
+                u: v(POLITICAS.umbralDesviacion, 'pct0'),
+              }),
         ),
         bloqueDesviaciones(m, { conCausas: false }),
       ]
@@ -328,6 +337,7 @@ export const prevision = {
       ),
       kpisProyecto(m, null, { claves: ['cef', 'consolidado', 'disponible', 'desviacion'] }),
     ]
+    if (tot.reservas > 0) bloques.push(texto(t('El coste estimado final incluye {res} de reservas de riesgos de rodaje (agente exploratorio), aparte de los capítulos.', { res: v(tot.reservas, 'eur') })))
     if (pend.length) {
       bloques.push(texto(t('Si se aprueban las órdenes pendientes ({ids}), el coste estimado final sube {extra}.', { ids: v(pend.map((o) => o.id).join(', ')), extra: v(extra, 'eur') })))
     }
@@ -422,7 +432,7 @@ export const resumen = {
           }),
         ),
         kpisProyecto(m),
-        ...(altos.length ? [texto(t('Riesgos de rodaje: {n}. El primero: {r}.', { n: cuenta(altos.length, 'alto abierto', 'altos abiertos'), r: altos[0].titulo }))] : []),
+        ...(altos.length ? [texto(t('Riesgos de rodaje (agente exploratorio, datos de ejemplo): {n}. El primero: {r}.', { n: cuenta(altos.length, 'alto', 'altos'), r: altos[0].titulo }))] : []),
         { tipo: 'decisiones' },
       ],
       sugerencias: [sug('Prepárame el informe semanal de coste'), sug('¿Qué riesgos hay para las próximas jornadas?'), sug('¿Qué capítulos están fuera de rango?')],

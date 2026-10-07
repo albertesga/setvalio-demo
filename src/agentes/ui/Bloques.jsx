@@ -401,7 +401,9 @@ const ESTADO_DECISION = {
   mitigado: { etiqueta: 'Plan cambiado', tono: 'positive' },
   reservado: { etiqueta: 'Reserva aprobada', tono: 'info' },
   aceptado: { etiqueta: 'Riesgo asumido', tono: 'neutral' },
+  desactualizada: { etiqueta: 'La previsión ha cambiado desde esta tarjeta', tono: 'neutral' },
 }
+const ICONO_DECISION = { aprobada: IconCheck, mitigado: IconCheck, reservado: IconCheck, preparada: IconCheck, rechazada: IconClose, aceptado: IconClose, desactualizada: IconClock }
 
 export function BloqueAprobacion({ b }) {
   const { mundo, persona, decidir, ocupado, enviar } = useCtx()
@@ -472,11 +474,19 @@ export function BloqueAprobacion({ b }) {
       {decidida ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Tono tono={decidida.tono}>
-            {ed.estado === 'aprobada' && <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />}
+            {(() => {
+              const I = ICONO_DECISION[ed.estado]
+              return I ? <I size={12} strokeWidth={2.6} aria-hidden="true" /> : null
+            })()}
             {decidida.etiqueta}
           </Tono>
           {ed.por && <span className="text-xs text-muted">por {ed.por}</span>}
           {ed.importe !== undefined && ed.importe !== null && <span className="text-xs text-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
+          {ed.estado === 'desactualizada' && b.entradaActual && (
+            <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(b.entradaActual)}>
+              Ver la situación actual
+            </button>
+          )}
         </div>
       ) : informeViejo ? (
         <div className="mt-4">
@@ -515,6 +525,11 @@ export function BloqueAprobacion({ b }) {
               )
             })}
           </div>
+          {!sinPermiso && visibles.some((a) => !a.soloSinPermiso && !tieneRolPropio(a)) && (
+            <p className="mt-2 text-xs text-muted">
+              Como {persona.rol.toLowerCase()} puedes {visibles.filter((a) => !a.soloSinPermiso && tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' o ')}; {visibles.filter((a) => !a.soloSinPermiso && !tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' y ')} lo decide {visibles.find((a) => !a.soloSinPermiso && !tieneRolPropio(a)).rol.toLowerCase()}.
+            </p>
+          )}
           {sinPermiso && (
             <p className="mt-2 text-xs text-muted">
               Como {persona.rol.toLowerCase()} no puedes decidir esta: la decide {b.rol}. {yaPedida ? 'Ya se ha pedido; cambia «Ver como» para decidir.' : 'Puedes pedir su aprobación o cambiar «Ver como».'}
@@ -652,7 +667,7 @@ function BloqueInforme({ b }) {
           <h5>Para decidir esta semana</h5>
           <ul>
             <li>
-              <span>Decisiones abiertas</span>
+              <span>Decisiones de coste abiertas</span>
               <span className="tnum">{formatear(r.decisiones, 'num')}</span>
             </li>
             <li>
@@ -669,14 +684,14 @@ function BloqueInforme({ b }) {
             </li>
             {r.reservas > 0 && (
               <li>
-                <span>Reservas de riesgos en la previsión</span>
+                <span>Reservas de riesgos (exploratorio)</span>
                 <span className="tnum">{formatear(r.reservas, 'eur')}</span>
               </li>
             )}
             {r.riesgosAltos?.map((x) => (
               <li key={x.id}>
                 <span>
-                  Riesgo alto: <Tx value={x.titulo} />
+                  Riesgo alto (exploratorio, datos de ejemplo): <Tx value={x.titulo} />
                 </span>
                 <span>abierto</span>
               </li>
@@ -1183,7 +1198,7 @@ function BloqueLlamada({ b }) {
 const SEVERIDAD = {
   alta: { etiqueta: 'Riesgo alto', tono: 'negative', Icon: IconAlert },
   media: { etiqueta: 'Riesgo medio', tono: 'warning', Icon: IconClock },
-  baja: { etiqueta: 'Riesgo bajo', tono: 'neutral', Icon: null },
+  baja: { etiqueta: 'Riesgo bajo', tono: 'neutral', Icon: null, dot: true },
   controlado: { etiqueta: 'Controlado', tono: 'positive', Icon: IconCheck },
 }
 
@@ -1192,13 +1207,13 @@ export function ChipSeveridad({ severidad }) {
   const Icon = s.Icon
   return (
     <Tono tono={s.tono}>
-      {Icon && <Icon size={12} strokeWidth={2.6} aria-hidden="true" />}
+      {Icon ? <Icon size={12} strokeWidth={2.6} aria-hidden="true" /> : <span className="ag-chip-dot" aria-hidden="true" />}
       {s.etiqueta}
     </Tono>
   )
 }
 
-const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido' }
+const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido · sigue vigilado' }
 
 /** Radar en vivo: lee el mundo actual, así que cambia con cada novedad o decisión. */
 export function RadarRiesgos({ compacto = false }) {
@@ -1211,7 +1226,13 @@ export function RadarRiesgos({ compacto = false }) {
           <div className="flex flex-wrap items-center gap-2">
             <ChipSeveridad severidad={r.severidad} />
             <span className="text-xs font-bold text-muted">{r.tipo}</span>
-            {ESTADO_RIESGO[r.estado] && <span className="text-xs font-semibold text-ink">· {ESTADO_RIESGO[r.estado]}{r.estado === 'reservado' && r.reservaAprobada ? ` ${formatear(r.reservaAprobada, 'eur')}` : ''}</span>}
+            {ESTADO_RIESGO[r.estado] && (
+              <span className="text-xs font-semibold text-ink">
+                · {ESTADO_RIESGO[r.estado]}
+                {r.estado === 'reservado' && r.reservaAprobada ? ` ${formatear(r.reservaAprobada, 'eur')}` : ''}
+                {r.reservaCorta ? ` · se queda corta (${formatear(r.reserva, 'eur')})` : ''}
+              </span>
+            )}
           </div>
           <strong className="mt-1 block text-sm text-ink">
             <Tx value={r.titulo} />
@@ -1219,7 +1240,7 @@ export function RadarRiesgos({ compacto = false }) {
           <span className="block text-xs text-muted">
             {r.jornadas.length > 1 ? `Jornadas ${r.jornadas.join(' y ')}` : `Jornada ${r.jornadas[0]}`} · {fechaLarga(r.fecha)} · {r.dias === 1 ? 'mañana' : `en ${formatear(r.dias, 'dias')}`}
             {r.probabilidad != null && ` · lluvia ${formatear(r.probabilidad, 'pct0')}`}
-            {r.exposicion != null && r.exposicion > 0 && ` · exposición ${formatear(r.exposicion, 'eur')}`}
+            {r.exposicion != null && r.exposicion > 0 && ` · exposición máxima ${formatear(r.exposicion, 'eur')}`}
             {r.exposicion == null && ' · impacto por estimar'}
           </span>
           {!compacto && (
@@ -1227,8 +1248,8 @@ export function RadarRiesgos({ compacto = false }) {
               <Tx value={r.respuesta} />
             </p>
           )}
-          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(PREGUNTA[r.id])}>
-            Ver respuesta <IconChevronRight size={14} aria-hidden="true" />
+          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(PREGUNTA[r.id])} aria-label={`${r.aviso && r.estado === 'abierto' ? 'Preparar aviso' : 'Ver respuesta'}: ${renderTexto(r.titulo)}`}>
+            {r.aviso && r.estado === 'abierto' ? 'Preparar aviso' : 'Ver respuesta'} <IconChevronRight size={14} aria-hidden="true" />
           </button>
         </li>
       ))}
