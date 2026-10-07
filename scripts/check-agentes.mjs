@@ -24,7 +24,7 @@ import { CASOS, RECORRIDO, CASO_DE_INTENCION } from '../src/agentes/casos.js'
 import { crearSesion, reducirSesion, estadoTour } from '../src/agentes/sesion.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
-import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, LOCALIZACIONES, decisionesRiesgos } from '../src/agentes/rodaje.js'
+import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, LOCALIZACIONES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
 import { CASHFLOW } from '../src/lib/data.js'
 import { diasEntre } from '../src/agentes/texto.js'
@@ -800,6 +800,16 @@ test('ni la portada ni los agentes mencionan la marca anterior ni la demo clási
     assert.ok(!/SetValio/i.test(src), `${f} menciona SetValio`)
     assert.ok(!/demo cl[aá]sica/i.test(src), `${f} menciona la demo clásica`)
   }
+})
+test('la portada enseña las cifras del agente de riesgos', () => {
+  const src = readFileSync(new URL('../src/screens/Landing.jsx', import.meta.url), 'utf8')
+  const rs = evaluarRiesgos(crearMundo())
+  const enJuego = rs.reduce((s, r) => s + (r.exposicion ?? 0), 0)
+  const lluvia = rs.find((r) => r.id === 'RG-1')
+  assert.ok(src.includes(`const RIESGO = { enJuego: ${enJuego}, ahorrado: ${lluvia.reserva} }`), `en juego ${enJuego}, ahorrado ${lluvia.reserva}`)
+  assert.ok(src.includes(`${Math.round(lluvia.probabilidad * 100)} % de lluvia en el exterior de la jornada ${lluvia.jornadas[0]}: propone cambiarla por la ${lluvia.intercambio}`))
+  assert.ok(src.includes(`pregunta: '${PREGUNTA['RG-1']}'`))
+  assert.equal(responder(crearMundo(), { tipo: 'texto', texto: PREGUNTA['RG-1'] }).turno.intencion, 'riesgos')
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

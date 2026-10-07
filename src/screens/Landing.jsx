@@ -18,6 +18,12 @@ const AGENTS_PREVIEW = [
   { familia: 'financiacion', nombre: 'Excepciones', tarea: 'Una compra de más de 10.000 € espera tu aprobación', estado: 'review' },
 ]
 
+// Agente de Riesgos de producción en «Cómo funciona». Las cifras son las de evaluarRiesgos()
+// sobre el mundo de los agentes (check:agentes lo comprueba): en juego, la exposición de los
+// riesgos con importe (lluvia en la jornada 18, la actriz sin billete y las horas extra de
+// noche); ahorrado, la reserva por lluvia que no hace falta si se aprueba cambiar el orden.
+const RIESGO = { enJuego: 119133, ahorrado: 26880 }
+
 const NAV = [
   { label: 'Agentes', href: '#agentes' },
   { label: 'Cómo funciona', href: '#flujo' },
@@ -346,7 +352,6 @@ export default function Landing({ onNavigate }) {
                   <span className="landing-flow-name">{name}</span>
                   <span className="landing-flow-detail">
                     {detail}
-                    <span className="landing-flow-pregunta">Pregúntales: «{pregunta}»</span>
                   </span>
                   <span className="landing-flow-cifra">
                     <strong>{value}</strong>
@@ -355,6 +360,39 @@ export default function Landing({ onNavigate }) {
                   <IconChevronRight className="landing-flow-arrow" size={19} aria-hidden="true" />
                 </button>
               ))}
+            </div>
+            <div className="landing-riesgo">
+              <div className="landing-riesgo-copy">
+                <p className="landing-riesgo-agente">
+                  <AgentGlyph family="presupuesto" size={28} />
+                  <span>
+                    <strong>Riesgos de producción</strong> · agente de la familia Presupuesto
+                  </span>
+                </p>
+                <h3 className="flp-subtitle">Se adelanta a la desviación.</h3>
+                <p>Cruza el plan de rodaje con la previsión del tiempo, las convocatorias y los permisos. Si algo puede desviar el coste, calcula cuánto dinero hay en juego y propone cómo evitarlo. El cambio lo apruebas tú.</p>
+                <p className="landing-riesgo-caso">
+                  <StateChip state="review" />
+                  <span>80 % de lluvia en el exterior de la jornada 18: propone cambiarla por la 19, un interior con el decorado montado, sin coste en la previsión.</span>
+                </p>
+                <ArrowLink onClick={() => abrirAgentes({ pregunta: '¿Va a llover en la jornada 18?' })}>Ver cómo lo analiza</ArrowLink>
+              </div>
+              <dl className="landing-riesgo-cifras">
+                <div>
+                  <dt>Análisis de riesgo</dt>
+                  <dd>
+                    <strong>{eur(RIESGO.enJuego)}</strong>
+                    <span>en juego: lluvia, una ausencia en Canarias y horas extra de noche</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Dinero ahorrado</dt>
+                  <dd>
+                    <strong>{eur(RIESGO.ahorrado)}</strong>
+                    <span>la reserva por lluvia que no hace falta al cambiar el orden</span>
+                  </dd>
+                </div>
+              </dl>
             </div>
             <p className="landing-example-note">Ejemplo: «La última función», largometraje de ficción con un presupuesto de {eur(TOTALES.presupuesto)}.</p>
           </Container>
