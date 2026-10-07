@@ -71,7 +71,7 @@ Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por re
 
 ## Fotografía
 
-`images/production-team-*` es una **imagen generada de concepto**: no representa al equipo, a clientes ni a un rodaje real. El `alt` y la portada lo dicen. El interés está en la mitad derecha; el texto va a la izquierda sobre una capa de contraste.
+`images/production-team-*` es una **imagen generada de concepto**: no representa al equipo, a clientes ni a un rodaje real. Por decisión de producto, la portada no lo rotula ni dice que Filmpilot sea un prototipo. El interés está en la mitad derecha; el texto va a la izquierda sobre una capa de contraste.
 
 En la portada, la banda de la foto se mueve por capas con el scroll, sin bucles:
 

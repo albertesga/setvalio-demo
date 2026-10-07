@@ -43,10 +43,10 @@ const DOSSIER = [
 ]
 
 const FAQ = [
-  ['¿Qué puedo probar aquí?', 'Una demo de los agentes con datos de ejemplo de «La última función». Pides un informe, una explicación o el parte de riesgos del rodaje y ves cómo trabaja cada agente y qué te deja decidir. Todo es simulado: no hay un modelo de lenguaje detrás y no se envía nada.'],
+  ['¿Qué puedo probar aquí?', 'Los agentes trabajando sobre «La última función», un largometraje con 15 de sus 30 jornadas rodadas. Pides un informe, una explicación o el parte de riesgos del rodaje y ves cómo trabaja cada agente y qué te deja decidir.'],
   ['¿Los agentes deciden por mí?', 'No. Hacen solos lo rutinario y reversible, como contabilizar una factura que casa con su pedido. Lo dudoso lo proponen y lo que compromete dinero o tiene riesgo fiscal espera la aprobación de la persona responsable.'],
   ['¿Sustituye a mi fiscalista?', 'No. Tu fiscalista revisa, valida y firma. Filmpilot prepara cálculos, evidencias y trazabilidad para que esa revisión sea más clara.'],
-  ['¿Puedo trabajar con cine, series y documental?', 'El prototipo contempla distintas tipologías, territorios, presupuestos por capítulos ICAA y requisitos de coproducción.'],
+  ['¿Puedo trabajar con cine, series y documental?', 'Filmpilot contempla distintas tipologías, territorios, presupuestos por capítulos ICAA y requisitos de coproducción.'],
   ['¿Cómo se procesan las facturas?', 'La factura electrónica se lee como dato estructurado. Los PDF y tickets se procesan con OCR y los casos de baja confianza quedan señalados para revisión.'],
 ]
 
@@ -68,7 +68,7 @@ function ArrowLink({ children, onClick, className = '' }) {
 // Capas de la banda de foto, de lejos a cerca: la foto (más lenta que la página y con
 // un leve acercamiento), el texto (algo más rápido, cada línea a su ritmo) y dos bandas
 // de cine que se cierran cuando la sección llega al centro. Solo se mueve con el scroll.
-const CAPAS_TEXTO = [1, 0.86, 0.72, 0.5, 0.36]
+const CAPAS_TEXTO = [1, 0.86, 0.72, 0.5]
 
 function BandaFoto() {
   const raiz = useRef(null)
@@ -139,9 +139,6 @@ function BandaFoto() {
         <p ref={capa(3)} className="landing-photo-capa flp-body">
           Los agentes persiguen facturas, cuadran pedidos y vigilan el plan de rodaje. Tu equipo dedica el tiempo a producir.
         </p>
-        <small ref={capa(4)} className="landing-photo-capa flp-mono">
-          Imagen conceptual
-        </small>
       </Container>
     </section>
   )
@@ -264,9 +261,6 @@ export default function Landing({ onNavigate }) {
                   Ver cómo trabajan
                 </FilmpilotButton>
               </div>
-              <p className="landing-hero-caption">
-                <span className="flp-mono">Prototipo</span> Datos de ejemplo: todas las cifras son de «La última función», un largometraje con 15 de sus 30 jornadas rodadas.
-              </p>
             </div>
             <div className="landing-hero-art">
               <CinematicSymbol />
@@ -277,7 +271,7 @@ export default function Landing({ onNavigate }) {
         <section id="agentes" className="landing-section landing-agents-section flp-dark" aria-labelledby="landing-agents-title">
           <Container className="landing-agents-grid">
             <div className="landing-agents-copy">
-              <Kicker className="text-flp-muted">Agentes · prototipo conversacional</Kicker>
+              <Kicker className="text-flp-muted">Agentes</Kicker>
               <h2 id="landing-agents-title" className="flp-title">
                 Los agentes preparan. Tú decides.
               </h2>
@@ -302,7 +296,6 @@ export default function Landing({ onNavigate }) {
                   Empezar el recorrido guiado
                 </FilmpilotButton>
               </div>
-              <small className="landing-agents-note">Demo con agentes simulados y datos de ejemplo: no hay un modelo de lenguaje detrás y no se envía nada.</small>
             </div>
             <div className="landing-agents-preview" role="img" aria-label="Ejemplo: al pedir el informe semanal, Facturas, Conciliación y Control de costes completan su parte y Excepciones deja una compra de más de 10.000 euros por revisar">
               <div className="landing-agents-ask">Prepárame el informe semanal de coste.</div>
@@ -425,7 +418,6 @@ export default function Landing({ onNavigate }) {
 
         <section className="landing-final" aria-labelledby="landing-final-title">
           <Container className="landing-final-inner">
-            <Kicker className="text-flp-muted">Prototipo · datos de ejemplo</Kicker>
             <h2 id="landing-final-title" className="flp-title">
               Pruébalo con «La última función».
             </h2>
@@ -462,7 +454,7 @@ export default function Landing({ onNavigate }) {
             </nav>
           </div>
           <div className="landing-footer-bottom">
-            <span>Estimación orientativa: no sustituye el criterio de tu fiscalista. La foto es una imagen conceptual.</span>
+            <span>Estimación orientativa: no sustituye el criterio de tu fiscalista.</span>
             <a href="#landing-title">
               Volver arriba <span aria-hidden="true">↑</span>
             </a>

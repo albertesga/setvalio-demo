@@ -36,8 +36,6 @@
 .landing-hero-description { max-width: 52ch; color: var(--flp-muted); font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.55; }
 .landing-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 .landing-hero-art { justify-self: end; width: 100%; max-width: 380px; margin-top: calc(clamp(1rem, 4vw, 3rem) * -1); }
-.landing-hero-caption { max-width: 52ch; margin-top: 4px; color: var(--flp-muted); font-size: 14px; line-height: 1.5; }
-.landing-hero-caption span { display: inline-block; margin-right: 6px; padding: 1px 9px; border-radius: 999px; background: var(--flp-carbon); color: var(--flp-chalk); letter-spacing: .08em; text-transform: uppercase; vertical-align: 1px; }
 
 /* ── Secciones ────────────────────────────────────────────────────────────── */
 .landing-section { padding: clamp(4rem, 8vw, 7rem) 0; }
@@ -58,7 +56,6 @@
 .landing-families strong { display: block; font-size: 17px; font-weight: 500; }
 .landing-families small { display: block; margin-top: 2px; color: var(--flp-muted); font-size: 14px; line-height: 1.45; }
 .landing-agents-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.landing-agents-note { color: var(--flp-muted); font-size: 13px; }
 .landing-agents-preview { padding: clamp(18px, 3vw, 28px); border: 1px solid var(--flp-border); border-radius: var(--flp-radius-lg); background: var(--flp-surface); }
 .landing-agents-ask { justify-self: end; width: fit-content; max-width: 90%; margin: 0 0 18px auto; padding: 10px 16px; border-radius: 16px 16px 4px 16px; background: var(--flp-chalk); color: var(--flp-carbon); font-size: 15px; }
 .landing-agents-preview ol { display: grid; }
@@ -89,7 +86,7 @@
 .landing-flow-arrow { color: var(--flp-muted); }
 .landing-example-note { margin-top: 18px; color: var(--flp-muted); font-size: 13px; }
 
-/* ── Foto B/N (imagen conceptual) ─────────────────────────────────────────── */
+/* ── Foto B/N ───────────────────────────────────────────────────────────── */
 .landing-photo-band { position: relative; display: grid; min-height: clamp(420px, 56vw, 640px); align-items: end; overflow: hidden; }
 /* La foto es más alta que la banda: así puede moverse sin dejar ver los bordes. */
 .landing-photo-media { position: absolute; inset: -12% 0; transform-origin: 62% 50%; will-change: transform; }
@@ -105,7 +102,6 @@
 .landing-photo-banda.is-abajo { bottom: 0; transform-origin: bottom; }
 .landing-photo-copy .flp-title { max-width: 12ch; color: var(--flp-chalk); }
 .landing-photo-copy .flp-body { max-width: 40ch; color: var(--flp-chalk); }
-.landing-photo-copy small { color: var(--flp-silver); }
 
 /* ── Dossier fiscal ───────────────────────────────────────────────────────── */
 .landing-document-section { border-top: 1px solid var(--flp-border); }

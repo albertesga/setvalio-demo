@@ -183,8 +183,8 @@ export function CinematicSymbol({ className = '' }) {
     }
   }, [])
 
-  const capa = (contenido, z, extra = '') => (
-    <svg className={`flp-cine-capa ${extra}`} viewBox={`0 0 ${LADO} ${LADO}`} style={{ transform: `translateZ(${(z * f).toFixed(2)}px)` }} focusable="false">
+  const capa = (contenido, z, extra = '', key) => (
+    <svg key={key} className={`flp-cine-capa ${extra}`} viewBox={`0 0 ${LADO} ${LADO}`} style={{ transform: `translateZ(${(z * f).toFixed(2)}px)` }} focusable="false">
       {contenido}
     </svg>
   )
@@ -219,6 +219,7 @@ export function CinematicSymbol({ className = '' }) {
                   </g>,
                   -c * GROSOR,
                   c === 0 ? 'is-frente' : 'is-canto',
+                  c,
                 ),
               )}
             </div>
