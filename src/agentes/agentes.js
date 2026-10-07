@@ -65,9 +65,25 @@ export const AGENTES = {
     hace: 'Prepara la documentación y avisa de lo que bloquea. El fiscalista revisa y firma.',
     niveles: ['propone', 'aprueba'],
   },
+  presupuesto: {
+    id: 'presupuesto',
+    nombre: 'Presupuesto',
+    codigo: 'PS',
+    rol: 'Monta la propuesta de presupuesto por capítulos ICAA.',
+    hace: 'Coloca los costes que aportas en su partida y estima por capítulo lo que falta por detallar. No cierra el presupuesto: lo propone.',
+    niveles: ['ejecuta', 'propone'],
+  },
+  proveedores: {
+    id: 'proveedores',
+    nombre: 'Proveedores',
+    codigo: 'PV',
+    rol: 'Busca proveedores más baratos y confirma precios por teléfono.',
+    hace: 'Compara el directorio con tus requisitos y, con tu permiso, llama para confirmar el precio final. No reserva ni negocia: eliges tú.',
+    niveles: ['ejecuta', 'propone', 'aprueba'],
+  },
 }
 
-export const ORDEN_AGENTES = ['orquestador', 'facturas', 'conciliacion', 'excepciones', 'prevision', 'costes', 'informes', 'cumplimiento']
+export const ORDEN_AGENTES = ['orquestador', 'presupuesto', 'proveedores', 'facturas', 'conciliacion', 'excepciones', 'prevision', 'costes', 'informes', 'cumplimiento']
 
 export const AUTONOMIA = {
   ejecuta: {
@@ -99,5 +115,6 @@ export const DURACIONES = {
   calculo: 850,
   revision: 900,
   redaccion: 1200,
+  llamada: 2400,
   bloque: 140,
 }

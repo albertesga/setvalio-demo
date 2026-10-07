@@ -6,6 +6,7 @@
 
 import { r2, pendiente, totales, desviaciones, excepciones, dossier, tesoreria, informeDesactualizado } from './calculos.js'
 import { crearMundo } from './mundo.js'
+import { ALTERNATIVAS_POR_ID, resultadoLlamada } from './propuesta.js'
 
 function clonar(m) {
   return JSON.parse(JSON.stringify(m))
@@ -216,6 +217,76 @@ export function reducir(m, accion) {
       const n = clonar(m)
       n.borradores[accion.id].estado = 'descartado'
       return confirmar(n, accion, { tipo: 'borrador', id: accion.id })
+    }
+
+    // ── Propuesta de presupuesto ──────────────────────────────────────────
+    case 'propuesta/anadirLinea': {
+      const l = accion.linea
+      if (!l || !l.concepto || !(l.importe > 0) || !m.partidas[l.partida]) return m
+      const n = clonar(m)
+      const p = n.propuesta
+      const id = `L${p.lineas.length + 1}`
+      const cap = l.partida.slice(0, 2)
+      const efectos = [{ ambito: 'propuesta', id, campo: 'importe', antes: 0, despues: r2(l.importe) }]
+      p.lineas.push({ id, partida: l.partida, concepto: l.concepto, detalle: l.detalle ?? '', proveedor: l.proveedor || 'Sin proveedor', importe: r2(l.importe), origen: 'Añadido por ti', requisitos: [] })
+      if (accion.sustituyeEstimado) {
+        const quita = Math.min(l.importe, p.porDetallar[cap] ?? 0)
+        efectos.push({ ambito: 'propuesta', id: cap, campo: 'porDetallar', antes: p.porDetallar[cap], despues: r2(p.porDetallar[cap] - quita) })
+        p.porDetallar[cap] = r2((p.porDetallar[cap] ?? 0) - quita)
+      }
+      return confirmar(n, accion, { tipo: 'linea', id }, efectos)
+    }
+
+    case 'propuesta/prepararLlamadas': {
+      if (m.propuesta.autorizacion) return m
+      const n = clonar(m)
+      n.propuesta.autorizacion = 'pendiente'
+      return confirmar(n, accion, { tipo: 'llamadas', id: 'R1' })
+    }
+
+    case 'propuesta/autorizarLlamadas': {
+      if (m.propuesta.autorizacion !== 'pendiente') return m
+      const n = clonar(m)
+      n.propuesta.autorizacion = 'autorizada'
+      n.propuesta.autorizadaPor = accion.por ?? null
+      return confirmar(n, accion, { tipo: 'llamadas', id: 'R1' })
+    }
+
+    case 'propuesta/noLlamar': {
+      if (m.propuesta.autorizacion !== 'pendiente') return m
+      const n = clonar(m)
+      n.propuesta.autorizacion = 'rechazada'
+      return confirmar(n, accion, { tipo: 'llamadas', id: 'R1' })
+    }
+
+    case 'propuesta/registrarLlamada': {
+      const a = ALTERNATIVAS_POR_ID[accion.altId]
+      if (!a?.llamada || m.propuesta.autorizacion !== 'autorizada' || m.propuesta.llamadas[a.id]) return m
+      const n = clonar(m)
+      n.propuesta.llamadas[a.id] = resultadoLlamada(a.id)
+      return confirmar(n, accion, { tipo: 'llamada', id: a.id })
+    }
+
+    case 'propuesta/elegir': {
+      const p0 = m.propuesta
+      const linea0 = p0.lineas.find((l) => l.id === accion.lineaId)
+      if (!linea0 || p0.elecciones[accion.lineaId]) return m
+      const a = accion.altId ? ALTERNATIVAS_POR_ID[accion.altId] : null
+      if (a && (!p0.llamadas[a.id]?.cumple || a.linea !== accion.lineaId)) return m
+      const n = clonar(m)
+      const linea = n.propuesta.lineas.find((l) => l.id === accion.lineaId)
+      const efectos = []
+      if (a) {
+        const precio = n.propuesta.llamadas[a.id].precioFinal
+        efectos.push({ ambito: 'propuesta', id: linea.id, campo: 'importe', antes: linea.importe, despues: precio })
+        linea.anterior = { proveedor: linea.proveedor, importe: linea.importe }
+        linea.proveedor = a.proveedor
+        linea.importe = precio
+        linea.origen = 'Confirmado por teléfono'
+      }
+      n.propuesta.elecciones[accion.lineaId] = { altId: a?.id ?? null, por: accion.por ?? null }
+      if (a) n.propuesta.version += 1
+      return confirmar(n, accion, { tipo: 'eleccion', id: accion.lineaId }, efectos)
     }
 
     case 'mundo/reiniciar':

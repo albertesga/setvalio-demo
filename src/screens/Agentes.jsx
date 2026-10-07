@@ -13,6 +13,7 @@ import * as c from '../agentes/calculos.js'
 import { AgentesCtx } from '../agentes/ui/contexto.js'
 import { Hoja } from '../agentes/ui/Piezas.jsx'
 import { Mensaje } from '../agentes/ui/Mensajes.jsx'
+import { decisionesAbiertas } from '../agentes/ui/Bloques.jsx'
 import { Inicio, Sugerencias, Redactor, BarraRecorrido } from '../agentes/ui/Conversacion.jsx'
 import { AgentRail, CasosTracker, DetalleAgente, PanelActividad, PanelDecisiones, estadoAgentes } from '../agentes/ui/Paneles.jsx'
 
@@ -246,7 +247,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   }, [firma])
 
   const estados = useMemo(() => estadoAgentes(s), [s])
-  const pendientes = c.excepciones(s.mundo).length
+  const pendientes = decisionesAbiertas(s.mundo).length
   const trabajando = Object.entries(estados).filter(([, e]) => e.estado === 'trabajando').map(([id]) => id)
 
   const ultimoAgentes = [...s.mensajes].reverse().find((m) => m.rol === 'agentes')

@@ -1,6 +1,9 @@
 // Lo que hacen los agentes después de una decisión de una persona.
 
 import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja } from './comun.js'
+import { cuenta } from '../texto.js'
+import { optimizacion, totalesPropuesta, ALTERNATIVAS_POR_ID } from '../propuesta.js'
+import { componerComparacion, kpisPropuesta, textoDiferencia } from './presupuesto.js'
 
 function cambioCaja(antes, despues) {
   const a = c.tesoreria(antes)
@@ -10,7 +13,23 @@ function cambioCaja(antes, despues) {
 
 export const accion = {
   id: 'accion',
-  titulo: 'Tras tu decisión',
+  titulo: (det) =>
+    ({
+      'orden/aprobar': 'Compra aprobada',
+      'orden/rechazar': 'Compra rechazada',
+      'orden/escalar': 'Aprobación pedida',
+      'documento/contabilizar': 'Gasto contabilizado',
+      'documento/aplazar': 'Gasto en revisión',
+      'documento/revision': 'Paquete para el fiscalista',
+      'partida/ajustarCef': 'Previsión ajustada',
+      'informe/aprobar': 'Informe aprobado',
+      'borrador/marcarListo': 'Borrador revisado',
+      'borrador/descartar': 'Borrador descartado',
+      'propuesta/autorizarLlamadas': 'Llamadas a proveedores',
+      'propuesta/noLlamar': 'Sin llamadas',
+      'propuesta/elegir': 'Elección de proveedor',
+      'propuesta/anadirLinea': 'Coste añadido a la propuesta',
+    })[det.accion?.tipo] ?? 'Tras tu decisión',
   ejemplos: [],
 
   planificar(m, det) {
@@ -49,7 +68,40 @@ export const accion = {
       case 'partida/ajustarCef':
         return [paso('prevision', t('Ajusta la previsión de {p}', { p: v(a.codigo, 'id') }), { tipo: 'plan', acciones: [a], salida: t('Nuevo coste estimado final {cef}', { cef: v(a.cef, 'eur') }) }), ...regInf]
       case 'informe/aprobar':
-        return [paso('informes', t('Marca el informe como aprobado'), { tipo: 'plan', acciones: [a], salida: t('Listo para compartir') })]
+        return [paso('informes', t('Marca el informe como aprobado'), { tipo: 'plan', acciones: [a], salida: t('Aprobación registrada') })]
+      case 'propuesta/autorizarLlamadas': {
+        const aLlamar = optimizacion(m).filter((x) => x.llamar)
+        return [
+          paso('excepciones', t('Registra tu permiso para llamar'), { tipo: 'plan', acciones: [a], salida: t('{n} autorizadas', { n: cuenta(aLlamar.length, 'llamada', 'llamadas') }) }),
+          // Llama de dos en dos: cada llamada es independiente.
+          ...aLlamar.map((x, i) =>
+            paso('proveedores', t('Llama a {prov} por {c}', { prov: v(x.proveedor), c: v(x.lineaConcepto.toLowerCase()) }), {
+              tipo: 'llamada',
+              paralelo: i % 2 === 1,
+              acciones: [{ tipo: 'propuesta/registrarLlamada', altId: x.id }],
+              salida: (_, d) => {
+                const r = d.propuesta.llamadas[x.id]
+                return r.cumple ? t('Confirma {precio} y cumple los requisitos', { precio: v(r.precioFinal, 'eur') }) : t('No cumple: {motivo}', { motivo: v(r.motivo.toLowerCase().replace(/\.$/, '')) })
+              },
+            }),
+          ),
+          paso('proveedores', t('Compara los precios confirmados'), { autonomia: 'propone', salida: (_, d) => t('Una elección por cada coste con alternativa') }),
+        ]
+      }
+      case 'propuesta/noLlamar':
+        return [paso('excepciones', t('Registra que no se llama'), { tipo: 'plan', acciones: [a], salida: t('Nadie recibe llamadas') })]
+      case 'propuesta/elegir': {
+        const linea = m.propuesta.lineas.find((l) => l.id === a.lineaId)
+        return [
+          paso('presupuesto', a.altId ? t('Cambia {c} a {prov}', { c: v(linea.concepto.toLowerCase()), prov: v(ALTERNATIVAS_POR_ID[a.altId].proveedor) }) : t('Mantiene {prov} en {c}', { prov: v(linea.proveedor), c: v(linea.concepto.toLowerCase()) }), { tipo: 'plan', acciones: [a] }),
+          paso('costes', t('Recalcula la propuesta'), { salida: (_, d) => t('Total {tot}', { tot: v(totalesPropuesta(d).total, 'eur') }) }),
+        ]
+      }
+      case 'propuesta/anadirLinea':
+        return [
+          paso('presupuesto', t('Coloca «{c}» en {p}', { c: v(a.linea.concepto), p: v(a.linea.partida, 'id') }), { tipo: 'plan', acciones: [a], salida: t('{imp}', { imp: v(a.linea.importe, 'eur') }) }),
+          paso('costes', t('Recalcula la propuesta'), { salida: (_, d) => t('Total {tot}', { tot: v(totalesPropuesta(d).total, 'eur') }) }),
+        ]
       case 'borrador/marcarListo':
       case 'borrador/descartar':
         return [paso('orquestador', a.tipo === 'borrador/marcarListo' ? t('Marca el borrador como revisado') : t('Descarta el borrador'), { tipo: 'plan', acciones: [a], salida: t('Sin envío') })]
@@ -133,6 +185,40 @@ export const accion = {
         bloques.push(texto(t('Previsión de {p} ajustada por {por}.', { p: v(a.codigo, 'id'), por: v(por) })))
         bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion', 'disponible'] }))
         break
+      case 'propuesta/autorizarLlamadas': {
+        const comp = componerComparacion(despues)
+        return { ...comp, sugerencias: comp.sugerencias.slice(0, 3) }
+      }
+      case 'propuesta/noLlamar':
+        bloques.push(texto(t('No se llama a nadie. Tienes la lista de alternativas y tus requisitos para pedir presupuesto tú.')))
+        sugerencias.push(sug('Optimiza los proveedores de la propuesta'))
+        break
+      case 'propuesta/elegir': {
+        const linea = despues.propuesta.lineas.find((l) => l.id === a.lineaId)
+        const tot = totalesPropuesta(despues)
+        bloques.push(
+          texto(
+            a.altId
+              ? t('{c}: {prov} por {imp}, elegido por {por}. La propuesta queda en {tot}, {dif}.', { c: v(linea.concepto), prov: v(linea.proveedor), imp: v(linea.importe, 'eur'), por: v(por), tot: v(tot.total, 'eur'), dif: textoDiferencia(tot) })
+              : t('{c}: se mantiene {prov}. La propuesta sigue en {tot}, {dif}.', { c: v(linea.concepto), prov: v(linea.proveedor), tot: v(tot.total, 'eur'), dif: textoDiferencia(tot) }),
+          ),
+        )
+        bloques.push(kpisPropuesta(despues, antes))
+        const pendientes = Object.keys(despues.propuesta.llamadas).length && despues.propuesta.lineas.some((l) => !despues.propuesta.elecciones[l.id] && Object.values(despues.propuesta.llamadas).length && optimizacion(despues).some((o) => o.linea === l.id && o.resultado?.cumple))
+        if (!pendientes) {
+          bloques.push(texto(t('Ya has elegido en todos los costes con alternativa. Esta es la propuesta, edición {v}:', { v: v(despues.propuesta.version, 'num') })))
+          bloques.push({ tipo: 'propuesta' })
+        }
+        sugerencias.push(sug('Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €'))
+        break
+      }
+      case 'propuesta/anadirLinea': {
+        const tot = totalesPropuesta(despues)
+        bloques.push(texto(t('Añadido «{c}» en {p}. La propuesta queda en {tot}, {dif}.', { c: v(a.linea.concepto), p: v(a.linea.partida, 'id'), tot: v(tot.total, 'eur'), dif: textoDiferencia(tot) })))
+        bloques.push(kpisPropuesta(despues, antes))
+        sugerencias.push(sug('Optimiza los proveedores de la propuesta'))
+        break
+      }
       case 'informe/aprobar':
         bloques.push(texto(t('Informe aprobado por {por}. En la demo no se descarga ni se envía: queda registrada la aprobación.', { por: v(por) })))
         break
@@ -149,8 +235,10 @@ export const accion = {
       bloques.push(aviso('aviso', 'Informe desactualizado', t('Las cifras han cambiado desde que se redactó el informe de esta semana.')))
       sugerencias.unshift(sug('Regenera el informe semanal de coste'))
     }
-    sugerencias.push(sug('¿Cómo cerraremos el proyecto y llegamos con la caja?'))
-    if (c.excepciones(despues).length) sugerencias.push(sug('¿Cómo vamos?'))
+    if (!a.tipo.startsWith('propuesta/')) {
+      sugerencias.push(sug('¿Cómo cerraremos el proyecto y llegamos con la caja?'))
+      if (c.excepciones(despues).length) sugerencias.push(sug('¿Cómo vamos?'))
+    }
     return {
       bloques,
       sugerencias: sugerencias.slice(0, 3),

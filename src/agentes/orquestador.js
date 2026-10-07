@@ -81,7 +81,7 @@ export function responder(mundo, entrada, contexto = {}) {
   const turno = {
     intencion: det.intencion,
     caso: CASO_DE_INTENCION[det.intencion] ?? null,
-    titulo: esc.titulo,
+    titulo: typeof esc.titulo === 'function' ? esc.titulo(det) : esc.titulo,
     origen: entrada.tipo,
     entidades: det.entidades,
     motivo: det.motivo ?? null,

@@ -9,10 +9,10 @@ import * as c from '../calculos.js'
 import { fechaCorta } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentTile, AutonomyBadge, Tono } from './Piezas.jsx'
-import { ListaDecisiones } from './Bloques.jsx'
+import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
 
 // Qué agente sostiene cada tipo de decisión pendiente.
-const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision' }
+const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores' }
 
 export function estadoAgentes(s) {
   const out = Object.fromEntries(ORDEN_AGENTES.map((id) => [id, { estado: 'disponible', detalle: null, espera: 0 }]))
@@ -22,7 +22,7 @@ export function estadoAgentes(s) {
       if (activo.estadoPasos[i] === 'en_curso') out[p.agente] = { ...out[p.agente], estado: 'trabajando', detalle: p.titulo }
     })
   }
-  for (const e of c.excepciones(s.mundo)) {
+  for (const e of decisionesAbiertas(s.mundo)) {
     const a = AGENTE_DE_EXCEPCION[e.tipo]
     if (a) out[a].espera += 1
   }
@@ -116,7 +116,7 @@ export function DetalleAgente({ id, onCerrar }) {
   )
 }
 
-const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior' }
+const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Por validar' }
 
 export function CasosTracker({ vistos }) {
   const { enviar, ocupado } = useCtx()
@@ -240,7 +240,7 @@ export function PanelActividad({ s }) {
 }
 
 export function PanelDecisiones({ s }) {
-  const decididas = [...s.mundo.historial].reverse().filter((h) => h.por && h.ref && ['orden', 'documento', 'revision', 'cef', 'informe', 'borrador'].includes(h.ref.tipo) && !['Conciliación', 'Informes'].includes(h.por))
+  const decididas = [...s.mundo.historial].reverse().filter((h) => h.por && h.ref && ['orden', 'documento', 'revision', 'cef', 'informe', 'borrador', 'llamadas', 'eleccion', 'linea'].includes(h.ref.tipo) && !['Conciliación', 'Informes'].includes(h.por))
   const VERBO = {
     'orden/aprobar': 'aprueba',
     'orden/rechazar': 'rechaza',
@@ -252,6 +252,10 @@ export function PanelDecisiones({ s }) {
     'informe/aprobar': 'aprueba el informe',
     'borrador/marcarListo': 'revisa el borrador',
     'borrador/descartar': 'descarta el borrador',
+    'propuesta/autorizarLlamadas': 'autoriza las llamadas',
+    'propuesta/noLlamar': 'decide no llamar',
+    'propuesta/elegir': 'elige proveedor para',
+    'propuesta/anadirLinea': 'añade a la propuesta',
   }
   return (
     <div>

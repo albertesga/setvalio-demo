@@ -151,6 +151,15 @@ export function extraerEntidades(texto, mundo) {
     }
   }
 
+  // Importe: «9.600 €», «3200 euros», «1.250,50 €».
+  const mImp = String(texto ?? '').match(/(\d{1,3}(?:[.\s]\d{3})+|\d+)(?:,(\d{1,2}))?\s*(?:€|eur\b|euros\b)/i)
+  if (mImp) {
+    e.importe = Number(mImp[1].replace(/[.\s]/g, '')) + (mImp[2] ? Number(`0.${mImp[2]}`) : 0)
+    // Con importe, «con X» suele ser el proveedor: «… con Grúas Norte por 3.200 €».
+    const mProv = String(texto ?? '').match(/\bcon\s+(.+?)(?:\s+(?:por|a|de)\s+\d|\s*,|\s*$)/i)
+    if (mProv && !e.proveedor) e.proveedorLibre = mProv[1].trim()
+  }
+
   const mPct = norm.match(/(\d{1,3}(?:[.,]\d+)?)\s*(%|por ?ciento)/)
   if (mPct) e.porcentaje = Number(mPct[1].replace(',', '.')) / 100
 
@@ -202,6 +211,19 @@ export const LEXICO = {
     frases: ['tax credit', 'deduccion fiscal', 'incentivo fiscal', 'incentivos fiscales', '36 lis', 'retorno fiscal', 'cuanto supondria', 'cuanto podemos recuperar'],
     raices: { incentiv: 3, deduc: 3, desgrav: 3, retorno: 2, intensidad: 2, credito: 1, recuper: 1 },
     entidades: { porcentaje: 1, territorio: 1 },
+  },
+  presupuesto_nuevo: {
+    frases: ['primera propuesta de presupuesto', 'propuesta de presupuesto', 'preparar el presupuesto', 'prepara el presupuesto', 'crear el presupuesto', 'nuevo presupuesto', 'hacer el presupuesto', 'montar el presupuesto', 'primer presupuesto'],
+    raices: { presupuest: 1, propuesta: 2, itsasoa: 3, budget: 3, presupuestar: 2 },
+  },
+  optimizar_proveedores: {
+    frases: ['optimiza los proveedores', 'optimizar los proveedores', 'optimizar proveedores', 'mejores precios', 'proveedores mas baratos', 'busca proveedores', 'busca alternativas', 'mejorar precios', 'compara proveedores', 'llama a los proveedores', 'confirmado precio', 'proveedores que han confirmado'],
+    raices: { optimiz: 3, proveedores: 2, barat: 2, alternativ: 2, llam: 2, confirmad: 1 },
+  },
+  anadir_coste: {
+    frases: ['anade un coste', 'anadir un coste', 'agrega un coste', 'mete un coste'],
+    raices: { anad: 3, agreg: 3, incluy: 1 },
+    entidades: { importe: 2 },
   },
   ayuda: {
     frases: ['que puedes hacer', 'que sabes hacer', 'como funciona', 'que agentes', 'como decides', 'quien eres', 'que haces', 'casos de uso'],

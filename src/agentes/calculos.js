@@ -284,6 +284,17 @@ export function estadoDecision(mundo, ref) {
       if (inf?.estado === 'aprobado') return { estado: 'aprobada', por: inf.aprobadoPor }
       return { estado: 'pendiente' }
     }
+    case 'llamadas': {
+      const a = mundo.propuesta?.autorizacion
+      if (a === 'autorizada') return { estado: 'aprobada', por: mundo.propuesta.autorizadaPor }
+      if (a === 'rechazada') return { estado: 'rechazada', por }
+      return { estado: 'pendiente' }
+    }
+    case 'eleccion': {
+      const e = mundo.propuesta?.elecciones[ref.id]
+      if (!e) return { estado: 'pendiente' }
+      return { estado: e.altId ? 'aprobada' : 'rechazada', por: e.por }
+    }
     case 'borrador': {
       const b = mundo.borradores[ref.id]
       if (b?.estado === 'listo') return { estado: 'aprobada', por: b.listoPor }

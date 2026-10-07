@@ -2,9 +2,10 @@
 // que el motor resuelve (lo comprueba scripts/check-agentes.mjs).
 //
 // capacidad: 'decidida' (alcance del MVP), 'exploratoria' (se exploró, sin
-// validar) o 'posterior' (fase posterior).
+// validar), 'propuesta' (caso nuevo por validar) o 'posterior' (fase posterior).
 
 export const GRUPOS_CASOS = [
+  { id: 'prepara', titulo: 'Antes del rodaje · Itsasoa' },
   { id: 'semana', titulo: 'Cerrar la semana' },
   { id: 'entra', titulo: 'Lo que entra' },
   { id: 'anticipa', titulo: 'Cumplir y anticipar' },
@@ -20,6 +21,26 @@ export const CASOS = [
     agentes: ['facturas', 'conciliacion', 'costes', 'prevision', 'excepciones', 'cumplimiento', 'informes'],
     nivel: 'aprueba',
     capacidad: 'decidida',
+  },
+  {
+    id: 'presupuesto',
+    grupo: 'prepara',
+    titulo: 'Primera propuesta de presupuesto',
+    descripcion: 'Aportas los costes que ya tienes hablados; los agentes estiman el resto por capítulo y lo comparan con el objetivo.',
+    prompt: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa',
+    agentes: ['presupuesto', 'prevision', 'costes'],
+    nivel: 'propone',
+    capacidad: 'propuesta',
+  },
+  {
+    id: 'proveedores',
+    grupo: 'prepara',
+    titulo: 'Optimizar proveedores con llamadas',
+    descripcion: 'Busca alternativas más baratas, descarta las que no cumplen y, con tu permiso, llama para confirmar el precio final. Eliges tú.',
+    prompt: 'Optimiza los proveedores de la propuesta',
+    agentes: ['proveedores', 'excepciones', 'presupuesto'],
+    nivel: 'aprueba',
+    capacidad: 'propuesta',
   },
   {
     id: 'desviacion',
@@ -127,6 +148,9 @@ export const CASO_DE_INTENCION = {
   cumplimiento: 'cumplimiento',
   incentivo: 'incentivo',
   fuera_alcance: 'alcance',
+  presupuesto_nuevo: 'presupuesto',
+  anadir_coste: 'presupuesto',
+  optimizar_proveedores: 'proveedores',
 }
 
 // Recorrido guiado: cada paso envía una entrada y explica qué mirar.
@@ -140,5 +164,7 @@ export const RECORRIDO = [
   { id: 'r7', titulo: 'Dossier fiscal', entrada: { tipo: 'texto', texto: '¿Qué bloquea el dossier fiscal?' }, nota: 'Cumplimiento prepara; el fiscalista revisa y firma.' },
   { id: 'r8', titulo: 'Pedir documentación (exploratorio)', entrada: { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' }, nota: 'Un borrador listo para revisar. En la demo no sale ningún correo.' },
   { id: 'r9', titulo: 'Incentivo (exploratorio)', entrada: { tipo: 'texto', texto: '¿Cuánto supondría llegar al 50 % de gasto en Canarias?' }, nota: 'Exploratorio: una estimación orientativa, fuera del alcance decidido.' },
-  { id: 'r10', titulo: 'Fuera de alcance', entrada: { tipo: 'texto', texto: 'Activa el Production Rescue' }, nota: 'Cuando algo no está en el producto, lo dice.' },
+  { id: 'r10', titulo: 'Primera propuesta de presupuesto (por validar)', entrada: { tipo: 'texto', texto: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa' }, nota: 'Otro proyecto, antes del rodaje: tus costes con proveedor más una estimación por capítulo, frente al objetivo.' },
+  { id: 'r11', titulo: 'Optimizar proveedores con llamadas', entrada: { tipo: 'texto', texto: 'Optimiza los proveedores de la propuesta' }, nota: 'Proveedores descarta lo que no cumple y te pide permiso antes de llamar. Autoriza o no para continuar; si autorizas, verás cada llamada.', espera: { tipo: 'llamadas', id: 'R1' } },
+  { id: 'r12', titulo: 'Fuera de alcance', entrada: { tipo: 'texto', texto: 'Activa el Production Rescue' }, nota: 'Cuando algo no está en el producto, lo dice.' },
 ]

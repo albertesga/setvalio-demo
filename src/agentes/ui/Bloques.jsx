@@ -2,14 +2,16 @@
 // cola de decisiones, informe, borrador) leen el mundo actual: si decides en una
 // tarjeta, todas las vistas de esa decisión cambian a la vez.
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Button } from '../../components/ui.jsx'
-import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload } from '../../components/icons.jsx'
+import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload, IconPlay } from '../../components/icons.jsx'
 import { formatear, renderTexto, fecha as fechaLarga } from '../texto.js'
 import * as c from '../calculos.js'
 import { puedeDecidir } from '../politicas.js'
 import { AGENTES } from '../agentes.js'
 import { useCtx } from './contexto.js'
+import { totalesPropuesta, capitulosPropuesta, decisionesPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
+import { useMovimientoReducido } from '../useAgentes.js'
 import { Tx, AutonomyBadge, Tono, AgentTile } from './Piezas.jsx'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
@@ -34,8 +36,8 @@ function BloqueTexto({ b }) {
 }
 
 function BloqueAviso({ b }) {
-  const etiqueta = { exploratorio: 'Exploratorio', fase: 'Fase posterior', aviso: 'Atención', info: 'Nota' }[b.tono] ?? 'Nota'
-  const tono = { exploratorio: 'neutral', fase: 'neutral', aviso: 'warning', info: 'info' }[b.tono] ?? 'info'
+  const etiqueta = { exploratorio: 'Exploratorio', porvalidar: 'Por validar', fase: 'Fase posterior', aviso: 'Atención', info: 'Nota' }[b.tono] ?? 'Nota'
+  const tono = { exploratorio: 'neutral', porvalidar: 'neutral', fase: 'neutral', aviso: 'warning', info: 'info' }[b.tono] ?? 'info'
   return (
     <div className={`ag-aviso ag-aviso--${b.tono}`} role="note">
       <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -57,7 +59,7 @@ function BloqueLista({ b }) {
   return (
     <div className="ag-panel">
       <Titulo extra={b.nivel && <AutonomyBadge nivel={b.nivel} />}>{b.titulo}</Titulo>
-      <ul className="space-y-2">
+      <ul className={b.numerada ? 'ag-lista-numerada space-y-2' : 'space-y-2'}>
         {b.items.map((it, i) =>
           it.entrada ? (
             <li key={i}>
@@ -68,7 +70,13 @@ function BloqueLista({ b }) {
             </li>
           ) : (
             <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-muted">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-line-strong" aria-hidden="true" />
+              {b.numerada ? (
+                <span className="ag-numero tnum" aria-hidden="true">
+                  {i + 1}
+                </span>
+              ) : (
+                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-line-strong" aria-hidden="true" />
+              )}
               <span>
                 <Tx value={it.texto} />
               </span>
@@ -428,8 +436,8 @@ export function BloqueAprobacion({ b }) {
         <div className="ag-impacto" role="table" aria-label="Impacto de la decisión">
           <div role="row" className="ag-impacto-cab">
             <span role="columnheader">{b.impactoTitulo ?? 'Si se aprueba'}</span>
-            <span role="columnheader" className="text-right">Ahora</span>
-            <span role="columnheader" className="text-right">Después</span>
+            <span role="columnheader" className="text-right">{b.impactoColumnas?.[0] ?? 'Ahora'}</span>
+            <span role="columnheader" className="text-right">{b.impactoColumnas?.[1] ?? 'Después'}</span>
           </div>
           {b.impacto.map((f) => (
             <div role="row" key={f.etiqueta} className={f.alerta ? 'is-alerta' : ''}>
@@ -517,9 +525,13 @@ export function BloqueAprobacion({ b }) {
 
 // ── Cola de decisiones (en vivo) ─────────────────────────────────────────────
 
+export function decisionesAbiertas(mundo) {
+  return [...c.excepciones(mundo), ...decisionesPropuesta(mundo)]
+}
+
 export function ListaDecisiones({ compacta = false }) {
   const { mundo, enviar, ocupado } = useCtx()
-  const ex = c.excepciones(mundo)
+  const ex = decisionesAbiertas(mundo)
   if (!ex.length) return <p className="text-sm text-muted">No hay decisiones pendientes.</p>
   return (
     <ul className="ag-decisiones">
@@ -532,7 +544,7 @@ export function ListaDecisiones({ compacta = false }) {
               {e.aplazado && <span className="text-xs font-semibold text-muted">· en revisión</span>}
             </div>
             <div className="mt-1 text-sm font-semibold text-ink">{e.titulo}</div>
-            <div className="tnum text-xs text-muted">{formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>
+            {e.importe > 0 && <div className="tnum text-xs text-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
           </div>
           <button type="button" className="ag-boton-fila" disabled={ocupado} onClick={() => enviar(e.entrada)}>
             Revisar <IconChevronRight size={15} aria-hidden="true" />
@@ -545,7 +557,7 @@ export function ListaDecisiones({ compacta = false }) {
 
 function BloqueDecisiones() {
   const { mundo } = useCtx()
-  const n = c.excepciones(mundo).length
+  const n = decisionesAbiertas(mundo).length
   return (
     <div className="ag-panel">
       <Titulo extra={<span className="text-xs text-muted">Excepciones · en vivo</span>}>{n ? `Decisiones pendientes (${n})` : 'Decisiones pendientes'}</Titulo>
@@ -860,6 +872,282 @@ function BloqueEnlace({ b }) {
   )
 }
 
+// ── Propuesta de presupuesto ─────────────────────────────────────────────────
+
+function FormularioCoste({ onCerrar }) {
+  const { mundo, decidir, ocupado } = useCtx()
+  const uid = useId()
+  const [concepto, setConcepto] = useState('')
+  const [partida, setPartida] = useState('06.02')
+  const [proveedor, setProveedor] = useState('')
+  const [importe, setImporte] = useState('')
+  const [sustituye, setSustituye] = useState(true)
+  const valor = Number(String(importe).replace(/\./g, '').replace(',', '.'))
+  const valido = concepto.trim() && valor > 0
+  const enviarForm = (e) => {
+    e.preventDefault()
+    if (!valido || ocupado) return
+    decidir({ tipo: 'propuesta/anadirLinea', linea: { concepto: concepto.trim(), partida, proveedor: proveedor.trim(), importe: valor }, sustituyeEstimado: sustituye }, `Añadir «${concepto.trim()}» · ${formatear(valor, 'eur')}`)
+    onCerrar()
+  }
+  return (
+    <form className="ag-form-coste" onSubmit={enviarForm}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-c`}>
+          Concepto
+          <input id={`${uid}-c`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej.: Dron, 2 jornadas" />
+        </label>
+        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-p`}>
+          Partida
+          <select id={`${uid}-p`} className="fp-input mt-1 w-full px-2 text-[16px] sm:text-sm" value={partida} onChange={(e) => setPartida(e.target.value)}>
+            {mundo.capitulos.map((cap) => (
+              <optgroup key={cap.id} label={`${cap.id} ${cap.nombre}`}>
+                {cap.partidas.map((cod) => (
+                  <option key={cod} value={cod}>
+                    {cod} {mundo.partidas[cod].nombre}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-v`}>
+          Proveedor con el que has hablado
+          <input id={`${uid}-v`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Opcional" />
+        </label>
+        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-i`}>
+          Importe sin IVA (€)
+          <input id={`${uid}-i`} className="fp-input tnum mt-1 w-full px-3 text-[16px] sm:text-sm" inputMode="decimal" value={importe} onChange={(e) => setImporte(e.target.value)} placeholder="3.200" />
+        </label>
+      </div>
+      <label className="mt-3 flex min-h-[44px] items-center gap-2 text-sm text-ink">
+        <input type="checkbox" className="h-5 w-5 accent-[#311b2e]" checked={sustituye} onChange={(e) => setSustituye(e.target.checked)} />
+        Sale de lo estimado por detallar en su capítulo
+      </label>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="submit" variant="primary" disabled={!valido || ocupado}>
+          Añadir a la propuesta
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCerrar}>
+          Cancelar
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function BloquePropuesta({ b }) {
+  const { mundo } = useCtx()
+  const p = mundo.propuesta
+  const tot = totalesPropuesta(mundo)
+  const caps = capitulosPropuesta(mundo)
+  const [form, setForm] = useState(!!b.abrirFormulario)
+  const [verEstimados, setVerEstimados] = useState(false)
+  const conLineas = caps.filter((c) => c.lineas.length)
+  const soloEstimados = caps.filter((c) => !c.lineas.length)
+  const estimadoResto = soloEstimados.reduce((a, c) => a + c.porDetallar, 0)
+  return (
+    <article className="ag-propuesta" aria-label={`Propuesta de presupuesto de ${p.proyecto.titulo}`}>
+      <header className="ag-propuesta-cab">
+        <div>
+          <span>Propuesta de presupuesto</span>
+          <strong>
+            {p.proyecto.titulo} · {p.proyecto.productora}
+          </strong>
+          <small>
+            En desarrollo · edición {p.version} · objetivo {formatear(tot.objetivo, 'eur')}
+          </small>
+        </div>
+        <Tono tono={tot.diferencia > 0 ? 'warning' : 'positive'}>
+          {tot.diferencia > 0 ? `${formatear(tot.diferencia, 'eurSigned')} sobre el objetivo` : tot.diferencia < 0 ? `${formatear(-tot.diferencia, 'eur')} por debajo del objetivo` : 'En el objetivo'}
+        </Tono>
+      </header>
+      <div className="ag-propuesta-total">
+        <span>Total</span>
+        <strong className="tnum">{formatear(tot.total, 'eur')}</strong>
+        <span className="text-muted">
+          detallado {formatear(tot.detallado, 'eur')} · estimado {formatear(tot.estimado, 'eur')}
+        </span>
+      </div>
+      <ul className="ag-propuesta-caps">
+        {conLineas.map((cap) => (
+          <li key={cap.id}>
+            <div className="ag-propuesta-cap">
+              <span>
+                <span className="tnum text-muted">{cap.id}</span> {cap.nombre}
+              </span>
+              <strong className="tnum">{formatear(cap.total, 'eur')}</strong>
+            </div>
+            <ul className="ag-propuesta-lineas">
+              {cap.lineas.map((l) => (
+                <li key={l.id}>
+                  <div className="min-w-0">
+                    <span className="font-semibold text-ink">{l.concepto}</span>
+                    {l.detalle && <span className="text-muted"> · {l.detalle}</span>}
+                    <span className="block text-xs text-muted">
+                      {l.proveedor} · <span className={l.origen === 'Confirmado por teléfono' ? 'font-semibold text-positive' : ''}>{l.origen}</span>
+                      {l.anterior && <> · antes {l.anterior.proveedor}, <s className="tnum">{formatear(l.anterior.importe, 'eur')}</s></>}
+                    </span>
+                  </div>
+                  <span className="tnum font-bold text-ink">{formatear(l.importe, 'eur')}</span>
+                </li>
+              ))}
+              {cap.porDetallar > 0 && (
+                <li className="is-estimado">
+                  <span>Resto del capítulo, estimado por detallar</span>
+                  <span className="tnum">{formatear(cap.porDetallar, 'eur')}</span>
+                </li>
+              )}
+            </ul>
+          </li>
+        ))}
+        <li>
+          <button type="button" className="ag-propuesta-cap is-boton" onClick={() => setVerEstimados((x) => !x)} aria-expanded={verEstimados}>
+            <span>
+              {soloEstimados.length} capítulos aún sin detallar <span className="text-muted">· estimados por el reparto ICAA</span>
+            </span>
+            <strong className="tnum">{formatear(estimadoResto, 'eur')}</strong>
+            <IconChevronDown size={16} className={verEstimados ? 'rotate-180' : ''} aria-hidden="true" />
+          </button>
+          {verEstimados && (
+            <ul className="ag-propuesta-lineas">
+              {soloEstimados.map((cap) => (
+                <li key={cap.id} className="is-estimado">
+                  <span>
+                    <span className="tnum">{cap.id}</span> {cap.nombre}
+                  </span>
+                  <span className="tnum">{formatear(cap.porDetallar, 'eur')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      </ul>
+      {form ? (
+        <FormularioCoste onCerrar={() => setForm(false)} />
+      ) : (
+        <button type="button" className="ag-boton-fila mt-3" onClick={() => setForm(true)}>
+          + Añadir un coste
+        </button>
+      )}
+    </article>
+  )
+}
+
+// ── Llamada a un proveedor ───────────────────────────────────────────────────
+
+// Llamadas que ya se han reproducido: al volver a pintarlas se enseñan enteras.
+const llamadasVistas = new Set()
+
+function BloqueLlamada({ b }) {
+  const { mundo } = useCtx()
+  const reducido = useMovimientoReducido()
+  const a = ALTERNATIVAS_POR_ID[b.altId]
+  const r = mundo.propuesta.llamadas[b.altId]
+  const total = a?.llamada?.guion.length ?? 0
+  const [abierta, setAbierta] = useState(!b.plegada || llamadasVistas.has(b.altId))
+  const [n, setN] = useState(() => (llamadasVistas.has(b.altId) || reducido ? total : 0))
+  useEffect(() => {
+    if (!abierta) return
+    if (n >= total) {
+      llamadasVistas.add(b.altId)
+      return
+    }
+    const id = setTimeout(() => setN((x) => x + 1), n === 0 ? 800 : 1000)
+    return () => clearTimeout(id)
+  }, [n, total, b.altId, abierta])
+  if (!a || !r) return null
+  if (!abierta) {
+    return (
+      <section className="ag-llamada" aria-label={`Llamada a ${a.proveedor}`}>
+        <header className="ag-llamada-cab">
+          <AgentTile id="proveedores" size={32} />
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-extrabold text-ink">Llamada a {a.proveedor}</h4>
+            <p className="text-xs text-muted">
+              {r.cumple ? `Confirma ${formatear(r.precioFinal, 'eur')} y cumple los requisitos` : `No cumple: ${r.motivo}`} · {a.llamada.duracion}
+            </p>
+          </div>
+          <Tono tono={r.cumple ? 'positive' : 'warning'}>{r.cumple ? 'Cumple' : 'No cumple'}</Tono>
+        </header>
+        <button type="button" className="ag-boton-fila mt-3" onClick={() => setAbierta(true)}>
+          <IconPlay size={14} aria-hidden="true" /> Ver cómo fue la llamada
+        </button>
+      </section>
+    )
+  }
+  const linea = mundo.propuesta.lineas.find((l) => l.id === a.linea)
+  const visibles = a.llamada.guion.slice(0, n)
+  const confirmados = {}
+  for (const [, , conf] of visibles) if (conf) Object.assign(confirmados, conf)
+  const terminada = n >= total
+  const estado = n === 0 ? 'Llamando…' : terminada ? `Terminada · ${a.llamada.duracion}` : 'En llamada'
+  return (
+    <section className="ag-llamada" aria-label={`Llamada a ${a.proveedor}`}>
+      <header className="ag-llamada-cab">
+        <AgentTile id="proveedores" size={32} trabajando={!terminada} />
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-extrabold text-ink">Llamada a {a.proveedor}</h4>
+          <p className="text-xs text-muted">
+            {linea.concepto} · alternativa a {linea.anterior?.proveedor ?? linea.proveedor} · simulada: no se llama a nadie
+          </p>
+        </div>
+        <Tono tono={terminada ? (r.cumple ? 'positive' : 'warning') : 'info'}>
+          {!terminada && <span className="ag-onda" aria-hidden="true"><i /><i /><i /></span>}
+          {estado}
+        </Tono>
+      </header>
+      <p className="ag-llamada-meta">Llama desde el número de Gau Films · se presenta como asistente automático · graba solo con permiso · no reserva ni negocia</p>
+      <div className="ag-llamada-cuerpo">
+        <ol className="ag-transcripcion" aria-label="Transcripción">
+          {visibles.map(([quien, txt], i) => (
+            <li key={i} className={`is-${quien}`}>
+              {quien !== 'sistema' && <span className="ag-transcripcion-quien">{quien === 'agente' ? 'Agente de Proveedores' : a.proveedor}</span>}
+              <p>{txt}</p>
+            </li>
+          ))}
+          {!terminada && (
+            <li className="is-sistema">
+              <span className="ag-puntos" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+            </li>
+          )}
+        </ol>
+        <div className="ag-llamada-lado">
+          <h5>Requisitos</h5>
+          <ul>
+            {linea.requisitos.map((req) => (
+              <li key={req}>
+                <Check ok={confirmados[req] === undefined ? null : confirmados[req]} />
+                <span>{REQUISITOS[req]}</span>
+              </li>
+            ))}
+          </ul>
+          {terminada && (
+            <div className={`ag-llamada-resultado ${r.cumple ? 'is-ok' : 'is-ko'}`}>
+              <span className="text-xs font-bold text-muted">Precio final confirmado</span>
+              <strong className="tnum">{formatear(r.precioFinal, 'eur')}</strong>
+              <span className="text-xs text-muted">
+                Tarifa {formatear(a.referencia, 'eur')}
+                {r.extras.map((e) => ` + ${e.concepto.toLowerCase()} ${formatear(e.importe, 'eur')}`).join('')}
+              </span>
+              <span className="mt-1 text-sm font-semibold text-ink">{r.cumple ? 'Cumple todos los requisitos' : `No cumple: ${r.motivo}`}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      {!terminada && (
+        <button type="button" className="ag-link" onClick={() => setN(total)}>
+          <IconPlay size={14} aria-hidden="true" /> Ver la transcripción completa
+        </button>
+      )}
+    </section>
+  )
+}
+
 const REGISTRO = {
   texto: BloqueTexto,
   aviso: BloqueAviso,
@@ -876,6 +1164,8 @@ const REGISTRO = {
   caja: BloqueCaja,
   acciones: BloqueAcciones,
   enlace: BloqueEnlace,
+  propuesta: BloquePropuesta,
+  llamada: BloqueLlamada,
 }
 
 export function Bloque({ b }) {

@@ -8,7 +8,7 @@ import { CASOS, GRUPOS_CASOS } from '../casos.js'
 import { useCtx } from './contexto.js'
 import { AgentTile, AutonomyBadge } from './Piezas.jsx'
 
-const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior' }
+const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Por validar' }
 
 function TarjetaCaso({ caso, onElegir, destacado = false, deshabilitado }) {
   return (
@@ -62,7 +62,7 @@ export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
         Buenos días, {nombre}. ¿Qué <em>revisamos</em> hoy?
       </h1>
       <p className="ag-inicio-lead">
-        Ocho agentes preparan el control de coste del rodaje. Hacen solos lo rutinario y reversible, te proponen lo dudoso y te piden aprobación cuando hay dinero comprometido o riesgo fiscal.
+        Diez agentes preparan el presupuesto y el control de coste de tus producciones. Hacen solos lo rutinario y reversible, te proponen lo dudoso y te piden aprobación cuando hay dinero comprometido, riesgo fiscal o hay que hablar con alguien de fuera.
       </p>
 
       <ul className="ag-leyenda" aria-label="Niveles de autonomía">

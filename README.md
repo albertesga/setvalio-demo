@@ -39,7 +39,17 @@ Control de costes, Informes y Cumplimiento. Cada paso muestra si el agente
 **ejecuta**, **propone** o **pide aprobación**; las decisiones las toma una persona
 en su tarjeta y cambian las cifras de toda la conversación. Mientras se conversa
 llegan novedades de ejemplo (una factura, una solicitud de compra, un vencimiento)
-y un recorrido guiado enseña los diez casos de uso.
+y un recorrido guiado enseña todos los casos de uso.
+
+Incluye un caso **por validar**, sobre el proyecto en desarrollo *Itsasoa*: la
+**primera propuesta de presupuesto**. Aportas los costes que ya tienes hablados
+con proveedores (en la conversación o con el formulario), el agente Presupuesto
+estima por capítulo lo que falta por detallar y lo compara con el objetivo.
+Después, Proveedores busca alternativas más baratas en un directorio de ejemplo,
+descarta las que no cumplen tus requisitos (por ejemplo, el alcance de una grúa),
+te pide permiso para llamar y, si lo das, enseña cada llamada: cómo se presenta,
+qué confirma y el precio final. Tú eliges el proveedor y la propuesta se recalcula.
+Las llamadas son simuladas: no se llama a nadie.
 
 Es una demo **simulada y guionizada**: no hay modelo de lenguaje, no se envía nada
 y ninguna cifra está escrita a mano en los guiones. El motor vive en `src/agentes/`

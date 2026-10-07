@@ -82,6 +82,12 @@ export function segmentos(tx) {
     if (m.index > last) out.push({ texto: tx.plantilla.slice(last, m.index), esValor: false })
     const val = tx.valores[m[1]]
     if (val === undefined) throw new Error(`Falta el valor «${m[1]}» en «${tx.plantilla}»`)
+    // Una plantilla dentro de otra: se integran sus segmentos.
+    if (esPlantilla(val)) {
+      out.push(...segmentos(val))
+      last = re.lastIndex
+      continue
+    }
     const valor = val && typeof val === 'object' && 'formato' in val ? val : v(val)
     const esNumero = ['eur', 'eurCents', 'eurSigned', 'pct', 'pct0', 'pctSigned', 'num'].includes(valor.formato)
     out.push({ texto: formatear(valor.valor, valor.formato), esValor: true, esNumero })

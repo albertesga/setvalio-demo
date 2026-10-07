@@ -22,6 +22,8 @@ import { AGENTES, AUTONOMIA } from '../src/agentes/agentes.js'
 import { CASOS, RECORRIDO, CASO_DE_INTENCION } from '../src/agentes/casos.js'
 import { crearSesion, reducirSesion, estadoTour } from '../src/agentes/sesion.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
+import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
+import { eur } from '../src/lib/format.js'
 
 let fallos = 0
 let total = 0
@@ -328,7 +330,7 @@ test('las decisiones de cada tarjeta producen un turno válido', () => {
 })
 test('los casos de uso tienen intención y los del recorrido existen', () => {
   for (const caso of CASOS) assert.ok(Object.values(CASO_DE_INTENCION).includes(caso.id), caso.id)
-  assert.equal(RECORRIDO.length, 10)
+  assert.equal(RECORRIDO.length, 12)
 })
 
 // ── 6. Sesión con reloj falso ────────────────────────────────────────────────
@@ -479,6 +481,59 @@ test('deshacer conserva el borrador redactado después', () => {
   s = reducirSesion(s, { tipo: 'deshacer', mensajeId: decision.id })
   assert.equal(s.mundo.ordenes['OC-106'].estado, 'Pendiente')
   assert.ok(s.mundo.borradores['BOR-G-004'], 'el borrador sigue')
+})
+
+// ── 8. Primera propuesta de presupuesto ──────────────────────────────────────
+console.log('Propuesta de presupuesto')
+test('la propuesta parte de los costes aportados y el reparto ICAA de Itsasoa', () => {
+  const t0 = totalesPropuesta(mundoBase)
+  assert.equal(t0.objetivo, 1_200_000)
+  cerca(t0.detallado, 212_500)
+  cerca(t0.total, 1_204_100)
+})
+test('cada guion de llamada dice el mismo precio final que su ficha', () => {
+  for (const a of ALTERNATIVAS.filter((x) => x.llamada)) {
+    const dicho = a.llamada.guion.map(([, txt]) => txt).join(' ')
+    assert.ok(dicho.includes(eur(a.llamada.precioFinal).replace(/\u00a0/g, ' ')) || dicho.includes(eur(a.llamada.precioFinal)), `${a.proveedor}: ${eur(a.llamada.precioFinal)}`)
+    const extras = a.llamada.extras.reduce((x, e) => x + e.importe, 0)
+    assert.equal(a.referencia + extras, a.llamada.precioFinal, `${a.proveedor}: referencia + extras`)
+  }
+})
+test('optimizar: descarta por ficha, pide permiso y no llama sin él', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: 'Optimiza los proveedores de la propuesta' })
+  assert.equal(r.mundo.propuesta.autorizacion, 'pendiente')
+  assert.equal(Object.keys(r.mundo.propuesta.llamadas).length, 0)
+  assert.deepEqual(optimizacion(r.mundo).filter((a) => a.descartada).map((a) => a.id), ['A2', 'A4'])
+  assert.ok(r.turno.bloques.some((b) => b.tipo === 'aprobacion' && b.ref.tipo === 'llamadas'))
+})
+test('autorizar → cuatro llamadas → elegir las tres mejores deja la propuesta por debajo del objetivo', () => {
+  let m = responder(mundoBase, { tipo: 'texto', texto: 'Optimiza los proveedores de la propuesta' }).mundo
+  const r = responder(m, { tipo: 'accion', accion: { tipo: 'propuesta/autorizarLlamadas', por: 'Prueba' } })
+  revisarTurno(r.turno, 'autorizar llamadas')
+  m = r.mundo
+  assert.equal(Object.keys(m.propuesta.llamadas).length, 4)
+  assert.equal(m.propuesta.llamadas.A3.cumple, false)
+  const tarjetas = r.turno.bloques.filter((b) => b.tipo === 'aprobacion')
+  assert.equal(tarjetas.length, 3)
+  assert.equal(r.turno.bloques.filter((b) => b.tipo === 'llamada').length, 4)
+  for (const tj of tarjetas) {
+    const res = responder(m, { tipo: 'accion', accion: { ...tj.acciones.find((x) => x.id === 'aprobar').accion, por: 'Prueba' } })
+    revisarTurno(res.turno, tj.id)
+    m = res.mundo
+  }
+  cerca(totalesPropuesta(m).total, 1_199_600)
+  assert.ok(totalesPropuesta(m).diferencia < 0)
+})
+test('añadir un coste escrito sustituye lo estimado de su capítulo', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: 'Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €' })
+  assert.equal(r.turno.intencion, 'anadir_coste')
+  const l = r.mundo.propuesta.lineas.at(-1)
+  assert.equal(l.partida, '06.02')
+  assert.equal(l.importe, 3_200)
+  assert.equal(l.proveedor, 'Dron Services Madrid')
+  // El capítulo 06 ya no tenía estimación por detallar: el total sube.
+  cerca(totalesPropuesta(r.mundo).total, 1_207_300)
+  revisarTurno(r.turno, 'añadir coste')
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)
