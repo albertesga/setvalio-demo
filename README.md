@@ -30,6 +30,23 @@ Cada cambio en `main` se publica automáticamente con el flujo de `.github/workf
 4. **Rodaje:** órdenes de compra, control de costes, proveedores y bandeja de gastos.
 5. **Justificación:** elegibilidad por gasto, dossier fiscal, informes y consola multi-cliente.
 
+## Agentes (prototipo conversacional)
+
+Desde la portada, **Probar el asistente** abre una conversación con los agentes de
+SetValio sobre La última función (también con `?vista=agentes`). Un Orquestador
+reparte cada petición entre Facturas, Conciliación, Excepciones, Previsión,
+Control de costes, Informes y Cumplimiento. Cada paso muestra si el agente
+**ejecuta**, **propone** o **pide aprobación**; las decisiones las toma una persona
+en su tarjeta y cambian las cifras de toda la conversación. Mientras se conversa
+llegan novedades de ejemplo (una factura, una solicitud de compra, un vencimiento)
+y un recorrido guiado enseña los diez casos de uso.
+
+Es una demo **simulada y guionizada**: no hay modelo de lenguaje, no se envía nada
+y ninguna cifra está escrita a mano en los guiones. El motor vive en `src/agentes/`
+(mundo de demo, cálculos, reductor, intenciones, guiones y sesión) y
+`npm run check:agentes` lo comprueba en Node: cifras frente a `src/lib`, frases de
+ejemplo, transiciones, recorrido y deshacer.
+
 La ruta **Design system** documenta en vivo los tokens y componentes compartidos.
 La dirección de marca, usos del logotipo y normas de voz están en
 [docs/identidad-setvalio.md](docs/identidad-setvalio.md).

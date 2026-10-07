@@ -248,6 +248,43 @@
 .landing-fiscal-list .is-pending { background: #F6EAD0; color: var(--lv-warning); }
 .landing-fiscal-list > small { display: block; margin-top: 17px; color: #DFCFDA; font-size: 11px; }
 
+.landing-agents-section { background: var(--lv-plum); color: var(--lv-paper); }
+.landing-agents-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.95fr); align-items: center; gap: 72px; }
+.landing-agents-kicker { display: inline-block; margin-bottom: 18px; color: #DFCFDA; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.landing-agents-copy h2 { color: var(--lv-paper); }
+.landing-agents-copy h2 em { color: var(--lv-lime); }
+.landing-agents-copy > p { max-width: 540px; margin: 24px 0 26px; color: #E9DDE4; font-size: 18px; line-height: 1.66; }
+.landing-agents-levels { display: grid; gap: 10px; margin-bottom: 30px; border-top: 1px solid rgb(244 241 232 / .3); }
+.landing-agents-levels li { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 16px; padding-top: 10px; border-bottom: 1px solid rgb(244 241 232 / .2); padding-bottom: 10px; font-size: 14px; }
+.landing-agents-levels b { color: var(--lv-paper); font-weight: 800; }
+.landing-agents-levels span { color: #E9DDE4; }
+.landing-agents-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; }
+.landing-agents-actions .landing-arrow-link { margin-top: 0; }
+.landing-agents-copy > small { display: block; max-width: 460px; margin-top: 20px; color: #DFCFDA; font-size: 12px; line-height: 1.5; }
+.landing-agents-preview { padding: 22px; border-radius: 10px; background: var(--lv-paper); color: var(--lv-plum); box-shadow: 0 24px 64px rgb(0 0 0 / .25); }
+.landing-agents-ask { width: fit-content; max-width: 85%; margin-left: auto; padding: 10px 14px; border-radius: 10px 10px 4px 10px; background: var(--lv-plum); color: var(--lv-paper); font-size: 14px; font-weight: 600; }
+.landing-agents-preview ol { display: grid; gap: 4px; margin-top: 16px; padding: 6px; border: 1px solid var(--lv-line); border-radius: 10px; background: #FFFEFA; }
+.landing-agents-preview li { display: flex; align-items: center; gap: 12px; padding: 10px 8px; }
+.landing-agents-preview li > span:nth-child(2) { min-width: 0; flex: 1; }
+.landing-agents-preview li strong { display: block; font-size: 14px; }
+.landing-agents-preview li small { display: block; color: var(--lv-muted); font-size: 13px; }
+.landing-agents-tile { display: inline-flex; width: 32px; height: 32px; flex: none; align-items: center; justify-content: center; border: 1px solid #9A8492; border-radius: 6px; background: #FFFEFA; font-size: 12px; font-weight: 800; }
+.landing-agents-preview li b { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+.landing-agents-preview li b.is-done { background: #E4EFDF; color: var(--lv-success); }
+.landing-agents-preview li b.is-waiting { background: #F6EAD0; color: var(--lv-warning); }
+.landing-agents-preview li:last-child { border-radius: 8px; box-shadow: inset 3px 0 0 var(--lv-warning); background: #FDF8EC; }
+.landing-agents-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--lv-line); font-size: 13px; }
+.landing-agents-foot span { color: var(--lv-muted); font-weight: 600; }
+.landing-agents-foot strong { font-variant-numeric: tabular-nums; }
+@media (max-width: 860px) {
+  .landing-agents-grid { grid-template-columns: 1fr; gap: 42px; }
+}
+@media (max-width: 600px) {
+  .landing-agents-levels li { grid-template-columns: 1fr; gap: 2px; }
+  .landing-agents-preview { padding: 14px; }
+  .landing-agents-preview li { gap: 10px; padding: 8px 4px; }
+}
+
 .landing-access-section { background: var(--lv-paper); }
 .landing-access-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 17px; }
 .landing-access-grid > button { position: relative; display: flex; min-height: 230px; flex-direction: column; align-items: start; padding: 26px; border: 1px solid var(--lv-line); border-radius: 8px; background: #FFFEF9; text-align: left; transition: background-color .18s ease, border-color .18s ease, transform .18s var(--lv-ease-out), box-shadow .18s ease; }

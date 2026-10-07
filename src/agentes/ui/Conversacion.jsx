@@ -37,8 +37,20 @@ function TarjetaCaso({ caso, onElegir, destacado = false, deshabilitado }) {
   )
 }
 
+// Evita que el segundo clic de un doble clic en la portada caiga sobre una tarjeta recién montada.
+function useListo(ms) {
+  const [listo, setListo] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setListo(true), ms)
+    return () => clearTimeout(id)
+  }, [ms])
+  return listo
+}
+
 export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
-  const { enviar, mundo, ocupado } = useCtx()
+  const { enviar: enviarCtx, mundo, ocupado } = useCtx()
+  const listo = useListo(400)
+  const enviar = (texto) => listo && enviarCtx(texto)
   const hero = CASOS.find((x) => x.grupo === 'hero')
   const nombre = persona.nombre.split(' ')[0]
   return (
@@ -74,7 +86,7 @@ export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
           <span className="ag-caso-kicker">Primera vez</span>
           <strong className="ag-caso-titulo">Recorrido guiado</strong>
           <span className="ag-caso-desc">Diez pasos por todos los casos de uso, con una nota en cada uno. Unos cuatro minutos; en el segundo decides tú.</span>
-          <Button variant="secondary" className="mt-auto self-start" icon={IconPlay} onClick={onRecorrido} disabled={ocupado}>
+          <Button variant="secondary" className="mt-auto self-start" icon={IconPlay} onClick={() => listo && onRecorrido()} disabled={ocupado}>
             Empezar recorrido
           </Button>
         </div>

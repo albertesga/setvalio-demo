@@ -19,9 +19,18 @@ import {
 
 const BRAND_IMAGES = `${import.meta.env.BASE_URL}brand/setvalio/images`
 
+// Vista estática del prototipo de agentes (no importa el motor para no cargarlo en la portada).
+const AGENTS_PREVIEW = [
+  ['FA', 'Facturas', 'Lee los documentos de la bandeja', 'Hecho'],
+  ['CN', 'Conciliación', 'Cuadra cada factura con su pedido', 'Hecho'],
+  ['CC', 'Control de costes', 'Escenografía queda fuera del umbral', 'Hecho'],
+  ['EX', 'Excepciones', 'Una compra deja Viajes por encima del umbral', 'Tu decisión'],
+]
+
 const NAV = [
   { label: 'Cómo funciona', href: '#flujo' },
   { label: 'Producto', href: '#producto' },
+  { label: 'Agentes', href: '#agentes' },
   { label: 'Fiscalidad', href: '#documental' },
   { label: 'Despachos', href: '#despachos' },
   { label: 'Para quién', href: '#perfiles' },
@@ -46,6 +55,7 @@ const FAQ = [
   ['¿Qué problema resuelve SetValio?', 'Conecta presupuesto, incentivos, ayudas, financiación, gasto y documentación fiscal. Cuando cambia una cifra, puedes ver cómo afecta al resto del proyecto.'],
   ['¿Sustituye a mi fiscalista?', 'No. Tu fiscalista revisa, valida y firma. SetValio prepara cálculos, evidencias y trazabilidad para que esa revisión sea más clara.'],
   ['¿Puedo trabajar con cine, series y documental?', 'El prototipo contempla distintas tipologías, territorios, presupuestos por capítulos ICAA y requisitos de coproducción.'],
+  ['¿Los agentes deciden por mí?', 'No. Hacen solos lo rutinario y reversible, como contabilizar una factura que casa con su pedido. Lo dudoso lo proponen y lo que compromete dinero o tiene riesgo fiscal espera la aprobación de la persona responsable. Tu fiscalista revisa y firma.'],
   ['¿Cómo se procesan las facturas?', 'La factura electrónica se lee como dato estructurado. Los PDF y tickets se procesan con OCR y los casos de baja confianza quedan señalados para revisión.'],
 ]
 
@@ -230,10 +240,10 @@ export default function Landing({ onNavigate }) {
   const clearSectionHash = () => {
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
   }
-  const go = (route) => {
+  const go = (route, context) => {
     setMenuOpen(false)
     clearSectionHash()
-    onNavigate(route)
+    onNavigate(route, context)
   }
 
   return (
@@ -255,6 +265,7 @@ export default function Landing({ onNavigate }) {
         </Container>
         <nav id="landing-mobile-nav" className={`landing-mobile-nav${menuOpen ? ' is-open' : ''}`} aria-label="Navegación móvil" aria-hidden={!menuOpen} inert={menuOpen ? undefined : ''}>
           {NAV.map(({ label, href }) => <a key={href} href={href} onClick={() => setMenuOpen(false)}>{label}<IconChevronRight size={16} /></a>)}
+          <button type="button" onClick={() => go('agentes')}>Probar el asistente <IconChevronRight size={16} /></button>
           <button type="button" onClick={() => go('panel')}>Abrir demo <IconChevronRight size={16} /></button>
         </nav>
       </header>
@@ -322,6 +333,39 @@ export default function Landing({ onNavigate }) {
             </div>
             <ProductPreview onNavigate={go} />
             <div className="landing-product-foot"><span>Demo interactiva · La última función</span><button type="button" onClick={() => go('panel')}>Entrar al proyecto completo <IconChevronRight size={17} /></button></div>
+          </Container>
+        </section>
+
+        <section id="agentes" className="landing-section landing-agents-section" aria-labelledby="landing-agents-title">
+          <Container className="landing-agents-grid">
+            <div className="landing-agents-copy">
+              <span className="landing-agents-kicker">Nuevo · Prototipo conversacional</span>
+              <h2 id="landing-agents-title">Agentes que preparan. <em>Tú decides.</em></h2>
+              <p>Pide el informe semanal, la explicación de una desviación o el estado del dossier fiscal. Cada agente calcula, cuadra o revisa su parte y enseña cómo lo ha hecho. Lo que compromete dinero o tiene riesgo fiscal espera tu aprobación.</p>
+              <ul className="landing-agents-levels">
+                <li><b>Ejecuta</b><span>Contabiliza la factura que casa con su pedido.</span></li>
+                <li><b>Propone</b><span>Sugiere la partida de un ticket dudoso.</span></li>
+                <li><b>Pide aprobación</b><span>Una compra que deja un capítulo por encima del umbral.</span></li>
+              </ul>
+              <div className="landing-agents-actions">
+                <button type="button" className="landing-button landing-button--lime" onClick={() => go('agentes')}>Probar el asistente <IconChevronRight size={18} /></button>
+                <ArrowLink light onClick={() => go('agentes', { tour: true })}>Ver recorrido guiado</ArrowLink>
+              </div>
+              <small>Demo con agentes simulados y datos de ejemplo: no hay un modelo de lenguaje detrás y no se envía nada.</small>
+            </div>
+            <div className="landing-agents-preview" role="img" aria-label="Ejemplo: al pedir el informe semanal, Facturas, Conciliación y Control de costes hacen su parte y Excepciones deja una compra pendiente de tu decisión">
+              <div className="landing-agents-ask">Prepárame el informe semanal de coste.</div>
+              <ol>
+                {AGENTS_PREVIEW.map(([code, name, task, status]) => (
+                  <li key={code}>
+                    <span className="landing-agents-tile">{code}</span>
+                    <span><strong>{name}</strong><small>{task}</small></span>
+                    <b className={status === 'Hecho' ? 'is-done' : 'is-waiting'}>{status === 'Hecho' ? <IconCheck size={12} /> : null}{status}</b>
+                  </li>
+                ))}
+              </ol>
+              <div className="landing-agents-foot"><span>Coste estimado final</span><strong>{eur(TOTALES.cef)} · {pctSigned(TOTALES.desviacionPct)}</strong></div>
+            </div>
           </Container>
         </section>
 
