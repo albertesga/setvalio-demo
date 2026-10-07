@@ -56,6 +56,19 @@ El Orquestador lleva el símbolo de Filmpilot (tiza sobre carbón). Un glifo nun
 
 Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por revisar** (carbón sobre señal) · **Completado**, más **Detenido** y **Bloqueante** donde hacen falta. El movimiento es breve: el glifo de un agente que trabaja respira dos veces y para; todo respeta `prefers-reduced-motion`.
 
+## Composición del hero en 3D
+
+`src/brand/CinematicSymbol.jsx` convierte `graphics/orbit-signal.svg` en una escena 3D (CSS, sin librerías). En reposo es la composición del kit, sin sombra, con un visor de cámara alrededor (esquinas, «A · CAM · 24 FPS», «2.39:1» y un código de tiempo). Solo se mueve con la persona, nunca en bucle:
+
+- **Cursor:** inclina la escena como un movimiento de cámara. Los cinco gestos están a distinta profundidad y tienen grosor.
+- **Scroll:**
+  - los gestos se abren como las láminas de un diafragma;
+  - el satélite se acerca a cámara;
+  - las órbitas giran como los aros de un gimbal;
+  - el código de tiempo avanza.
+- Con `prefers-reduced-motion` se queda quieta. Fuera de pantalla no calcula nada.
+- En móvil no hay cursor: solo el scroll. Por debajo de 320 px de ancho se ocultan los datos del visor y quedan las esquinas.
+
 ## Fotografía
 
 `images/production-team-*` es una **imagen generada de concepto**: no representa al equipo, a clientes ni a un rodaje real. El `alt` y la portada lo dicen. El interés está en la mitad derecha; el texto va a la izquierda sobre una capa de contraste.

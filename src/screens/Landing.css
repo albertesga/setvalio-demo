@@ -35,8 +35,7 @@
 .landing-hero-support { font-size: clamp(1.25rem, 2vw, 1.625rem); line-height: 1.25; letter-spacing: -0.02em; }
 .landing-hero-description { max-width: 52ch; color: var(--flp-muted); font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.55; }
 .landing-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-.landing-hero-art { justify-self: end; width: 100%; max-width: 340px; margin-top: calc(clamp(1rem, 4vw, 3rem) * -1); }
-.landing-hero-orbit { display: block; width: 100%; height: auto; border-radius: var(--flp-radius-lg); }
+.landing-hero-art { justify-self: end; width: 100%; max-width: 380px; margin-top: calc(clamp(1rem, 4vw, 3rem) * -1); }
 .landing-hero-caption { max-width: 52ch; margin-top: 4px; color: var(--flp-muted); font-size: 14px; line-height: 1.5; }
 .landing-hero-caption span { display: inline-block; margin-right: 6px; padding: 1px 9px; border-radius: 999px; background: var(--flp-carbon); color: var(--flp-chalk); letter-spacing: .08em; text-transform: uppercase; vertical-align: 1px; }
 

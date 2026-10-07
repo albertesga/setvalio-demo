@@ -3,7 +3,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import './Landing.css'
-import { AgentGlyph, FilmpilotButton, FilmpilotLogo, Kicker, OrbitGraphic, ProductionPhoto, StateChip } from '../brand/Filmpilot.jsx'
+import { AgentGlyph, FilmpilotButton, FilmpilotLogo, Kicker, ProductionPhoto, StateChip } from '../brand/Filmpilot.jsx'
+import { CinematicSymbol } from '../brand/CinematicSymbol.jsx'
 import { FAMILIAS, ORDEN_FAMILIAS } from '../agentes/agentes.js'
 import { TOTALES } from '../lib/data.js'
 import { eur, pctSigned } from '../lib/format.js'
@@ -186,7 +187,7 @@ export default function Landing({ onNavigate }) {
               </p>
             </div>
             <div className="landing-hero-art">
-              <OrbitGraphic tone="signal" className="landing-hero-orbit" />
+              <CinematicSymbol />
             </div>
           </Container>
         </section>
