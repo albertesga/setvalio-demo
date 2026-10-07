@@ -11,6 +11,23 @@ function cambioCaja(antes, despues) {
   return a.semanas.some((s, i) => Math.abs(s.saldo - d.semanas[i].saldo) > 0.004)
 }
 
+// Aviso al equipo del cambio de orden de las jornadas 18 y 19 (se crea en el mismo turno: deshacer lo quita).
+function avisoCambioOrden() {
+  return {
+    id: 'BOR-CAMBIO-18-19',
+    canal: 'mensaje interno',
+    para: 'Equipo de rodaje · ayudantía de dirección',
+    ref: 'RG-1',
+    firma: 'Álvaro Ferrer · Line producer · La última función',
+    asunto: t('Cambio de orden: jornadas {a} y {b}', { a: v(18, 'num'), b: v(19, 'num') }),
+    cuerpo: [
+      t('Hola a todos:'),
+      t('Por la previsión de lluvia, el miércoles (jornada {a}) rodamos en el Teatro Apolo y el exterior de la azotea pasa al jueves (jornada {b}).', { a: v(18, 'num'), b: v(19, 'num') }),
+      t('Ayudantía de dirección publicará las órdenes del día con el cambio.'),
+    ],
+  }
+}
+
 export const accion = {
   id: 'accion',
   titulo: (det) =>
@@ -29,6 +46,9 @@ export const accion = {
       'propuesta/noLlamar': 'Sin llamadas',
       'propuesta/elegir': 'Elección de proveedor',
       'propuesta/anadirLinea': 'Coste añadido a la propuesta',
+      'riesgo/mitigar': 'Plan de rodaje cambiado',
+      'riesgo/reservar': 'Reserva de riesgo aprobada',
+      'riesgo/aceptar': 'Riesgo asumido',
     })[det.accion?.tipo] ?? 'Tras tu decisión',
   ejemplos: [],
 
@@ -88,6 +108,21 @@ export const accion = {
           paso('proveedores', t('Compara los precios confirmados'), { autonomia: 'propone', salida: (_, d) => t('Una elección por cada coste con alternativa') }),
         ]
       }
+      case 'riesgo/mitigar':
+        return [
+          paso('riesgos', a.riesgoId === 'RG-1' ? t('Cambia el orden de las jornadas {a} y {b}', { a: v(18, 'num'), b: v(19, 'num') }) : t('Replanifica las noches con una citación más tardía'), { tipo: 'plan', acciones: [a], salida: t('Plan de rodaje actualizado') }),
+          ...(a.riesgoId === 'RG-1' ? [paso('riesgos', t('Redacta el aviso del cambio para el equipo'), { tipo: 'redaccion', autonomia: 'propone', acciones: [{ tipo: 'borrador/crear', borrador: avisoCambioOrden() }], salida: t('Borrador listo; no se envía') })] : []),
+          paso('prevision', t('Recalcula la previsión'), { salida: (_, d) => t('Coste estimado final {cef}', { cef: v(c.totales(d).cef, 'eur') }) }),
+          ...regInf,
+        ]
+      case 'riesgo/reservar':
+        return [
+          paso('excepciones', t('Registra la aprobación de la reserva'), { tipo: 'plan', acciones: [a], salida: t('{imp} reservados', { imp: v(a.importe, 'eur') }) }),
+          paso('prevision', t('Suma la reserva al coste estimado final'), { salida: (_, d) => t('Coste estimado final {cef}', { cef: v(c.totales(d).cef, 'eur') }) }),
+          ...regInf,
+        ]
+      case 'riesgo/aceptar':
+        return [paso('riesgos', t('Registra que se asume el riesgo'), { tipo: 'plan', acciones: [a], salida: t('Seguirá vigilándolo') })]
       case 'propuesta/noLlamar':
         return [paso('excepciones', t('Registra que no se llama'), { tipo: 'plan', acciones: [a], salida: t('Nadie recibe llamadas') })]
       case 'propuesta/elegir': {
@@ -189,6 +224,25 @@ export const accion = {
         const comp = componerComparacion(despues)
         return { ...comp, sugerencias: comp.sugerencias.slice(0, 3) }
       }
+      case 'riesgo/mitigar': {
+        if (a.riesgoId === 'RG-1') {
+          bloques.push(texto(t('Cambio hecho por {por}: la jornada {a} pasa a ser el interior de {apolo} y el exterior se rueda en la jornada {b}, con una previsión de {p} de lluvia. El coste estimado final no cambia.', { por: v(por), a: v(18, 'num'), apolo: v(despues.rodaje.jornadas.find((j) => j.n === 18).localizacion), b: v(19, 'num'), p: v(despues.rodaje.meteo[despues.rodaje.jornadas.find((j) => j.n === 19).fecha] ?? 0, 'pct0') })))
+          bloques.push({ tipo: 'plan' })
+          bloques.push({ tipo: 'borrador', id: 'BOR-CAMBIO-18-19' })
+        } else {
+          bloques.push(texto(t('Noches replanificadas por {por} con una citación más tardía. La reserva no hace falta.', { por: v(por) })))
+          bloques.push({ tipo: 'plan' })
+        }
+        if (antes.reservas?.[a.riesgoId]) bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
+        break
+      }
+      case 'riesgo/reservar':
+        bloques.push(texto(t('Reserva de {imp} aprobada por {por}: el coste estimado final sube a {cef}. Ningún capítulo cambia; la reserva se ve aparte en la previsión.', { imp: v(a.importe, 'eur'), por: v(por), cef: v(c.totales(despues).cef, 'eur') })))
+        bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
+        break
+      case 'riesgo/aceptar':
+        bloques.push(texto(t('Riesgo asumido por {por}: no cambia el plan ni la previsión. El agente lo seguirá vigilando.', { por: v(por) })))
+        break
       case 'propuesta/noLlamar':
         bloques.push(texto(t('No se llama a nadie. Tienes la lista de alternativas y tus requisitos para pedir presupuesto tú.')))
         sugerencias.push(sug('Optimiza los proveedores de la propuesta'))
@@ -235,7 +289,9 @@ export const accion = {
       bloques.push(aviso('aviso', 'Informe desactualizado', t('Las cifras han cambiado desde que se redactó el informe de esta semana.')))
       sugerencias.unshift(sug('Regenera el informe semanal de coste'))
     }
-    if (!a.tipo.startsWith('propuesta/')) {
+    if (a.tipo.startsWith('riesgo/')) {
+      sugerencias.push(sug('¿Qué riesgos hay para las próximas jornadas?'))
+    } else if (!a.tipo.startsWith('propuesta/')) {
       sugerencias.push(sug('¿Cómo cerraremos el proyecto y llegamos con la caja?'))
       if (c.excepciones(despues).length) sugerencias.push(sug('¿Cómo vamos?'))
     }

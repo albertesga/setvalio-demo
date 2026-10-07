@@ -12,6 +12,7 @@ import { CAPITULOS, FACTURAS, FACTURA_DEMO, SALDO_HOY, CASHFLOW, PLAN_FINANCIACI
 import { PROYECTOS } from '../lib/proyectos.js'
 import { isoDesde } from './texto.js'
 import { crearPropuesta } from './propuesta.js'
+import { crearRodaje } from './rodaje.js'
 
 export const CORTE = { fecha: '2026-06-01', etiqueta: 'lunes 1 de junio de 2026' }
 export const PERIODO = { id: 'R3', etiqueta: 'Rodaje 3', fechas: '25–31 may', desde: '2026-05-25', hasta: '2026-05-31' }
@@ -189,7 +190,12 @@ export function crearMundo() {
     borradores: {},
     revisiones: {},
     ajustesCef: {},
-    entrantes: ['EV-01', 'EV-02', 'EV-03'],
+    // Novedades que llegan solas, en este orden (sesion.js).
+    entrantes: ['EV-RIESGOS', 'EV-01', 'EV-CITACION', 'EV-02', 'EV-LLUVIA', 'EV-03'],
+    // Plan de rodaje y señales que vigila el agente de riesgos (exploratorio).
+    rodaje: crearRodaje(),
+    decisionesRiesgo: {},
+    reservas: {},
     // Primera propuesta de presupuesto de Itsasoa (caso por validar).
     propuesta: crearPropuesta(),
     avisos: [],

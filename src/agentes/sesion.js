@@ -12,14 +12,20 @@ import { DURACIONES } from './agentes.js'
 import { estadoDecision } from './calculos.js'
 import { t, v } from './texto.js'
 
+// Llegan en este orden y solo cuando la conversación está parada (retrasoMs de inactividad).
 export const EVENTOS = [
-  { id: 'EV-01', retrasoMs: 18_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur' },
+  { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas' },
+  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur' },
+  { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar' },
   { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado una solicitud de compra' },
+  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia del miércoles' },
   { id: 'EV-03', retrasoMs: 30_000, agente: 'cumplimiento', titulo: 'Un documento del dossier vence esta semana' },
 ]
 
 const EVENTOS_POR_ID = Object.fromEntries(EVENTOS.map((e) => [e.id, e]))
-const MUTAN_DESHACIBLE = new Set(['documento/contabilizar', 'documento/aplazar', 'documento/revision', 'orden/aprobar', 'orden/rechazar', 'orden/escalar', 'partida/ajustarCef', 'informe/aprobar', 'borrador/marcarListo', 'borrador/descartar'])
+const MUTAN_DESHACIBLE = new Set(['documento/contabilizar', 'documento/aplazar', 'documento/revision', 'orden/aprobar', 'orden/rechazar', 'orden/escalar', 'partida/ajustarCef', 'informe/aprobar', 'borrador/marcarListo', 'borrador/descartar', 'riesgo/mitigar', 'riesgo/reservar', 'riesgo/aceptar'])
+// Acciones que deshacer siempre conserva: no invalidan el deshacer anterior.
+const CONSERVADAS = new Set(['evento/recibir', 'borrador/crear'])
 
 /** Hora simulada: la sesión empieza a las 10:30 del día del corte. */
 export function horaDe(relojMs) {
@@ -146,7 +152,7 @@ function progresar(s0, ms) {
     const acciones = turno.pasos.flatMap((p) => p.acciones)
     if ((msg.origen === 'accion' || msg.origen === 'evento') && acciones.some((a) => MUTAN_DESHACIBLE.has(a.tipo))) {
       s.ultimaMutacion = { mensajeId: msg.id }
-    } else if (acciones.some((a) => a.tipo !== 'borrador/crear')) {
+    } else if (acciones.some((a) => !CONSERVADAS.has(a.tipo))) {
       // Cualquier otro cambio del mundo invalida el deshacer anterior.
       if (turno.pasos.some((p) => p.muta)) s.ultimaMutacion = null
     }
@@ -257,7 +263,7 @@ export function reducirSesion(s, a) {
       const decision = [...s.mensajes.slice(0, idx)].reverse().find((m) => m.rol === 'decision' || m.rol === 'novedad')
       const que = decision?.rol === 'decision' ? decision.texto : msg.turno.titulo
       const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true } : m)), actividad: [...s.actividad] }
-      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: `${persona.nombre} ha deshecho «${que}». Las cifras vuelven a como estaban.`, hora: horaDe(n.reloj) })
+      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: `${persona.nombre} ha deshecho «${que}». Todo vuelve a como estaba.`, hora: horaDe(n.reloj) })
       n.actividad.unshift({ id: nuevoId(n, 'act'), hora: horaDe(n.reloj), persona: persona.nombre, texto: t('{por} deshace: {que}', { por: v(persona.nombre), que: v(que) }) })
       return n
     }

@@ -55,15 +55,21 @@ export function capitulos(mundo) {
   return mundo.capitulos.map((c) => capitulo(mundo, c.id))
 }
 
+/** Reservas de riesgos aprobadas: suben el coste estimado final sin tocar ningún capítulo. */
+export function reservasTotal(mundo) {
+  return r2(Object.values(mundo.reservas ?? {}).reduce((a, x) => a + x.importe, 0))
+}
+
 export function totales(mundo) {
   const caps = capitulos(mundo)
+  const reservas = reservasTotal(mundo)
   const t = agregar({
     presupuesto: sumar(caps, 'presupuesto'),
     gastado: sumar(caps, 'gastado'),
     comprometido: sumar(caps, 'comprometido'),
-    cef: sumar(caps, 'cef'),
+    cef: r2(sumar(caps, 'cef') + reservas),
   })
-  return { ...t, ejecucionPct: t.presupuesto ? t.gastado / t.presupuesto : 0, consolidadoPct: t.cef ? t.consolidado / t.cef : 0 }
+  return { ...t, reservas, ejecucionPct: t.presupuesto ? t.gastado / t.presupuesto : 0, consolidadoPct: t.cef ? t.consolidado / t.cef : 0 }
 }
 
 export function nombreCapitulo(mundo, id) {
@@ -103,7 +109,8 @@ export function desviaciones(mundo) {
     }))
   const sobrecostes = r2(items.filter((c) => c.desviacion > 0).reduce((a, c) => a + c.desviacion, 0))
   const ahorros = r2(items.filter((c) => c.desviacion < 0).reduce((a, c) => a + c.desviacion, 0))
-  return { items, resumen: { sobrecostes, ahorros, neto: r2(sobrecostes + ahorros) }, umbral: POLITICAS.umbralDesviacion }
+  const reservas = reservasTotal(mundo)
+  return { items, resumen: { sobrecostes, ahorros, reservas, neto: r2(sobrecostes + ahorros + reservas) }, umbral: POLITICAS.umbralDesviacion }
 }
 
 /** Partidas cuyo gastado + comprometido supera el CEF (previsión incoherente). */
@@ -294,6 +301,13 @@ export function estadoDecision(mundo, ref) {
       const e = mundo.propuesta?.elecciones[ref.id]
       if (!e) return { estado: 'pendiente' }
       return { estado: e.altId ? 'aprobada' : 'rechazada', por: e.por }
+    }
+    case 'riesgo': {
+      const d = mundo.decisionesRiesgo?.[ref.id]
+      if (!d) return { estado: 'pendiente' }
+      // Una tarjeta nueva con otra reserva (la previsión cambió) vuelve a estar abierta.
+      if (d.estado === 'reservado' && ref.reserva !== undefined && Math.abs(d.importe - ref.reserva) > 0.5) return { estado: 'pendiente', reservaActual: d.importe, por: d.por }
+      return { estado: d.estado, por: d.por, importe: d.importe }
     }
     case 'borrador': {
       const b = mundo.borradores[ref.id]

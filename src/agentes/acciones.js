@@ -7,6 +7,7 @@
 import { r2, pendiente, totales, desviaciones, excepciones, dossier, tesoreria, informeDesactualizado } from './calculos.js'
 import { crearMundo } from './mundo.js'
 import { ALTERNATIVAS_POR_ID, resultadoLlamada } from './propuesta.js'
+import { riesgosAltos } from './rodaje.js'
 
 function clonar(m) {
   return JSON.parse(JSON.stringify(m))
@@ -45,6 +46,9 @@ export function reducir(m, accion) {
       }
       if (accion.eventoId === 'EV-02') n.ordenes['OC-104'].estado = 'Pendiente'
       if (accion.eventoId === 'EV-03') n.avisos.push({ id: 'DOS-01', tipo: 'vencimiento' })
+      // Riesgos: todo lo que cambia una novedad vive aquí, para que deshacer lo conserve.
+      if (accion.eventoId === 'EV-CITACION') n.rodaje.senales.citacion.alerta = true
+      if (accion.eventoId === 'EV-LLUVIA') n.rodaje.meteo['2026-06-03'] = 0.9
       return confirmar(n, accion, { tipo: 'evento', id: accion.eventoId })
     }
 
@@ -168,6 +172,8 @@ export function reducir(m, accion) {
           conAprobacion: ex.filter((e) => e.nivel === 'aprueba').length,
           vencimiento: dos.reduce((a, d) => (d.dias < a.dias ? d : a), dos[0]),
           cajaMinima: { semana: tes.minimo.semana, fechas: tes.minimo.fechas, saldo: tes.minimo.saldo },
+          reservas: totales(n).reservas,
+          riesgosAltos: riesgosAltos(n).map((r) => ({ id: r.id, titulo: r.titulo, jornadas: r.jornadas })),
         },
       }
       return confirmar(n, accion, { tipo: 'informe', id })
@@ -217,6 +223,52 @@ export function reducir(m, accion) {
       const n = clonar(m)
       n.borradores[accion.id].estado = 'descartado'
       return confirmar(n, accion, { tipo: 'borrador', id: accion.id })
+    }
+
+    // ── Riesgos de producción ─────────────────────────────────────────────
+    case 'riesgo/mitigar': {
+      const d0 = m.decisionesRiesgo[accion.riesgoId]
+      if (d0 && d0.estado !== 'reservado') return m
+      const n = clonar(m)
+      const efectos = []
+      if (accion.riesgoId === 'RG-1') {
+        // Cambia el contenido de las jornadas 18 y 19; cada una conserva su número y su fecha.
+        const a = n.rodaje.jornadas.find((j) => j.n === 18)
+        const b = n.rodaje.jornadas.find((j) => j.n === 19)
+        const campos = ['localizacion', 'tipo', 'franja', 'roles', 'nota']
+        for (const c of campos) [a[c], b[c]] = [b[c], a[c]]
+        efectos.push({ ambito: 'plan', id: 'J18', campo: 'localizacion', antes: b.localizacion, despues: a.localizacion })
+      } else if (accion.riesgoId === 'RG-5') {
+        for (const j of n.rodaje.jornadas.filter((x) => n.rodaje.senales.noches.jornadas.includes(x.n))) {
+          j.franja = 'Tarde-noche'
+          j.nota = 'Citación más tardía para reducir horas extra'
+        }
+        efectos.push({ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' })
+      } else return m
+      if (n.reservas[accion.riesgoId]) {
+        efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+        delete n.reservas[accion.riesgoId]
+      }
+      n.decisionesRiesgo[accion.riesgoId] = { estado: 'mitigado', opcion: accion.opcion ?? null, por: accion.por ?? null }
+      return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId }, efectos)
+    }
+
+    case 'riesgo/reservar': {
+      const d0 = m.decisionesRiesgo[accion.riesgoId]
+      if (!(accion.importe > 0)) return m
+      if (d0 && !(d0.estado === 'reservado' && Math.abs(d0.importe - accion.importe) > 0.5)) return m
+      const n = clonar(m)
+      const antes = n.reservas[accion.riesgoId]?.importe ?? 0
+      n.reservas[accion.riesgoId] = { importe: accion.importe, por: accion.por ?? null }
+      n.decisionesRiesgo[accion.riesgoId] = { estado: 'reservado', importe: accion.importe, por: accion.por ?? null }
+      return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId }, [{ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes, despues: accion.importe }])
+    }
+
+    case 'riesgo/aceptar': {
+      if (m.decisionesRiesgo[accion.riesgoId]) return m
+      const n = clonar(m)
+      n.decisionesRiesgo[accion.riesgoId] = { estado: 'aceptado', por: accion.por ?? null }
+      return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId })
     }
 
     // ── Propuesta de presupuesto ──────────────────────────────────────────

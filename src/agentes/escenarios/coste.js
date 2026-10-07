@@ -3,6 +3,8 @@
 import { reducirVarias } from '../acciones.js'
 import { confianzaBaja } from '../politicas.js'
 import { eurSigned } from '../../lib/format.js'
+import { decisionesAbiertas } from '../pendientes.js'
+import { riesgosAltos } from '../rodaje.js'
 import { cuenta } from '../texto.js'
 import { t, v, c, POLITICAS, paso, sug, texto, aviso, lista, kpisProyecto, bloqueDesviaciones, tablaCapitulos, tablaPartidas, bloqueCaja, aprobacionOrden } from './comun.js'
 
@@ -406,7 +408,8 @@ export const resumen = {
   },
   componer({ despues: m }) {
     const tot = c.totales(m)
-    const ex = c.excepciones(m)
+    const ex = decisionesAbiertas(m)
+    const altos = riesgosAltos(m)
     return {
       bloques: [
         texto(
@@ -419,9 +422,10 @@ export const resumen = {
           }),
         ),
         kpisProyecto(m),
+        ...(altos.length ? [texto(t('Riesgos de rodaje: {n}. El primero: {r}.', { n: cuenta(altos.length, 'alto abierto', 'altos abiertos'), r: altos[0].titulo }))] : []),
         { tipo: 'decisiones' },
       ],
-      sugerencias: [sug('Prepárame el informe semanal de coste'), sug('¿Qué capítulos están fuera de rango?'), sug('¿Qué puedes hacer?')],
+      sugerencias: [sug('Prepárame el informe semanal de coste'), sug('¿Qué riesgos hay para las próximas jornadas?'), sug('¿Qué capítulos están fuera de rango?')],
       fuentes: ['Presupuesto ICAA por partidas', 'Cola de excepciones'],
       reglas: [],
       noHecho: [t('Solo ha leído datos.')],

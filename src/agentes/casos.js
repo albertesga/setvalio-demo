@@ -123,6 +123,16 @@ export const CASOS = [
     capacidad: 'exploratoria',
   },
   {
+    id: 'riesgos',
+    grupo: 'anticipa',
+    titulo: 'Riesgos de rodaje',
+    descripcion: 'Lluvia en un exterior, una ausencia, un permiso pendiente o una orden del día sin publicar: avisa antes y propone qué hacer.',
+    prompt: '¿Qué riesgos hay para las próximas jornadas?',
+    agentes: ['riesgos', 'prevision', 'excepciones'],
+    nivel: 'aprueba',
+    capacidad: 'exploratoria',
+  },
+  {
     id: 'alcance',
     grupo: 'anticipa',
     titulo: 'Lo que aún no hace',
@@ -151,6 +161,7 @@ export const CASO_DE_INTENCION = {
   presupuesto_nuevo: 'presupuesto',
   anadir_coste: 'presupuesto',
   optimizar_proveedores: 'proveedores',
+  riesgos: 'riesgos',
 }
 
 // Recorrido guiado: cada paso envía una entrada y explica qué mirar.
@@ -162,6 +173,7 @@ export const RECORRIDO = [
   { id: 'r5', titulo: 'Desviación', entrada: { tipo: 'texto', texto: '¿Por qué se desvía Escenografía?' }, nota: 'Pregunta con tus palabras. La respuesta lleva cifras y de dónde salen.' },
   { id: 'r6', titulo: 'Cierre y caja', entrada: { tipo: 'texto', texto: '¿Cómo cerraremos el proyecto y llegamos con la caja?' }, nota: 'Previsión no mueve dinero: calcula, avisa y propone.' },
   { id: 'r7', titulo: 'Dossier fiscal', entrada: { tipo: 'texto', texto: '¿Qué bloquea el dossier fiscal?' }, nota: 'Cumplimiento prepara; el fiscalista revisa y firma.' },
+  { id: 'r7b', titulo: 'Riesgos de rodaje (exploratorio)', entrada: { tipo: 'evento', eventoId: 'EV-RIESGOS' }, nota: 'Un agente proactivo: el parte de riesgos llega sin pedirlo. Avisa con antelación, propone una respuesta y, si hay dinero en juego, te deja decidir si se reserva.' },
   { id: 'r8', titulo: 'Pedir documentación (exploratorio)', entrada: { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' }, nota: 'Un borrador listo para revisar. En la demo no sale ningún correo.' },
   { id: 'r9', titulo: 'Incentivo (exploratorio)', entrada: { tipo: 'texto', texto: '¿Cuánto supondría llegar al 50 % de gasto en Canarias?' }, nota: 'Exploratorio: una estimación orientativa, fuera del alcance decidido.' },
   { id: 'r10', titulo: 'Primera propuesta de presupuesto (por validar)', entrada: { tipo: 'texto', texto: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa' }, nota: 'Otro proyecto, antes del rodaje: tus costes con proveedor más una estimación por capítulo, frente al objetivo.' },

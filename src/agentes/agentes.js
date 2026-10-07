@@ -81,9 +81,18 @@ export const AGENTES = {
     hace: 'Compara el directorio con tus requisitos y, con tu permiso, llama para confirmar el precio final. No reserva ni negocia: eliges tú.',
     niveles: ['ejecuta', 'propone', 'aprueba'],
   },
+  riesgos: {
+    id: 'riesgos',
+    nombre: 'Riesgos de producción',
+    codigo: 'RG',
+    rol: 'Vigila el plan de rodaje y avisa de lo que puede alterarlo.',
+    hace: 'Cruza el plan con el tiempo, convocatorias, permisos y órdenes del día; avisa con antelación, propone una respuesta y calcula el impacto. Cambiar el plan o reservar dinero lo decides tú.',
+    niveles: ['ejecuta', 'propone', 'aprueba'],
+    exploratorio: true,
+  },
 }
 
-export const ORDEN_AGENTES = ['orquestador', 'presupuesto', 'proveedores', 'facturas', 'conciliacion', 'excepciones', 'prevision', 'costes', 'informes', 'cumplimiento']
+export const ORDEN_AGENTES = ['orquestador', 'presupuesto', 'proveedores', 'facturas', 'conciliacion', 'excepciones', 'prevision', 'costes', 'informes', 'cumplimiento', 'riesgos']
 
 export const AUTONOMIA = {
   ejecuta: {

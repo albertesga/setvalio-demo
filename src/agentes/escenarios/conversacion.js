@@ -16,6 +16,9 @@ const EJEMPLO = {
   incentivo: '¿Cuánto supondría llegar al 50 % de gasto en Canarias?',
   ayuda: '¿Qué puedes hacer?',
   resumen: '¿Cómo vamos?',
+  riesgos: '¿Qué riesgos hay para las próximas jornadas?',
+  presupuesto_nuevo: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa',
+  optimizar_proveedores: 'Optimiza los proveedores de la propuesta',
 }
 
 export const ayuda = {
@@ -48,6 +51,7 @@ export const ayuda = {
             { texto: t('Una compra de más de {imp} la aprueba line producer.', { imp: v(POLITICAS.umbralImporteOc, 'eur') }) },
             { texto: t('Si deja su capítulo por encima del {u}, la aprueba producción ejecutiva.', { u: v(POLITICAS.umbralDesviacion, 'pct0') }) },
             { texto: t('Lo fiscal lo valida el fiscalista. Los correos y los pagos nunca salen del asistente.') },
+            { texto: t('Riesgos de producción avisa sin que se lo pidas; cambiar el plan lo decide line producer y reservar dinero, producción ejecutiva.') },
           ],
         },
       ],
@@ -103,6 +107,9 @@ const NOMBRE_INTENCION = {
   incentivo: 'el incentivo fiscal',
   ayuda: 'lo que hacen los agentes',
   resumen: 'un resumen',
+  riesgos: 'los riesgos de rodaje',
+  presupuesto_nuevo: 'la propuesta de presupuesto',
+  optimizar_proveedores: 'optimizar proveedores',
 }
 
 export const desambiguar = {

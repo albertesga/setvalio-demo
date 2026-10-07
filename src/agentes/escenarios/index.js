@@ -7,7 +7,8 @@ import { cumplimiento, incentivo } from './fiscal.js'
 import { ayuda, fueraAlcance, desambiguar, noEntendido } from './conversacion.js'
 import { accion } from './decisiones.js'
 import { presupuestoNuevo, anadirCoste, optimizarProveedores } from './presupuesto.js'
+import { riesgos } from './riesgos.js'
 
 export const ESCENARIOS = Object.fromEntries(
-  [informeSemanal, explicarDesviacion, prevision, resumen, facturaNueva, revisarGasto, pedirDocumentacion, aprobarOc, cumplimiento, incentivo, ayuda, fueraAlcance, desambiguar, noEntendido, accion, presupuestoNuevo, anadirCoste, optimizarProveedores].map((e) => [e.id, e]),
+  [informeSemanal, explicarDesviacion, prevision, resumen, facturaNueva, revisarGasto, pedirDocumentacion, aprobarOc, cumplimiento, incentivo, ayuda, fueraAlcance, desambiguar, noEntendido, accion, presupuestoNuevo, anadirCoste, optimizarProveedores, riesgos].map((e) => [e.id, e]),
 )

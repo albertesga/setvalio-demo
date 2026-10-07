@@ -14,6 +14,9 @@ const EVENTOS = {
   'EV-01': 'factura_nueva',
   'EV-02': 'aprobar_oc',
   'EV-03': 'cumplimiento',
+  'EV-RIESGOS': 'riesgos',
+  'EV-CITACION': 'riesgos',
+  'EV-LLUVIA': 'riesgos',
 }
 
 /** Entrada → detección: { intencion, entidades, eventoId?, accion?, texto? }. */

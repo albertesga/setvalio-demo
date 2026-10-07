@@ -163,6 +163,20 @@ export function extraerEntidades(texto, mundo) {
   const mPct = norm.match(/(\d{1,3}(?:[.,]\d+)?)\s*(%|por ?ciento)/)
   if (mPct) e.porcentaje = Number(mPct[1].replace(',', '.')) / 100
 
+  // Riesgos de rodaje: jornada y riesgo por palabras clave cualificadas.
+  const mJ = norm.match(/\bjornadas?\s*(\d{1,2})\b/)
+  if (mJ) e.jornada = Number(mJ[1])
+  const RIESGO = [
+    [/\b(lluvia|llover|llovera|llueve|lloviendo|meteo|meteorolog|chubasco|tormenta)|prevision del tiempo/, 'RG-1'],
+    [/\b(actriz|billete|vuelo|ausencia|no show|no se presente)/, 'RG-2'],
+    [/(permiso de rodaje|via publica|permiso municipal)/, 'RG-3'],
+    [/(orden de rodaje|orden del dia|hoja de citacion|call sheet|citacion de manana)/, 'RG-4'],
+    [/(horas extra|rodaje de noche|jornadas de noche|las noches)/, 'RG-5'],
+    [/(cambio de localizacion|aviso a transportes|avisa a transportes|avisar a transportes)/, 'RG-6'],
+  ]
+  const r = RIESGO.find(([re]) => re.test(norm))
+  if (r) e.riesgo = r[1]
+
   if (/\b(envia|enviar|enviale|envialo|enviala|manda|mandar|mandale|mandalo)\b/.test(norm)) e.accionExterna = 'enviar'
   if (/\b(paga|pagar|pagale|pagala|pagues|abona|abonar|transfiere|transferir|haz la transferencia)\b/.test(norm)) e.accionExterna = 'pagar'
 
@@ -199,7 +213,7 @@ export const LEXICO = {
     raices: { forecast: 3, cef: 3, previs: 2, cierre: 2, proyecc: 2, tesorer: 3, caja: 3, saldo: 2, liquidez: 3, cerra: 1, negativ: 1 },
   },
   cumplimiento: {
-    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para'],
+    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal'],
     raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1 },
   },
   pedir_documentacion: {
@@ -211,6 +225,11 @@ export const LEXICO = {
     frases: ['tax credit', 'deduccion fiscal', 'incentivo fiscal', 'incentivos fiscales', '36 lis', 'retorno fiscal', 'cuanto supondria', 'cuanto podemos recuperar'],
     raices: { incentiv: 3, deduc: 3, desgrav: 3, retorno: 2, intensidad: 2, credito: 1, recuper: 1 },
     entidades: { porcentaje: 1, territorio: 1 },
+  },
+  riesgos: {
+    frases: ['que riesgos', 'riesgos de rodaje', 'riesgos del rodaje', 'parte de riesgos', 'radar de riesgos', 'que puede salir mal', 'proximas jornadas', 'prevision del tiempo', 'va a llover', 'orden del dia', 'orden de rodaje', 'call sheet', 'hoja de citacion', 'horas extra de noche', 'via publica', 'cambio de localizacion', 'aviso a transportes', 'informe de riesgos'],
+    raices: { riesg: 3, radar: 3, lluv: 3, llov: 3, llue: 3, meteo: 3, citacion: 2, billete: 2, jornad: 1 },
+    entidades: { riesgo: 2, jornada: 2 },
   },
   presupuesto_nuevo: {
     frases: ['primera propuesta de presupuesto', 'propuesta de presupuesto', 'preparar el presupuesto', 'prepara el presupuesto', 'crear el presupuesto', 'nuevo presupuesto', 'hacer el presupuesto', 'montar el presupuesto', 'primer presupuesto'],
@@ -243,6 +262,7 @@ const HEREDA = {
   pedir_documentacion: ['proveedor', 'documento'],
   incentivo: ['porcentaje', 'territorio'],
   cumplimiento: ['documento'],
+  riesgos: ['riesgo', 'jornada'],
 }
 
 function puntuar(norm, tokens, entidades, mundo) {
@@ -265,6 +285,9 @@ function puntuar(norm, tokens, entidades, mundo) {
     if (doc.impuesto?.tipo === 'IGIC') out.cumplimiento += 1
   }
   if (entidades.proveedor === 'Ferretería El Tornillo') out.revisar_gasto += 2
+  // «Aprueba las horas extra de Eléctricos Prado» es una orden de compra, no un riesgo.
+  if (entidades.oc && !/riesg/.test(norm)) out.riesgos = 0
+  if (/riesgo fiscal|riesgos fiscales/.test(norm)) out.riesgos = 0
   return out
 }
 
@@ -289,6 +312,11 @@ export function detectarIntencion(texto, mundo, contexto = {}) {
 
   const puntos = puntuar(norm, tokens, entidades, mundo)
 
+  // «Manda el aviso…», «envía el informe de riesgos»: nunca se envía; se enseña el borrador.
+  if (entidades.accionExterna === 'enviar' && (entidades.riesgo || /riesg/.test(norm) || (contexto.ultimaIntencion === 'riesgos' && !/(factura|proveedor|informe semanal)/.test(norm)))) {
+    const riesgo = entidades.riesgo ?? (/riesg/.test(norm) ? undefined : contexto.ultimasEntidades?.riesgo)
+    return { intencion: 'riesgos', puntuacion: 9, entidades: { ...entidades, riesgo, quiereEnviar: true }, alternativas: [] }
+  }
   // «apruébala», «recházala»: la orden de la que se hablaba.
   if (!entidades.oc && /\b(apruebala|aprobala|rechazala|autorizala)\b/.test(norm) && contexto.ultimasEntidades?.oc) {
     return { intencion: 'aprobar_oc', puntuacion: 9, entidades: { ...entidades, oc: contexto.ultimasEntidades.oc }, alternativas: [], heredada: true }
