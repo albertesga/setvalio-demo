@@ -46,7 +46,7 @@ export function useAgentes({ ritmo = 'normal' } = {}) {
         return
       }
       const ahora = performance.now()
-      const ms = Math.min(1000, ahora - ultimo)
+      const ms = Math.min(5000, ahora - ultimo)
       ultimo = ahora
       despachar({ tipo: 'avanzar', ms: activo ? ms * factor : ms })
     }, intervalo)

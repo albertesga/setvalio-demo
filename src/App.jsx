@@ -15,6 +15,7 @@ import {
   IconBookmark,
   IconFilm,
   IconSearch,
+  IconArrowLeft,
 } from './components/icons.jsx'
 
 import Landing from './screens/Landing.jsx'
@@ -37,6 +38,7 @@ const Informes = lazy(() => import('./screens/Informes.jsx'))
 const Documental = lazy(() => import('./screens/Documental.jsx'))
 const Despacho = lazy(() => import('./screens/Despacho.jsx'))
 const DesignSystem = lazy(() => import('./screens/DesignSystem.jsx'))
+const Agentes = lazy(() => import('./screens/Agentes.jsx'))
 
 const NAV_ICONS = {
   proyectos: IconFilm,
@@ -57,8 +59,25 @@ const NAV_ICONS = {
   'design-system': IconBookmark,
 }
 
+// ?vista=agentes abre directamente el prototipo conversacional (enlace compartible en GitHub Pages).
+function rutaInicial() {
+  if (typeof window === 'undefined') return 'landing'
+  return new URLSearchParams(window.location.search).get('vista') === 'agentes' ? 'agentes' : 'landing'
+}
+
+function sincronizarVista(route) {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  const actual = url.searchParams.get('vista')
+  if (route === 'agentes' && actual !== 'agentes') url.searchParams.set('vista', 'agentes')
+  else if (route !== 'agentes' && actual) url.searchParams.delete('vista')
+  else return
+  window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+}
+
 export default function App() {
-  const [route, setRoute] = useState('landing')
+  const [route, setRoute] = useState(rutaInicial)
+  const [desdeAgentes, setDesdeAgentes] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [gastosPendientes, setGastosPendientes] = useState(12)
   const [toast, setToast] = useState(null)
@@ -76,7 +95,10 @@ export default function App() {
       if (!prev[id]) return prev
       return { ...prev, [id]: null }
     })
+    if (route === 'agentes' && id !== 'agentes' && id !== 'landing') setDesdeAgentes(true)
+    if (id === 'agentes' || id === 'landing') setDesdeAgentes(false)
     setRoute(id)
+    sincronizarVista(id)
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
   }
 
@@ -156,6 +178,10 @@ export default function App() {
     >
       {route === 'landing' ? (
         <Landing onNavigate={navegar} />
+      ) : route === 'agentes' ? (
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted" role="status">Cargando agentes…</div>}>
+          <Agentes onNavigate={navegar} contexto={routeContext.agentes} pushToast={pushToast} />
+        </Suspense>
       ) : (
         <div className="flex min-h-screen lg:p-4">
       <Sidebar
@@ -208,6 +234,17 @@ export default function App() {
         </main>
       </div>
         </div>
+      )}
+
+      {desdeAgentes && route !== 'agentes' && route !== 'landing' && (
+        <button
+          type="button"
+          onClick={() => navegar('agentes')}
+          className="fixed bottom-5 left-4 z-[55] inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-ink px-4 text-sm font-semibold text-surface shadow-modal hover:bg-primary-hover lg:left-6"
+        >
+          <IconArrowLeft size={16} aria-hidden="true" />
+          Volver a la conversación
+        </button>
       )}
 
       {/* Toast */}

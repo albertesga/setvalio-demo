@@ -10,7 +10,7 @@ function cambioCaja(antes, despues) {
 
 export const accion = {
   id: 'accion',
-  titulo: 'Decisión',
+  titulo: 'Tras tu decisión',
   ejemplos: [],
 
   planificar(m, det) {

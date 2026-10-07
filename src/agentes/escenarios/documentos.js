@@ -243,6 +243,7 @@ export const revisarGasto = {
           a.exceso > 0 && b.exceso === 0
             ? t('{pa} ya no tiene pendiente: ahí sube el coste estimado final {exc}. En {pb} cabe en lo previsto.', { pa: v(d.partida, 'id'), exc: v(a.exceso, 'eurCents'), pb: v(d.alternativa, 'id') })
             : t('Elige la partida; el coste se recalcula al confirmar.'),
+        impactoTitulo: 'Según la partida',
         impacto: [
           { etiqueta: `Si va a ${d.partida} · coste estimado final`, antes: a.partida.antes.cef, despues: a.partida.despues.cef, formato: 'eurCents' },
           { etiqueta: `Si va a ${d.alternativa} · coste estimado final`, antes: b.partida.antes.cef, despues: b.partida.despues.cef, formato: 'eurCents' },

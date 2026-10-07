@@ -69,7 +69,8 @@ export function bloqueDesviaciones(m, { capitulos = null, conCausas = true } = {
     desviacionPct: x.desviacionPct,
     fueraRango: x.fueraRango,
     margenUmbral: x.margenUmbral,
-    causas: conCausas ? x.causas : [],
+    // Causas: solo las que empujan hacia arriba; con conCausas = 'fuera', solo de capítulos fuera de umbral.
+    causas: !conCausas || (conCausas === 'fuera' && !x.fueraRango) || (!capitulos && x.desviacion < 0) ? [] : x.causas.filter((p) => (x.desviacion > 0 ? p.desviacion > 0 : true)),
   }))
   return { tipo: 'desviaciones', umbral: d.umbral, items, resumen: capitulos ? null : d.resumen }
 }

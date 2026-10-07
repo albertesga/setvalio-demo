@@ -103,7 +103,7 @@ export const informeSemanal = {
         ),
       )
     }
-    bloques.push(bloqueDesviaciones(despues))
+    bloques.push(bloqueDesviaciones(despues, { conCausas: 'fuera' }))
     bloques.push({ tipo: 'informe', id: despues.periodo.id })
     bloques.push({ tipo: 'decisiones' })
     bloques.push({

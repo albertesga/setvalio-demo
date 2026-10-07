@@ -4,7 +4,7 @@
 // aplicó, el documento no está en la bandeja…) devuelve el MISMO objeto: así es
 // idempotente y la interfaz puede reintentar sin duplicar importes.
 
-import { r2, pendiente, totales } from './calculos.js'
+import { r2, pendiente, totales, desviaciones, excepciones, dossier, tesoreria } from './calculos.js'
 import { crearMundo } from './mundo.js'
 
 function clonar(m) {
@@ -145,7 +145,26 @@ export function reducir(m, accion) {
       const n = clonar(m)
       const id = accion.periodoId ?? n.periodo.id
       const previo = n.informes[id]
-      n.informes[id] = { id, periodo: n.periodo, estado: 'borrador', edicion: (previo?.edicion ?? 0) + 1, totales: totales(n) }
+      const des = desviaciones(n)
+      const ex = excepciones(n)
+      const dos = dossier(n)
+      const tes = tesoreria(n)
+      n.informes[id] = {
+        id,
+        periodo: n.periodo,
+        estado: 'borrador',
+        edicion: (previo?.edicion ?? 0) + 1,
+        totales: totales(n),
+        resumen: {
+          sobrecostes: des.resumen.sobrecostes,
+          ahorros: des.resumen.ahorros,
+          capitulos: des.items.slice(0, 4).map((c) => ({ id: c.id, nombre: c.nombre, desviacion: c.desviacion, desviacionPct: c.desviacionPct, fueraRango: c.fueraRango })),
+          decisiones: ex.length,
+          conAprobacion: ex.filter((e) => e.nivel === 'aprueba').length,
+          vencimiento: dos.reduce((a, d) => (d.dias < a.dias ? d : a), dos[0]),
+          cajaMinima: { semana: tes.minimo.semana, fechas: tes.minimo.fechas, saldo: tes.minimo.saldo },
+        },
+      }
       return confirmar(n, accion, { tipo: 'informe', id })
     }
 
