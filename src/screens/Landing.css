@@ -91,12 +91,18 @@
 
 /* ── Foto B/N (imagen conceptual) ─────────────────────────────────────────── */
 .landing-photo-band { position: relative; display: grid; min-height: clamp(420px, 56vw, 640px); align-items: end; overflow: hidden; }
-.landing-photo-media { position: absolute; inset: 0; }
+/* La foto es más alta que la banda: así puede moverse sin dejar ver los bordes. */
+.landing-photo-media { position: absolute; inset: -12% 0; transform-origin: 62% 50%; will-change: transform; }
 .landing-photo-media picture, .landing-photo-media img { width: 100%; height: 100%; }
 .landing-photo-media img { object-fit: cover; object-position: 70% center; }
 /* Capa de contraste a la izquierda: el interés de la foto está a la derecha. */
 .landing-photo-band::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgb(20 20 20 / 0.88) 0%, rgb(20 20 20 / 0.62) 42%, rgb(20 20 20 / 0) 72%); }
-.landing-photo-copy { position: relative; z-index: 1; display: grid; gap: 16px; padding-block: clamp(3rem, 6vw, 5rem); }
+.landing-photo-copy { position: relative; z-index: 2; display: grid; gap: 16px; padding-block: clamp(3rem, 6vw, 5rem); }
+.landing-photo-capa { display: block; will-change: transform, opacity; }
+/* Bandas de cine: se cierran cuando la sección llega al centro de la pantalla. */
+.landing-photo-banda { position: absolute; z-index: 1; right: 0; left: 0; height: 9%; background: var(--flp-carbon); transform: scaleY(0); pointer-events: none; }
+.landing-photo-banda.is-arriba { top: 0; transform-origin: top; }
+.landing-photo-banda.is-abajo { bottom: 0; transform-origin: bottom; }
 .landing-photo-copy .flp-title { max-width: 12ch; color: var(--flp-chalk); }
 .landing-photo-copy .flp-body { max-width: 40ch; color: var(--flp-chalk); }
 .landing-photo-copy small { color: var(--flp-silver); }
@@ -174,3 +180,8 @@
   .landing-sheet-list > div { flex-wrap: wrap; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .landing-photo-media { inset: 0; transform: none !important; }
+  .landing-photo-capa { transform: none !important; opacity: 1 !important; }
+  .landing-photo-banda { display: none; }
+}
