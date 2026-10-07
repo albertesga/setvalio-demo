@@ -73,6 +73,14 @@ Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por re
 
 `images/production-team-*` es una **imagen generada de concepto**: no representa al equipo, a clientes ni a un rodaje real. El `alt` y la portada lo dicen. El interés está en la mitad derecha; el texto va a la izquierda sobre una capa de contraste.
 
+En la portada, la banda de la foto se mueve por capas con el scroll, sin bucles:
+
+- **Foto:** va más lenta que la página y con un leve acercamiento.
+- **Texto:** va algo más rápido y cada línea a su ritmo.
+- **Bandas de cine:** dos bandas carbón se cierran cuando la sección llega al centro.
+
+Con `prefers-reduced-motion` todo queda quieto.
+
 ## Metadatos
 
 `index.html` usa el favicon, el `site.webmanifest` y la imagen social del kit (`social/og-filmpilot.png`) con URL absoluta bajo `https://albertesga.github.io/setvalio-demo/`. El `theme-color` es tiza (`#F5F4EF`).
