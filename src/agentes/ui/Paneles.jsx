@@ -9,10 +9,11 @@ import * as c from '../calculos.js'
 import { fechaCorta } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentTile, AutonomyBadge, Tono } from './Piezas.jsx'
-import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
+import { ListaDecisiones, decisionesAbiertas, RadarRiesgos } from './Bloques.jsx'
+import { riesgosAltos } from '../rodaje.js'
 
 // Qué agente sostiene cada tipo de decisión pendiente.
-const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores' }
+const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores', riesgo: 'riesgos' }
 
 export function estadoAgentes(s) {
   const out = Object.fromEntries(ORDEN_AGENTES.map((id) => [id, { estado: 'disponible', detalle: null, espera: 0 }]))
@@ -213,7 +214,7 @@ export function PanelActividad({ s }) {
         <div className="mb-4 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs text-muted">
           {s.mensajes.some((m) => m.rol === 'agentes')
             ? `Quedan ${quedan} ${quedan === 1 ? 'novedad' : 'novedades'} de ejemplo por llegar mientras conversas.`
-            : 'Cuando empieces a conversar irán llegando facturas y solicitudes de ejemplo.'}
+            : 'Cuando empieces a conversar irán llegando avisos de riesgos, facturas y solicitudes de ejemplo.'}
           <button type="button" className="ag-link ml-1" disabled={ocupado} onClick={() => despachar({ tipo: 'simularEvento' })}>
             Traer la siguiente ahora
           </button>
@@ -240,7 +241,7 @@ export function PanelActividad({ s }) {
 }
 
 export function PanelDecisiones({ s }) {
-  const decididas = [...s.mundo.historial].reverse().filter((h) => h.por && h.ref && ['orden', 'documento', 'revision', 'cef', 'informe', 'borrador', 'llamadas', 'eleccion', 'linea'].includes(h.ref.tipo) && !['Conciliación', 'Informes'].includes(h.por))
+  const decididas = [...s.mundo.historial].reverse().filter((h) => h.por && h.ref && ['orden', 'documento', 'revision', 'cef', 'informe', 'borrador', 'llamadas', 'eleccion', 'linea', 'riesgo'].includes(h.ref.tipo) && !['Conciliación', 'Informes'].includes(h.por))
   const VERBO = {
     'orden/aprobar': 'aprueba',
     'orden/rechazar': 'rechaza',
@@ -256,7 +257,11 @@ export function PanelDecisiones({ s }) {
     'propuesta/noLlamar': 'decide no llamar',
     'propuesta/elegir': 'elige proveedor para',
     'propuesta/anadirLinea': 'añade a la propuesta',
+    'riesgo/mitigar': 'cambia el plan por',
+    'riesgo/reservar': 'aprueba una reserva por',
+    'riesgo/aceptar': 'asume',
   }
+  const NOMBRE_RIESGO = { 'RG-1': 'la lluvia de la jornada 18', 'RG-5': 'las horas extra de noche' }
   return (
     <div>
       <h3 className="mb-2 text-xs font-bold text-muted">Pendientes</h3>
@@ -267,7 +272,7 @@ export function PanelDecisiones({ s }) {
           <ul className="space-y-2">
             {decididas.map((h) => (
               <li key={h.version} className="text-sm text-muted">
-                <strong className="text-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-semibold text-ink">{h.ref.id}</span>
+                <strong className="text-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-semibold text-ink">{h.ref.tipo === 'riesgo' ? NOMBRE_RIESGO[h.ref.id] ?? 'un riesgo' : h.ref.id}</span>
               </li>
             ))}
           </ul>
@@ -278,3 +283,21 @@ export function PanelDecisiones({ s }) {
 }
 
 export { CASOS }
+
+export function PanelRiesgos({ s }) {
+  const altos = riesgosAltos(s.mundo).length
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <AgentTile id="riesgos" size={28} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-ink">Riesgos de producción</p>
+          <p className="text-xs text-muted">{altos ? `${altos} ${altos === 1 ? 'riesgo alto abierto' : 'riesgos altos abiertos'}` : 'Sin riesgos altos abiertos'} · vigila las jornadas que quedan</p>
+        </div>
+        <span className="ag-etiqueta-capacidad">Exploratorio</span>
+      </div>
+      <RadarRiesgos compacto />
+      <p className="mt-3 text-xs text-muted">Plan, previsión del tiempo, convocatorias y permisos son de ejemplo.</p>
+    </div>
+  )
+}

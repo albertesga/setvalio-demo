@@ -4,13 +4,15 @@
 
 import { useEffect, useId, useState } from 'react'
 import { Button } from '../../components/ui.jsx'
-import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload, IconPlay } from '../../components/icons.jsx'
+import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload, IconPlay, IconClock } from '../../components/icons.jsx'
 import { formatear, renderTexto, fecha as fechaLarga } from '../texto.js'
 import * as c from '../calculos.js'
 import { puedeDecidir } from '../politicas.js'
 import { AGENTES } from '../agentes.js'
 import { useCtx } from './contexto.js'
-import { totalesPropuesta, capitulosPropuesta, decisionesPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
+import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
+import { decisionesAbiertas } from '../pendientes.js'
+import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
 import { useMovimientoReducido } from '../useAgentes.js'
 import { Tx, AutonomyBadge, Tono, AgentTile } from './Piezas.jsx'
 
@@ -271,7 +273,13 @@ function BloqueDesviaciones({ b }) {
       </ul>
       {b.resumen && (
         <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
-          Sobrecostes <strong className="tnum text-ink">{formatear(b.resumen.sobrecostes, 'eurSigned')}</strong> · ahorros <strong className="tnum text-ink">{formatear(b.resumen.ahorros, 'eurSigned')}</strong> · neto <strong className="tnum text-ink">{formatear(b.resumen.neto, 'eurSigned')}</strong>
+          Sobrecostes <strong className="tnum text-ink">{formatear(b.resumen.sobrecostes, 'eurSigned')}</strong> · ahorros <strong className="tnum text-ink">{formatear(b.resumen.ahorros, 'eurSigned')}</strong> {b.resumen.reservas > 0 && (
+            <>
+              {' '}
+              · reservas de riesgos <strong className="tnum text-ink">{formatear(b.resumen.reservas, 'eurSigned')}</strong>
+            </>
+          )}{' '}
+          · neto <strong className="tnum text-ink">{formatear(b.resumen.neto, 'eurSigned')}</strong>
         </p>
       )}
     </div>
@@ -390,6 +398,9 @@ const ESTADO_DECISION = {
   aprobada: { etiqueta: 'Aprobada', tono: 'positive' },
   rechazada: { etiqueta: 'Rechazada', tono: 'neutral' },
   preparada: { etiqueta: 'Paquete preparado · no enviado', tono: 'info' },
+  mitigado: { etiqueta: 'Plan cambiado', tono: 'positive' },
+  reservado: { etiqueta: 'Reserva aprobada', tono: 'info' },
+  aceptado: { etiqueta: 'Riesgo asumido', tono: 'neutral' },
 }
 
 export function BloqueAprobacion({ b }) {
@@ -465,7 +476,7 @@ export function BloqueAprobacion({ b }) {
             {decidida.etiqueta}
           </Tono>
           {ed.por && <span className="text-xs text-muted">por {ed.por}</span>}
-          {ed.estado === 'aprobada' && ed.importe !== undefined && <span className="text-xs text-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
+          {ed.importe !== undefined && ed.importe !== null && <span className="text-xs text-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
         </div>
       ) : informeViejo ? (
         <div className="mt-4">
@@ -476,6 +487,11 @@ export function BloqueAprobacion({ b }) {
         </div>
       ) : (
         <>
+          {ed.reservaActual !== undefined && (
+            <div className="mt-4">
+              <Tono tono="info">Reserva aprobada ahora: {formatear(ed.reservaActual, 'eur')}</Tono>
+            </div>
+          )}
           {(yaPedida || ed.aplazado) && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {yaPedida && <Tono tono="info">Pendiente de {ed.escaladaA}{ed.por ? ` · pedido por ${ed.por}` : ''}</Tono>}
@@ -525,9 +541,7 @@ export function BloqueAprobacion({ b }) {
 
 // ── Cola de decisiones (en vivo) ─────────────────────────────────────────────
 
-export function decisionesAbiertas(mundo) {
-  return [...c.excepciones(mundo), ...decisionesPropuesta(mundo)]
-}
+export { decisionesAbiertas }
 
 export function ListaDecisiones({ compacta = false }) {
   const { mundo, enviar, ocupado } = useCtx()
@@ -544,7 +558,7 @@ export function ListaDecisiones({ compacta = false }) {
               {e.aplazado && <span className="text-xs font-semibold text-muted">· en revisión</span>}
             </div>
             <div className="mt-1 text-sm font-semibold text-ink">{e.titulo}</div>
-            {e.importe > 0 && <div className="tnum text-xs text-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
+            {e.importe > 0 && <div className="tnum text-xs text-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Reserva propuesta ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
           </div>
           <button type="button" className="ag-boton-fila" disabled={ocupado} onClick={() => enviar(e.entrada)}>
             Revisar <IconChevronRight size={15} aria-hidden="true" />
@@ -653,6 +667,20 @@ function BloqueInforme({ b }) {
               <span>Caja mínima · {r.cajaMinima.semana}</span>
               <span className="tnum">{formatear(r.cajaMinima.saldo, 'eur')}</span>
             </li>
+            {r.reservas > 0 && (
+              <li>
+                <span>Reservas de riesgos en la previsión</span>
+                <span className="tnum">{formatear(r.reservas, 'eur')}</span>
+              </li>
+            )}
+            {r.riesgosAltos?.map((x) => (
+              <li key={x.id}>
+                <span>
+                  Riesgo alto: <Tx value={x.titulo} />
+                </span>
+                <span>abierto</span>
+              </li>
+            ))}
           </ul>
         </section>
       </div>
@@ -726,7 +754,9 @@ function BloqueBorrador({ b }) {
       </label>
       <textarea id={`${uid}-cuerpo`} className="fp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} onBlur={guardar} disabled={cerrado} />
       {cuerpo.includes('[') && !cerrado && <p className="mt-1 text-xs text-warning">Completa los campos entre corchetes antes de enviarlo.</p>}
-      <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-muted">En la demo no se envía nada: copia el texto y envíalo tú desde tu correo.</p>
+      <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-muted">
+        {bor.canal === 'email' ? 'En la demo no se envía nada: copia el texto y envíalo tú desde tu correo.' : 'En la demo no se envía nada: copia el texto y mándalo tú por el canal del equipo.'}
+      </p>
       {!cerrado && (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="primary" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id, asunto, cuerpo }, `Marcar como revisado · ${bor.para}`)}>
@@ -1148,6 +1178,120 @@ function BloqueLlamada({ b }) {
   )
 }
 
+// ── Riesgos de producción ────────────────────────────────────────────────────
+
+const SEVERIDAD = {
+  alta: { etiqueta: 'Riesgo alto', tono: 'negative', Icon: IconAlert },
+  media: { etiqueta: 'Riesgo medio', tono: 'warning', Icon: IconClock },
+  baja: { etiqueta: 'Riesgo bajo', tono: 'neutral', Icon: null },
+  controlado: { etiqueta: 'Controlado', tono: 'positive', Icon: IconCheck },
+}
+
+export function ChipSeveridad({ severidad }) {
+  const s = SEVERIDAD[severidad] ?? SEVERIDAD.baja
+  const Icon = s.Icon
+  return (
+    <Tono tono={s.tono}>
+      {Icon && <Icon size={12} strokeWidth={2.6} aria-hidden="true" />}
+      {s.etiqueta}
+    </Tono>
+  )
+}
+
+const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido' }
+
+/** Radar en vivo: lee el mundo actual, así que cambia con cada novedad o decisión. */
+export function RadarRiesgos({ compacto = false }) {
+  const { mundo, enviar, ocupado } = useCtx()
+  const riesgos = evaluarRiesgos(mundo)
+  return (
+    <ul className="ag-radar">
+      {riesgos.map((r) => (
+        <li key={r.id} className={`ag-radar-item is-${r.severidad}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipSeveridad severidad={r.severidad} />
+            <span className="text-xs font-bold text-muted">{r.tipo}</span>
+            {ESTADO_RIESGO[r.estado] && <span className="text-xs font-semibold text-ink">· {ESTADO_RIESGO[r.estado]}{r.estado === 'reservado' && r.reservaAprobada ? ` ${formatear(r.reservaAprobada, 'eur')}` : ''}</span>}
+          </div>
+          <strong className="mt-1 block text-sm text-ink">
+            <Tx value={r.titulo} />
+          </strong>
+          <span className="block text-xs text-muted">
+            {r.jornadas.length > 1 ? `Jornadas ${r.jornadas.join(' y ')}` : `Jornada ${r.jornadas[0]}`} · {fechaLarga(r.fecha)} · {r.dias === 1 ? 'mañana' : `en ${formatear(r.dias, 'dias')}`}
+            {r.probabilidad != null && ` · lluvia ${formatear(r.probabilidad, 'pct0')}`}
+            {r.exposicion != null && r.exposicion > 0 && ` · exposición ${formatear(r.exposicion, 'eur')}`}
+            {r.exposicion == null && ' · impacto por estimar'}
+          </span>
+          {!compacto && (
+            <p className="mt-1 text-sm text-muted">
+              <Tx value={r.respuesta} />
+            </p>
+          )}
+          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(PREGUNTA[r.id])}>
+            Ver respuesta <IconChevronRight size={14} aria-hidden="true" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function BloqueRiesgos() {
+  return (
+    <div className="ag-panel">
+      <Titulo extra={<span className="text-xs text-muted">Riesgos de producción · en vivo</span>}>Radar de riesgos</Titulo>
+      <RadarRiesgos />
+    </div>
+  )
+}
+
+function BloquePlan() {
+  const { mundo } = useCtx()
+  const riesgos = evaluarRiesgos(mundo)
+  const marca = {}
+  for (const r of riesgos) for (const n of r.jornadas) if (!marca[n] || (SEVERIDAD_ORDEN[r.severidad] ?? 9) < (SEVERIDAD_ORDEN[marca[n].severidad] ?? 9)) marca[n] = r
+  const semanas = [...new Set(mundo.rodaje.jornadas.map((j) => j.semana))]
+  return (
+    <div className="ag-panel">
+      <Titulo extra={<span className="text-xs text-muted">Plan de ejemplo</span>}>Próximas jornadas</Titulo>
+      {semanas.map((sem) => (
+        <section key={sem} className="mt-3 first:mt-0" aria-label={sem}>
+          <h5 className="mb-1.5 text-xs font-bold text-muted">{sem}</h5>
+          <ol className="ag-plan">
+            {mundo.rodaje.jornadas
+              .filter((j) => j.semana === sem)
+              .map((j) => {
+                const r = marca[j.n]
+                return (
+                  <li key={j.n} className={`ag-plan-dia ${r ? `is-${r.severidad}` : ''} ${j.n === mundo.proyecto.diaActual + 1 ? 'is-hoy' : ''}`}>
+                    <span className="ag-plan-n tnum">
+                      J{j.n} · {fechaCortaIso(j.fecha)}
+                      {j.n === mundo.proyecto.diaActual + 1 && <strong> · hoy</strong>}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="ag-plan-loc">{j.localizacion}</span>
+                      <span className="block text-xs text-muted">
+                        {j.tipo === 'EXT' ? 'Exterior' : 'Interior'} · {j.franja.toLowerCase()}
+                      </span>
+                    </span>
+                    {r ? <ChipSeveridad severidad={r.severidad} /> : <span aria-hidden="true" />}
+                  </li>
+                )
+              })}
+          </ol>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+const SEVERIDAD_ORDEN = { alta: 0, media: 1, baja: 2, controlado: 3 }
+const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+function fechaCortaIso(iso) {
+  const d = new Date(`${iso}T12:00:00Z`)
+  return `${DIAS_SEMANA[d.getUTCDay()]} ${d.getUTCDate()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
 const REGISTRO = {
   texto: BloqueTexto,
   aviso: BloqueAviso,
@@ -1166,6 +1310,8 @@ const REGISTRO = {
   enlace: BloqueEnlace,
   propuesta: BloquePropuesta,
   llamada: BloqueLlamada,
+  riesgos: BloqueRiesgos,
+  plan: BloquePlan,
 }
 
 export function Bloque({ b }) {

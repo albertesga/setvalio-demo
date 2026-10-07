@@ -226,7 +226,7 @@ export const accion = {
       }
       case 'riesgo/mitigar': {
         if (a.riesgoId === 'RG-1') {
-          bloques.push(texto(t('Cambio hecho por {por}: la jornada {a} pasa a ser el interior de {apolo} y el exterior se rueda en la jornada {b}, con una previsión de {p} de lluvia. El coste estimado final no cambia.', { por: v(por), a: v(18, 'num'), apolo: v(despues.rodaje.jornadas.find((j) => j.n === 18).localizacion), b: v(19, 'num'), p: v(despues.rodaje.meteo[despues.rodaje.jornadas.find((j) => j.n === 19).fecha] ?? 0, 'pct0') })))
+          bloques.push(texto(t('Cambio hecho por {por}: la jornada {a} pasa a ser el interior de {apolo} y el exterior se rueda en la jornada {b}, con un {p} de probabilidad de lluvia. El coste estimado final no cambia.', { por: v(por), a: v(18, 'num'), apolo: v(despues.rodaje.jornadas.find((j) => j.n === 18).localizacion), b: v(19, 'num'), p: v(despues.rodaje.meteo[despues.rodaje.jornadas.find((j) => j.n === 19).fecha] ?? 0, 'pct0') })))
           bloques.push({ tipo: 'plan' })
           bloques.push({ tipo: 'borrador', id: 'BOR-CAMBIO-18-19' })
         } else {

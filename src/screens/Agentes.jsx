@@ -15,7 +15,8 @@ import { Hoja } from '../agentes/ui/Piezas.jsx'
 import { Mensaje } from '../agentes/ui/Mensajes.jsx'
 import { decisionesAbiertas } from '../agentes/ui/Bloques.jsx'
 import { Inicio, Sugerencias, Redactor, BarraRecorrido } from '../agentes/ui/Conversacion.jsx'
-import { AgentRail, CasosTracker, DetalleAgente, PanelActividad, PanelDecisiones, estadoAgentes } from '../agentes/ui/Paneles.jsx'
+import { AgentRail, CasosTracker, DetalleAgente, PanelActividad, PanelDecisiones, PanelRiesgos, estadoAgentes } from '../agentes/ui/Paneles.jsx'
+import { riesgosAltos } from '../agentes/rodaje.js'
 
 function useTema() {
   useEffect(() => {
@@ -248,6 +249,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
 
   const estados = useMemo(() => estadoAgentes(s), [s])
   const pendientes = decisionesAbiertas(s.mundo).length
+  const altos = riesgosAltos(s.mundo).length
   const trabajando = Object.entries(estados).filter(([, e]) => e.estado === 'trabajando').map(([id]) => id)
 
   const ultimoAgentes = [...s.mensajes].reverse().find((m) => m.rol === 'agentes')
@@ -273,6 +275,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         {[
           ['actividad', 'Actividad', s.novedades],
           ['decisiones', 'Decisiones', pendientes],
+          ['riesgos', 'Riesgos', altos],
           ['casos', 'Casos', null],
         ].map(([id, etiqueta, n]) => (
           <button
@@ -310,6 +313,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
       <div id={`${pref}-tabpanel-${pestana}`} role="tabpanel" aria-labelledby={`${pref}-tab-${pestana}`} className="ag-panel-scroll">
         {pestana === 'actividad' && <PanelActividad s={s} />}
         {pestana === 'decisiones' && <PanelDecisiones s={s} />}
+        {pestana === 'riesgos' && <PanelRiesgos s={s} />}
         {pestana === 'casos' && <CasosTracker vistos={s.casosVistos} />}
       </div>
     </>
@@ -360,7 +364,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             <MenuMas ritmo={ritmo} setRitmo={setRitmo} onReiniciar={() => despachar({ tipo: 'reiniciar' })} onNavigate={onNavigate} />
           </div>
           <div className="ag-header-movil">
-            <button type="button" className="ag-icon-button relative" aria-label={`Actividad y decisiones${s.novedades ? `, ${s.novedades} novedades` : pendientes ? `, ${pendientes} decisiones pendientes` : ''}`} onClick={() => abrirHoja('actividad')}>
+            <button type="button" className="ag-icon-button relative" aria-label={`Actividad, decisiones y riesgos${s.novedades ? `, ${s.novedades} novedades` : pendientes ? `, ${pendientes} decisiones pendientes` : ''}`} onClick={() => abrirHoja('actividad')}>
               <IconBell size={20} />
               {(s.novedades > 0 || pendientes > 0) && <span className="ag-badge tnum">{s.novedades || pendientes}</span>}
             </button>
@@ -427,12 +431,12 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             </div>
           </main>
 
-          <aside className="ag-col-der" aria-label="Actividad y decisiones">
+          <aside className="ag-col-der" aria-label="Actividad, decisiones y riesgos">
             {panelDerecho('lateral')}
           </aside>
         </div>
 
-        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Actividad y decisiones" id="ag-hoja-actividad">
+        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Actividad, decisiones y riesgos" id="ag-hoja-actividad">
           {hoja === 'actividad' && panelDerecho('hoja')}
         </Hoja>
 

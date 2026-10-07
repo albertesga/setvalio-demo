@@ -6,6 +6,7 @@ import { IconArrowUp, IconChevronRight, IconPlay, IconClock } from '../../compon
 import { AGENTES, ORDEN_AGENTES } from '../agentes.js'
 import { CASOS, GRUPOS_CASOS } from '../casos.js'
 import { useCtx } from './contexto.js'
+import { evaluarRiesgos } from '../rodaje.js'
 import { AgentTile, AutonomyBadge } from './Piezas.jsx'
 
 const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Por validar' }
@@ -62,8 +63,10 @@ export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
         Buenos días, {nombre}. ¿Qué <em>revisamos</em> hoy?
       </h1>
       <p className="ag-inicio-lead">
-        Diez agentes preparan el presupuesto y el control de coste de tus producciones. Hacen solos lo rutinario y reversible, te proponen lo dudoso y te piden aprobación cuando hay dinero comprometido, riesgo fiscal o hay que hablar con alguien de fuera.
+        Once agentes preparan el presupuesto, controlan el coste y vigilan el rodaje de tus producciones. Hacen solos lo rutinario y reversible, te proponen lo dudoso y te piden aprobación cuando hay dinero comprometido, riesgo fiscal o hay que hablar con alguien de fuera.
       </p>
+
+      <FranjaRiesgos />
 
       <ul className="ag-leyenda" aria-label="Niveles de autonomía">
         <li>
@@ -118,6 +121,29 @@ export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+function FranjaRiesgos() {
+  const { mundo, enviar, ocupado } = useCtx()
+  const riesgos = evaluarRiesgos(mundo)
+  const altos = riesgos.filter((r) => r.severidad === 'alta').length
+  const medios = riesgos.filter((r) => r.severidad === 'media').length
+  return (
+    <div className="ag-franja-riesgos" role="note">
+      <AgentTile id="riesgos" size={32} />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-ink">
+          Riesgos de producción vigila las jornadas que quedan <span className="ag-etiqueta-capacidad ml-1">Exploratorio</span>
+        </p>
+        <p className="text-xs text-muted">
+          {altos} {altos === 1 ? 'riesgo alto' : 'riesgos altos'} y {medios} {medios === 1 ? 'medio' : 'medios'} esta semana y la próxima. El parte llega solo cuando empiezas a conversar.
+        </p>
+      </div>
+      <Button variant="secondary" disabled={ocupado} onClick={() => enviar('¿Qué riesgos hay para las próximas jornadas?')}>
+        Ver el parte
+      </Button>
     </div>
   )
 }

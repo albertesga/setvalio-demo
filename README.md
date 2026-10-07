@@ -51,6 +51,17 @@ te pide permiso para llamar y, si lo das, enseña cada llamada: cómo se present
 qué confirma y el precio final. Tú eliges el proveedor y la propuesta se recalcula.
 Las llamadas son simuladas: no se llama a nadie.
 
+**Riesgos de producción** (exploratorio) es un agente proactivo que vigila el plan
+de rodaje de La última función: un parte de riesgos llega solo al empezar a
+conversar, los avisos urgentes (orden del día sin publicar, más lluvia) llegan
+mientras hablas y la pestaña «Riesgos» muestra el radar en vivo. Detecta lluvia en
+un exterior, una ausencia, un permiso pendiente, una orden del día sin publicar,
+horas extra y un cambio de localización mal comunicado; propone una respuesta
+(cambiar el orden de jornadas, un aviso al equipo en borrador) y, si hay dinero en
+juego, calcula el impacto y propone una reserva que solo sube el coste estimado
+final si producción ejecutiva la aprueba. Plan, previsión del tiempo,
+convocatorias y permisos son de ejemplo.
+
 Es una demo **simulada y guionizada**: no hay modelo de lenguaje, no se envía nada
 y ninguna cifra está escrita a mano en los guiones. El motor vive en `src/agentes/`
 (mundo de demo, cálculos, reductor, intenciones, guiones y sesión) y
