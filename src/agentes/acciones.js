@@ -312,7 +312,7 @@ export function reducir(m, accion) {
     }
 
     case 'propuesta/autorizarLlamadas': {
-      if (m.propuesta.autorizacion !== 'pendiente') return m
+      if (m.propuesta.autorizacion !== 'pendiente' && m.propuesta.autorizacion !== 'rechazada') return m
       const n = clonar(m)
       n.propuesta.autorizacion = 'autorizada'
       n.propuesta.autorizadaPor = accion.por ?? null

@@ -8,8 +8,8 @@ import { t, v, paso, sug, texto, aviso } from './comun.js'
 
 const AVISO_POR_VALIDAR = aviso(
   'porvalidar',
-  'Por validar',
-  t('Preparar el presupuesto desde cero es un caso de uso propuesto, sin validar con clientes: lo decidido empieza por importar un presupuesto ya hecho. Proveedores, tarifas y llamadas son de ejemplo.'),
+  'Sin validar',
+  t('Empezar un presupuesto desde cero aún está sin validar con productoras; lo previsto es importar uno ya hecho. Proveedores, tarifas y llamadas son de ejemplo.'),
 )
 
 export function textoDiferencia(tot) {
@@ -215,9 +215,10 @@ export const optimizarProveedores = {
       return {
         bloques: [
           texto(t('Dijiste que no llamara. Te dejo los proveedores y requisitos para que les pidas presupuesto tú:')),
-          tablaAlternativas(opt),
+          tablaAlternativas(opt, { sinLlamadas: true }),
+          ...(aLlamar.length ? [tarjetaLlamadas(m, aLlamar, { retomar: true })] : []),
         ],
-        sugerencias: [sug('Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa')],
+        sugerencias: [sug('Enséñame la propuesta de Itsasoa')],
         fuentes: ['Directorio de proveedores (ejemplo)'],
         reglas: [],
         noHecho: [t('No ha llamado a nadie.')],
@@ -240,24 +241,8 @@ export const optimizarProveedores = {
           }),
         ),
         tablaAlternativas(opt),
-        { tipo: 'lista', titulo: 'Cómo llama el agente', nivel: 'aprueba', numerada: true, items: PROTOCOLO_LLAMADA.map((x) => ({ texto: t('{x}', { x: v(x) }) })) },
-        {
-          tipo: 'aprobacion',
-          id: 'ap-llamadas',
-          ref: { tipo: 'llamadas', id: 'R1' },
-          agente: 'proveedores',
-          nivel: 'aprueba',
-          rol: 'Line producer',
-          titulo: t('Llamar a {n} en nombre de {prod}', { n: cuenta(aLlamar.length, 'proveedor', 'proveedores'), prod: v(p.proyecto.productora) }),
-          resumen: t('Solo pedirá el precio final y confirmará tus requisitos. No reserva, no firma y no negocia. En la demo las llamadas son simuladas: no se llama a nadie.'),
-          impactoTitulo: 'A quién llama',
-          impacto: aLlamar.map((a) => ({ etiqueta: `${a.proveedor} · ${a.lineaConcepto.toLowerCase()} (ahora ${a.actual.proveedor})`, antes: a.actual.importe, despues: a.referencia, formato: 'eur' })),
-          impactoColumnas: ['Ahora', 'Referencia'],
-          acciones: [
-            { id: 'aprobar', etiqueta: 'Autorizar las llamadas', variante: 'primary', accion: { tipo: 'propuesta/autorizarLlamadas' }, rol: 'Line producer' },
-            { id: 'rechazar', etiqueta: 'No llamar: lo pido yo', variante: 'secondary', accion: { tipo: 'propuesta/noLlamar' }, rol: 'Line producer' },
-          ],
-        },
+        { tipo: 'lista', titulo: 'Cómo será la llamada', plegado: true, nivel: 'aprueba', numerada: true, items: PROTOCOLO_LLAMADA.map((x) => ({ texto: t('{x}', { x: v(x) }) })) },
+        tarjetaLlamadas(m, aLlamar),
       ],
       sugerencias: [sug('¿Qué hace el agente de Proveedores?')],
       fuentes: ['Directorio de proveedores (ejemplo)', 'Requisitos que diste para cada coste'],
@@ -267,21 +252,44 @@ export const optimizarProveedores = {
   },
 }
 
-function tablaAlternativas(opt) {
+/** Permiso para llamar. Tras decir que no, una tarjeta para cambiar de idea (solo autorizar). */
+function tarjetaLlamadas(m, aLlamar, { retomar = false } = {}) {
+  const p = m.propuesta
+  const acciones = [{ id: 'aprobar', etiqueta: 'Autorizar las llamadas', variante: 'primary', accion: { tipo: 'propuesta/autorizarLlamadas' }, rol: 'Line producer' }]
+  if (!retomar) acciones.push({ id: 'rechazar', etiqueta: 'No llamar: lo pido yo', variante: 'secondary', accion: { tipo: 'propuesta/noLlamar' }, rol: 'Line producer' })
+  return {
+    tipo: 'aprobacion',
+    id: retomar ? 'ap-llamadas-retomar' : 'ap-llamadas',
+    ref: retomar ? { tipo: 'llamadas', id: 'R1', retomar: true } : { tipo: 'llamadas', id: 'R1' },
+    agente: 'proveedores',
+    nivel: 'aprueba',
+    rol: 'Line producer',
+    titulo: retomar
+      ? t('¿Cambias de idea? Llamar a {n} en nombre de {prod}', { n: cuenta(aLlamar.length, 'proveedor', 'proveedores'), prod: v(p.proyecto.productora) })
+      : t('Llamar a {n} en nombre de {prod}', { n: cuenta(aLlamar.length, 'proveedor', 'proveedores'), prod: v(p.proyecto.productora) }),
+    resumen: t('Solo pedirá el precio final y confirmará tus requisitos. No reserva, no firma y no negocia. En la demo las llamadas son simuladas: no se llama a nadie.'),
+    impactoTitulo: 'A quién llama',
+    impacto: aLlamar.map((a) => ({ etiqueta: `${a.proveedor} · ${a.lineaConcepto.toLowerCase()} (ahora ${a.actual.proveedor})`, antes: a.actual.importe, despues: a.referencia, formato: 'eur' })),
+    impactoColumnas: ['Ahora', 'Referencia'],
+    acciones,
+  }
+}
+
+function tablaAlternativas(opt, { sinLlamadas = false } = {}) {
   return {
     tipo: 'tabla',
     titulo: 'Alternativas del directorio',
     columnas: [
       { id: 'coste', etiqueta: 'Coste y proveedor actual' },
       { id: 'actual', etiqueta: 'Ahora', formato: 'eur', alinear: 'right' },
-      { id: 'alternativa', etiqueta: 'Alternativa y qué hago', texto: true },
+      { id: 'alternativa', etiqueta: 'Alternativa y siguiente paso', texto: true },
       { id: 'referencia', etiqueta: 'Referencia', formato: 'eur', alinear: 'right' },
     ],
     filas: opt.map((a) => ({
       id: a.id,
       coste: `${a.lineaConcepto} · ${a.actual.proveedor}`,
       actual: a.actual.importe,
-      alternativa: `${a.proveedor} (${a.tarifa}). ${a.descartada ? `Descartada: ${a.motivoDescarte}` : 'Llamar para confirmar precio y requisitos.'}`,
+      alternativa: `${a.proveedor} (${a.tarifa}). ${a.descartada ? `Descartada: ${a.motivoDescarte}` : sinLlamadas ? 'Pedir precio y confirmar requisitos.' : 'Llamar para confirmar precio y requisitos.'}`,
       referencia: a.referencia,
       alerta: false,
     })),
@@ -329,14 +337,14 @@ export function componerComparacion(m) {
   ]
   return {
     bloques,
-    sugerencias: [sug('Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa')],
+    sugerencias: [sug('Enséñame la propuesta de Itsasoa')],
     fuentes: ['Llamadas grabadas y transcritas', 'Directorio de proveedores (ejemplo)'],
     reglas: [t('Solo se proponen las alternativas que confirman todos tus requisitos')],
     noHecho: [t('No ha reservado ni ha cambiado ningún proveedor: eso lo eliges tú.')],
   }
 }
 
-function tarjetaEleccion(m, x) {
+export function tarjetaEleccion(m, x) {
   const req = x.linea.requisitos.length
   return {
     tipo: 'aprobacion',
@@ -354,8 +362,6 @@ function tarjetaEleccion(m, x) {
       actual: v(x.linea.proveedor),
       desc: v(x.descartadas.length ? ` ${x.descartadas.map((d) => `${d.proveedor} no cumple: ${d.motivo.toLowerCase()}`).join(' ')}` : ''),
     }),
-    impactoTitulo: 'Si eliges la alternativa',
-    impacto: [{ etiqueta: `${x.linea.concepto} · ${x.linea.proveedor} → ${x.mejor.proveedor}`, antes: x.linea.importe, despues: x.mejor.precioFinal, formato: 'eur' }],
     acciones: [
       { id: 'aprobar', etiqueta: `Elegir ${x.mejor.proveedor}`, variante: 'primary', accion: { tipo: 'propuesta/elegir', lineaId: x.linea.id, altId: x.mejor.id }, rol: 'Line producer' },
       { id: 'rechazar', etiqueta: `Mantener ${x.linea.proveedor}`, variante: 'secondary', accion: { tipo: 'propuesta/elegir', lineaId: x.linea.id, altId: null }, rol: 'Line producer' },

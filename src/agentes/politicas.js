@@ -14,7 +14,7 @@ export const ROLES = {
   produccionEjecutiva: 'Producción ejecutiva',
   lineProducer: 'Line producer',
   fiscalista: 'Fiscalista',
-  revisionHumana: 'Revisión humana',
+  revisionHumana: 'Line producer o producción ejecutiva',
 }
 
 // Qué decisiones puede tomar cada persona de la demo.

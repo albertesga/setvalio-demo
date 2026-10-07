@@ -146,7 +146,7 @@ export const aprobarOc = {
           columnas: [
             { id: 'orden', etiqueta: 'Orden' },
             { id: 'importe', etiqueta: 'Importe', formato: 'eur', alinear: 'right' },
-            { id: 'exceso', etiqueta: 'Sube el CEF', formato: 'eur', alinear: 'right' },
+            { id: 'exceso', etiqueta: 'Suma al coste estimado final', formato: 'eur', alinear: 'right' },
             { id: 'desviacion', etiqueta: 'Capítulo queda', formato: 'pctSigned', alinear: 'right', tono: true },
             { id: 'decide', etiqueta: 'Decide' },
           ],
@@ -154,7 +154,7 @@ export const aprobarOc = {
         },
         ...pend.slice(0, 3).map((o) => aprobacionOrden(m, o.id)),
       ],
-      sugerencias: [sug('¿Cómo cerraremos el proyecto y llegamos con la caja?'), sug('¿Qué capítulos están fuera de rango?')],
+      sugerencias: [sug('¿Cómo cerraremos el proyecto y llegamos con la caja?'), sug('¿Qué capítulos están fuera de umbral?')],
       fuentes: ['Órdenes de compra', 'Presupuesto por partidas', 'Previsión de tesorería'],
       reglas: [t('Orden de más de {lim} o que deja su capítulo por encima del {u}: requiere aprobación', { lim: v(POLITICAS.umbralImporteOc, 'eur'), u: v(POLITICAS.umbralDesviacion, 'pct0') })],
       noHecho: [t('No ha aprobado ni rechazado ninguna orden.')],

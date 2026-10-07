@@ -26,15 +26,16 @@ export function lista(titulo, items, nivel) {
 }
 
 /** KPIs del proyecto. Si se pasa `antes`, cada cifra que cambie muestra su valor previo. */
-export function kpisProyecto(m, antes, { claves = ['presupuesto', 'gastado', 'comprometido', 'cef', 'desviacion'] } = {}) {
+export function kpisProyecto(m, antes, { claves = ['presupuesto', 'gastado', 'comprometido', 'cef'] } = {}) {
   const ahora = c.totales(m)
   const prev = antes ? c.totales(antes) : null
   const def = {
     presupuesto: { etiqueta: 'Presupuesto', formato: 'eur' },
     gastado: { etiqueta: 'Gastado', formato: 'eur', sub: t('{p} del presupuesto', { p: v(ahora.ejecucionPct, 'pct') }) },
     comprometido: { etiqueta: 'Comprometido', formato: 'eur' },
-    cef: { etiqueta: 'Coste estimado final', formato: 'eur' },
-    desviacion: { etiqueta: 'Desviación', formato: 'eurSigned', sub: t('{p} sobre presupuesto', { p: v(ahora.desviacionPct, 'pctSigned') }), tono: ahora.desviacionPct > 0 ? 'warning' : 'neutral' },
+    // Sin la celda «Desviación», el coste estimado final la lleva debajo: cuatro cifras llenan una fila.
+    cef: { etiqueta: 'Coste estimado final', formato: 'eur', sub: claves.includes('desviacion') ? undefined : t('{d} ({p}) sobre presupuesto', { d: v(ahora.desviacion, 'eurSigned'), p: v(ahora.desviacionPct, 'pctSigned') }) },
+    desviacion: { etiqueta: 'Desviación', formato: 'eurSigned', sub: t('{p} sobre presupuesto', { p: v(ahora.desviacionPct, 'pctSigned') }) },
     disponible: { etiqueta: 'Pendiente estimado', formato: 'eur', sub: t('Lo que falta por gastar según la previsión') },
     consolidado: { etiqueta: 'Consolidado', formato: 'eur', sub: t('{p} del coste estimado final', { p: v(ahora.consolidadoPct, 'pct') }) },
   }
@@ -86,7 +87,7 @@ export function tablaCapitulos(m) {
       { id: 'presupuesto', etiqueta: 'Presupuesto', formato: 'eur', alinear: 'right' },
       { id: 'gastado', etiqueta: 'Gastado', formato: 'eur', alinear: 'right' },
       { id: 'comprometido', etiqueta: 'Comprometido', formato: 'eur', alinear: 'right' },
-      { id: 'cef', etiqueta: 'CEF', formato: 'eur', alinear: 'right' },
+      { id: 'cef', etiqueta: 'Coste estimado final', formato: 'eur', alinear: 'right' },
       { id: 'desviacion', etiqueta: 'Desviación', formato: 'eurSigned', alinear: 'right', tono: true },
     ],
     filas: caps.map((x) => ({ id: x.id, capitulo: `${x.id} ${x.nombre}`, presupuesto: x.presupuesto, gastado: x.gastado, comprometido: x.comprometido, cef: x.cef, desviacion: x.desviacion, alerta: x.fueraRango })),
@@ -105,7 +106,7 @@ export function tablaPartidas(m, capId) {
       { id: 'presupuesto', etiqueta: 'Presupuesto', formato: 'eur', alinear: 'right' },
       { id: 'consolidado', etiqueta: 'Gastado + comprometido', formato: 'eur', alinear: 'right' },
       { id: 'pendiente', etiqueta: 'Pendiente', formato: 'eur', alinear: 'right' },
-      { id: 'cef', etiqueta: 'CEF', formato: 'eur', alinear: 'right' },
+      { id: 'cef', etiqueta: 'Coste estimado final', formato: 'eur', alinear: 'right' },
       { id: 'desviacion', etiqueta: 'Desviación', formato: 'eurSigned', alinear: 'right', tono: true },
     ],
     filas: cap.partidas.map((cod) => {
@@ -148,7 +149,6 @@ export function bloqueDossier(m) {
     tipo: 'checklist',
     titulo: 'Bloqueantes del dossier fiscal',
     items: c.dossier(m).map((d) => ({ id: d.id, documento: d.documento, responsable: d.responsable, deadline: d.deadline, dias: d.dias, estado: d.estado, evidencia: d.pendientes ? `${d.pendientes} ${d.evidencia.toLowerCase()}` : d.evidencia, razon: d.razon })),
-    nota: 'Filmpilot prepara la documentación. El fiscalista revisa y firma.',
   }
 }
 
@@ -167,7 +167,7 @@ export function aprobacionOrden(m, ocId) {
     filas.push({ etiqueta: `Caja · saldo ${imp.caja.semana}`, antes: imp.caja.antes, despues: imp.caja.despues, formato: 'eur', alerta: imp.caja.despues < 0 })
   }
   const motivos = []
-  if (imp.motivos.includes('importe')) motivos.push(t('supera el importe que requiere aprobación ({u})', { u: v(POLITICAS.umbralImporteOc, 'eur') }))
+  if (imp.motivos.includes('importe')) motivos.push(t('pasa de {u}', { u: v(POLITICAS.umbralImporteOc, 'eur') }))
   if (imp.motivos.includes('umbral')) motivos.push(t('deja el capítulo por encima del umbral del {u}', { u: v(POLITICAS.umbralDesviacion, 'pct0') }))
 
   const resumen =
@@ -179,7 +179,7 @@ export function aprobacionOrden(m, ocId) {
     { id: 'aprobar', etiqueta: 'Aprobar', variante: 'primary', accion: { tipo: 'orden/aprobar', ocId }, rol: imp.rol },
   ]
   if (imp.exceso > 0 && imp.consume > 0) {
-    acciones.push({ id: 'parcial', etiqueta: `Aprobar solo lo previsto`, detalle: t('{n}, sin subir el coste estimado final', { n: v(imp.consume, 'eur') }), variante: 'secondary', accion: { tipo: 'orden/aprobar', ocId, importe: imp.consume }, rol: imp.rol })
+    acciones.push({ id: 'parcial', etiqueta: `Aprobar solo lo previsto`, detalle: t('aprueba {n}, lo que ya estaba previsto; los {resto} restantes quedan sin aprobar y habría que pedirlos aparte', { n: v(imp.consume, 'eur'), resto: v(o.importe - imp.consume, 'eur') }), variante: 'secondary', accion: { tipo: 'orden/aprobar', ocId, importe: imp.consume }, rol: imp.rol })
   }
   acciones.push({ id: 'rechazar', etiqueta: 'Rechazar', variante: 'secondary', accion: { tipo: 'orden/rechazar', ocId }, rol: imp.rol })
   acciones.push({ id: 'escalar', etiqueta: 'Pedir aprobación', variante: 'secondary', accion: { tipo: 'orden/escalar', ocId, a: imp.rol }, soloSinPermiso: true })

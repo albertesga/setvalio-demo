@@ -8,13 +8,14 @@ import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, Ico
 import { formatear, renderTexto, fecha as fechaLarga } from '../texto.js'
 import * as c from '../calculos.js'
 import { puedeDecidir } from '../politicas.js'
-import { AGENTES } from '../agentes.js'
+import { AGENTES, AUTONOMIA } from '../agentes.js'
 import { useCtx } from './contexto.js'
 import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
 import { useMovimientoReducido } from '../useAgentes.js'
-import { Tx, AutonomyBadge, Tono, AgentAvatar } from './Piezas.jsx'
+import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable } from './Piezas.jsx'
+import { PERSONAS } from '../mundo.js'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
 
@@ -37,9 +38,25 @@ function BloqueTexto({ b }) {
   )
 }
 
-function BloqueAviso({ b }) {
-  const etiqueta = { exploratorio: 'Exploratorio', porvalidar: 'Por validar', fase: 'Fase posterior', aviso: 'Atención', info: 'Nota' }[b.tono] ?? 'Nota'
-  const tono = { exploratorio: 'neutral', porvalidar: 'neutral', fase: 'neutral', aviso: 'warning', info: 'info' }[b.tono] ?? 'info'
+const AVISOS_DE_ALCANCE = new Set(['exploratorio', 'porvalidar', 'fase'])
+
+function BloqueAviso({ b, mensajeId }) {
+  const { primerAviso } = useCtx()
+  const [abierto, setAbierto] = useState(false)
+  const etiqueta = { exploratorio: 'Exploratorio', porvalidar: 'Sin validar', fase: 'Fase posterior', aviso: 'Atención', info: 'Nota' }[b.tono] ?? 'Nota'
+  const tono = { exploratorio: 'neutral', porvalidar: 'neutral', fase: 'neutral', aviso: 'atencion', info: 'info' }[b.tono] ?? 'info'
+  // El aviso de alcance entero sale la primera vez; después basta la etiqueta (y el texto, si se pide).
+  if (AVISOS_DE_ALCANCE.has(b.tono) && primerAviso?.[b.tono] && mensajeId && primerAviso[b.tono] !== mensajeId && !abierto) {
+    return (
+      <p className="ag-aviso-breve" role="note">
+        <Tono tono={tono}>{etiqueta}</Tono>
+        <span className="text-xs text-flp-muted">Datos de ejemplo, como se explica más arriba.</span>
+        <button type="button" className="ag-link" onClick={() => setAbierto(true)}>
+          Qué significa
+        </button>
+      </p>
+    )
+  }
   return (
     <div className={`ag-aviso ag-aviso--${b.tono}`} role="note">
       <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -58,9 +75,7 @@ function BloqueAviso({ b }) {
 
 function BloqueLista({ b }) {
   const { enviar, ocupado } = useCtx()
-  return (
-    <div className="ag-panel">
-      <Titulo extra={b.nivel && <AutonomyBadge nivel={b.nivel} />}>{b.titulo}</Titulo>
+  const lista = (
       <ul className={b.numerada ? 'ag-lista-numerada space-y-2' : 'space-y-2'}>
         {b.items.map((it, i) =>
           it.entrada ? (
@@ -86,6 +101,20 @@ function BloqueLista({ b }) {
           ),
         )}
       </ul>
+  )
+  if (b.plegado) {
+    return (
+      <div className="ag-panel ag-panel--plegable">
+        <Desplegable titulo={b.titulo} resumen={`${b.items.length} pasos`} nivel={4}>
+          {lista}
+        </Desplegable>
+      </div>
+    )
+  }
+  return (
+    <div className="ag-panel">
+      <Titulo extra={b.nivel && <AutonomyBadge nivel={b.nivel} />}>{b.titulo}</Titulo>
+      {lista}
     </div>
   )
 }
@@ -100,9 +129,7 @@ function BloqueKpis({ b }) {
         {b.items.map((k) => (
           <div key={k.id} className="ag-kpi">
             <dt>{k.etiqueta}</dt>
-            <dd className="tnum text-flp-ink">
-              {k.tono === 'warning' ? <span className="ag-resalte">{fmt(k.valor, k.formato)}</span> : fmt(k.valor, k.formato)}
-            </dd>
+            <dd className="tnum text-flp-ink">{fmt(k.valor, k.formato)}</dd>
             {k.antes !== undefined ? (
               <span className="ag-kpi-antes">
                 antes <s className="tnum">{fmt(k.antes, k.formato)}</s>
@@ -189,7 +216,11 @@ function BloqueTabla({ b }) {
                   return (
                     <Tag key={col.id} scope={i === 0 ? 'row' : undefined} className={`${col.alinear === 'right' ? 'text-right tnum' : col.alinear === 'center' ? 'text-center' : 'text-left'} ${col.texto ? 'is-texto' : ''}`}>
                       {celda(col, fila)}
-                      {i === 0 && fila.alerta && <span className="ag-chip ag-chip--negative ml-2 align-middle">Fuera de umbral</span>}
+                      {i === 0 && fila.alerta && (
+                        <Tono tono="negative" className="ml-2 align-middle">
+                          Fuera de umbral
+                        </Tono>
+                      )}
                     </Tag>
                   )
                 })}
@@ -233,9 +264,8 @@ function chipDesviacion(x, umbral) {
 
 function BloqueDesviaciones({ b }) {
   const escala = Math.max(b.umbral * 1.4, ...b.items.map((x) => Math.abs(x.desviacionPct)))
-  return (
-    <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Umbral {formatear(b.umbral, 'pct0')}</span>}>Desviación por capítulo</Titulo>
+  const contenido = (
+    <>
       <ul className="space-y-3">
         {b.items.map((x) => {
           const ancho = Math.min(50, (Math.abs(x.desviacionPct) / escala) * 50)
@@ -284,6 +314,22 @@ function BloqueDesviaciones({ b }) {
           · neto <strong className="tnum text-flp-ink">{formatear(b.resumen.neto, 'eurSigned')}</strong>
         </p>
       )}
+    </>
+  )
+  if (b.plegado) {
+    const fuera = b.items.filter((x) => x.fueraRango).length
+    return (
+      <div className="ag-panel ag-panel--plegable">
+        <Desplegable titulo="Detalle por capítulo" resumen={`${fuera ? `${fuera} fuera del umbral del ${formatear(b.umbral, 'pct0')}` : `Umbral del ${formatear(b.umbral, 'pct0')}`} · causas y partidas`} nivel={4}>
+          {contenido}
+        </Desplegable>
+      </div>
+    )
+  }
+  return (
+    <div className="ag-panel">
+      <Titulo extra={<span className="text-xs text-flp-muted">Umbral {formatear(b.umbral, 'pct0')}</span>}>Desviación por capítulo</Titulo>
+      {contenido}
     </div>
   )
 }
@@ -298,8 +344,10 @@ function Confianza({ valor }) {
       <span className="ag-meter" aria-hidden="true">
         <span className={baja ? 'is-baja' : ''} style={{ width: `${valor * 100}%` }} />
       </span>
-      <span className={`tnum text-xs font-semibold text-flp-ink ${baja ? 'ag-resalte' : ''}`}>{formatear(valor, 'pct0')}</span>
-      {baja && <span className="sr-only">confianza baja</span>}
+      <span className="tnum text-xs font-semibold text-flp-ink">
+        {formatear(valor, 'pct0')}
+        {baja && ' · baja'}
+      </span>
     </span>
   )
 }
@@ -327,7 +375,7 @@ function BloqueDocumento({ b }) {
               Contabilizada
             </Tono>
           ) : (
-            <Tono tono="warning">En la bandeja</Tono>
+            <Tono tono="neutral">En la bandeja</Tono>
           )}
         </div>
       </div>
@@ -407,8 +455,16 @@ const ESTADO_DECISION = {
 }
 const ICONO_DECISION = { aprobada: IconCheck, mitigado: IconCheck, reservado: IconCheck, preparada: IconCheck, rechazada: IconClose, aceptado: IconClose, desactualizada: IconClock }
 
+const MOTIVO_INFORME = {
+  cifras: 'Han cambiado el gasto o el coste estimado final desde esta edición',
+  decisiones: 'Han cambiado las decisiones por revisar desde esta edición',
+  reservas: 'Ha cambiado la reserva de riesgos desde esta edición',
+  riesgos: 'Han cambiado los riesgos altos desde esta edición',
+  caja: 'Ha cambiado la previsión de caja desde esta edición',
+}
+
 export function BloqueAprobacion({ b }) {
-  const { mundo, persona, decidir, ocupado, enviar } = useCtx()
+  const { mundo, persona, decidir, ocupado, enviar, despachar } = useCtx()
   const ed = c.estadoDecision(mundo, b.ref)
   const decidida = ESTADO_DECISION[ed.estado]
   const tieneRolPropio = (a) => !a.rol || puedeDecidir(persona.rol, a.rol)
@@ -416,15 +472,28 @@ export function BloqueAprobacion({ b }) {
   const yaPedida = !!ed.escaladaA
   const visibles = b.acciones.filter((a) => (a.soloSinPermiso ? sinPermiso && !yaPedida : true))
   const etiquetaRef = renderTexto(b.titulo)
-  const informeViejo = b.ref?.tipo === 'informe' && c.informeDesactualizado(mundo, b.ref.id)
+  const informeViejo = b.ref?.tipo === 'informe' ? c.motivoInformeDesactualizado(mundo, b.ref.id) : null
+  // Quién decide: «Decides tú», «Decide: X» o, si las acciones son de dos roles, «Deciden: X y Y».
+  const rolesAcciones = [...new Set(visibles.filter((a) => !a.soloSinPermiso && a.rol).map((a) => a.rol))]
+  const quienDecide =
+    rolesAcciones.length > 1
+      ? `Deciden: ${rolesAcciones.map((r, i) => (i ? r.toLowerCase() : r)).join(' y ')}`
+      : b.rol && puedeDecidir(persona.rol, b.rol)
+        ? 'Decides tú'
+        : b.rol
+          ? `Decide: ${b.rol}`
+          : null
+  // Si otra persona de la demo puede decidir lo que esta no, se ofrece verla como ella.
+  const otraPersona = Object.values(PERSONAS).find((p) => p.id !== persona.id && visibles.some((a) => !a.soloSinPermiso && a.rol && !tieneRolPropio(a) && puedeDecidir(p.rol, a.rol)))
+  const lineaPermiso = !sinPermiso && visibles.some((a) => !a.soloSinPermiso && !tieneRolPropio(a))
 
   return (
-    <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`}>
+    <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`} data-ref={b.ref ? `${b.ref.tipo}-${b.ref.id}` : undefined}>
       <div className="flex flex-wrap items-center gap-2">
         <AgentAvatar id={b.agente} size={28} />
         <span className="text-xs font-semibold text-flp-muted">{AGENTES[b.agente]?.nombre}</span>
-        <AutonomyBadge nivel={b.nivel} />
-        {b.rol && <Tono tono="neutral">Decide: {b.rol}</Tono>}
+        {b.nivel !== 'aprueba' && <AutonomyBadge nivel={b.nivel} />}
+        {quienDecide && !decidida && <Tono tono="neutral">{quienDecide}</Tono>}
       </div>
       <h4 tabIndex={-1} className="mt-3 text-base font-semibold leading-snug text-flp-ink focus:outline-none">
         <Tx value={b.titulo} />
@@ -473,26 +542,31 @@ export function BloqueAprobacion({ b }) {
           <Tx value={b.recomendacion} />
         </p>
       )}
-      {decidida ? (
+      {ed.estado === 'desactualizada' ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-flp-muted">
+          <IconClock size={14} aria-hidden="true" />
+          <span>La previsión ha cambiado desde esta tarjeta.</span>
+          {b.entradaActual && (
+            <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(b.entradaActual)}>
+              Ver la situación actual
+            </button>
+          )}
+        </div>
+      ) : decidida ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Tono tono={decidida.tono}>
             {(() => {
               const I = ICONO_DECISION[ed.estado]
               return I ? <I size={12} strokeWidth={2.6} aria-hidden="true" /> : null
             })()}
-            {decidida.etiqueta}
+            {b.ref?.tipo === 'llamadas' && ed.estado === 'rechazada' ? 'Sin llamadas · lo pides tú' : decidida.etiqueta}
           </Tono>
           {ed.por && <span className="text-xs text-flp-muted">por {ed.por}</span>}
           {ed.importe !== undefined && ed.importe !== null && <span className="text-xs text-flp-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
-          {ed.estado === 'desactualizada' && b.entradaActual && (
-            <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(b.entradaActual)}>
-              Ver la situación actual
-            </button>
-          )}
         </div>
       ) : informeViejo ? (
         <div className="mt-4">
-          <p className="text-sm text-flp-muted">Las cifras han cambiado desde esta edición: regenera el informe antes de aprobarlo.</p>
+          <p className="text-sm text-flp-muted">{MOTIVO_INFORME[informeViejo] ?? 'Algo ha cambiado desde esta edición'}: regenera el informe para aprobar la versión al día.</p>
           <FilmpilotButton className="mt-2" variant="secondary" disabled={ocupado} onClick={() => enviar('Regenera el informe semanal de coste')}>
             Regenerar el informe
           </FilmpilotButton>
@@ -519,7 +593,7 @@ export function BloqueAprobacion({ b }) {
                   variant={a.variante === 'primary' && permitido ? 'primary' : 'secondary'}
                   size="md"
                   disabled={!permitido || ocupado}
-                  onClick={() => decidir(a.accion, `${a.etiqueta} · ${etiquetaRef}`)}
+                  onClick={() => decidir(a.accion, `${etiquetaRef} → ${a.etiqueta}`)}
                   title={a.detalle ? renderTexto(a.detalle) : undefined}
                 >
                   {a.etiqueta}
@@ -527,15 +601,20 @@ export function BloqueAprobacion({ b }) {
               )
             })}
           </div>
-          {!sinPermiso && visibles.some((a) => !a.soloSinPermiso && !tieneRolPropio(a)) && (
+          {lineaPermiso && (
             <p className="mt-2 text-xs text-flp-muted">
               Como {persona.rol.toLowerCase()} puedes {visibles.filter((a) => !a.soloSinPermiso && tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' o ')}; {visibles.filter((a) => !a.soloSinPermiso && !tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' y ')} lo decide {visibles.find((a) => !a.soloSinPermiso && !tieneRolPropio(a)).rol.toLowerCase()}.
             </p>
           )}
           {sinPermiso && (
             <p className="mt-2 text-xs text-flp-muted">
-              Como {persona.rol.toLowerCase()} no puedes decidir esta: la decide {b.rol}. {yaPedida ? 'Ya se ha pedido; cambia «Ver como» para decidir.' : 'Puedes pedir su aprobación o cambiar «Ver como».'}
+              Como {persona.rol.toLowerCase()} no puedes decidir esto: lo decide {b.rol.toLowerCase()}. {yaPedida ? 'Ya está pedido.' : 'Puedes pedir su aprobación.'}
             </p>
+          )}
+          {otraPersona && (sinPermiso || lineaPermiso) && (
+            <FilmpilotButton className="mt-2" size="sm" variant="ghost" disabled={ocupado} onClick={() => despachar({ tipo: 'persona', persona: otraPersona.id })}>
+              Decidir como {otraPersona.nombre} ({otraPersona.rol.toLowerCase()})
+            </FilmpilotButton>
           )}
           {visibles.some((a) => a.detalle) && (
             <p className="mt-2 text-xs text-flp-muted">
@@ -551,33 +630,62 @@ export function BloqueAprobacion({ b }) {
           {ocupado && <p className="mt-2 text-xs text-flp-muted">Los agentes están trabajando: podrás decidir en cuanto terminen.</p>}
         </>
       )}
-      {b.nota && <p className="mt-2 text-xs text-flp-muted">{b.nota}</p>}
+      {/* La nota no repite lo que ya dice la línea de permisos. */}
+      {b.nota && !(lineaPermiso && !decidida) && <p className="mt-2 text-xs text-flp-muted">{b.nota}</p>}
     </section>
   )
 }
 
-// ── Cola de decisiones (en vivo) ─────────────────────────────────────────────
+// ── Cola de decisiones (en directo) ────────────────────────────────────────────
 
 export { decisionesAbiertas }
 
-export function ListaDecisiones({ compacta = false }) {
+const CAPACIDAD_DECISION = { riesgo: 'Exploratorio', propuesta: 'Sin validar' }
+
+/** Si la tarjeta ya está en la conversación y sigue abierta, «Revisar» lleva a ella en vez de repetir el trabajo. */
+function irATarjeta(ref) {
+  if (!ref) return false
+  const tarjetas = document.querySelectorAll(`.ag-aprobacion[data-ref="${ref.tipo}-${ref.id}"]:not(.is-decidida)`)
+  const t = tarjetas[tarjetas.length - 1]
+  if (!t) return false
+  // Tras cerrar una hoja, el foco vuelve a su botón: se espera a que termine antes de moverlo.
+  setTimeout(() => {
+    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    t.scrollIntoView({ block: 'center', behavior: reducido ? 'auto' : 'smooth' })
+    t.querySelector('h4')?.focus({ preventScroll: true })
+  }, 60)
+  return true
+}
+
+export function ListaDecisiones({ filtro, onElegir }) {
   const { mundo, enviar, ocupado } = useCtx()
-  const ex = decisionesAbiertas(mundo)
-  if (!ex.length) return <p className="text-sm text-flp-muted">No hay decisiones pendientes.</p>
+  const ex = decisionesAbiertas(mundo).filter(filtro ?? (() => true))
+  if (!ex.length) return <p className="text-sm text-flp-muted">Nada por revisar.</p>
   return (
     <ul className="ag-decisiones">
       {ex.map((e) => (
         <li key={e.id}>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <AutonomyBadge nivel={e.nivel} compacto={compacta} />
-              <span className="text-xs text-flp-muted">{e.rol}</span>
-              {e.aplazado && <span className="text-xs font-semibold text-flp-muted">· en revisión</span>}
+            <div className="text-sm font-medium text-flp-ink">{e.titulo}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-flp-muted">
+              <span>
+                {AUTONOMIA[e.nivel]?.etiqueta} · Decide: {e.rol.toLowerCase()}
+                {e.aplazado ? ' · en revisión' : ''}
+              </span>
+              {CAPACIDAD_DECISION[e.tipo] && <span className="ag-etiqueta-capacidad">{CAPACIDAD_DECISION[e.tipo]}</span>}
             </div>
-            <div className="mt-1 text-sm font-semibold text-flp-ink">{e.titulo}</div>
             {e.importe > 0 && <div className="tnum text-xs text-flp-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Reserva propuesta ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
           </div>
-          <button type="button" className="ag-boton-fila" disabled={ocupado} onClick={() => enviar(e.entrada)}>
+          <button
+            type="button"
+            className="ag-boton-fila"
+            disabled={ocupado}
+            aria-label={`Revisar: ${e.titulo}`}
+            onClick={() => {
+              onElegir?.()
+              if (!irATarjeta(e.ref)) enviar(e.entrada)
+            }}
+          >
             Revisar <IconChevronRight size={15} aria-hidden="true" />
           </button>
         </li>
@@ -591,7 +699,7 @@ function BloqueDecisiones() {
   const n = decisionesAbiertas(mundo).length
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Excepciones · en vivo</span>}>{n ? `Decisiones pendientes (${n})` : 'Decisiones pendientes'}</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Excepciones · en directo</span>}>{n ? `Por revisar (${n})` : 'Por revisar'}</Titulo>
       <ListaDecisiones />
     </div>
   )
@@ -621,9 +729,9 @@ function BloqueInforme({ b }) {
             Aprobado{inf.aprobadoPor ? ` por ${inf.aprobadoPor}` : ''}
           </Tono>
         ) : desact ? (
-          <Tono tono="warning">Desactualizado</Tono>
+          <Tono tono="atencion">Desactualizado</Tono>
         ) : (
-          <Tono tono="neutral">Borrador · pendiente de revisión</Tono>
+          <Tono tono="neutral">Borrador · por revisar</Tono>
         )}
       </header>
       <h4 className="ag-informe-titular">
@@ -669,11 +777,11 @@ function BloqueInforme({ b }) {
           <h5>Para decidir esta semana</h5>
           <ul>
             <li>
-              <span>Decisiones de coste abiertas</span>
+              <span>Decisiones de coste por revisar (sin riesgos de rodaje)</span>
               <span className="tnum">{formatear(r.decisiones, 'num')}</span>
             </li>
             <li>
-              <span>De ellas, con aprobación</span>
+              <span>De ellas, piden aprobación</span>
               <span className="tnum">{formatear(r.conAprobacion, 'num')}</span>
             </li>
             <li>
@@ -703,7 +811,7 @@ function BloqueInforme({ b }) {
       </div>
       {desact && (
         <div className="ag-informe-aviso">
-          <span>Las cifras han cambiado desde esta edición.</span>
+          <span>{MOTIVO_INFORME[c.motivoInformeDesactualizado(mundo, b.id)] ?? 'Algo ha cambiado desde esta edición'}.</span>
           <button type="button" className="ag-link" onClick={() => enviar('Regenera el informe semanal de coste')}>
             Regenerar
           </button>
@@ -1132,7 +1240,7 @@ function BloqueLlamada({ b }) {
   const confirmados = {}
   for (const [, , conf] of visibles) if (conf) Object.assign(confirmados, conf)
   const terminada = n >= total
-  const estado = n === 0 ? 'Llamando…' : terminada ? `Terminada · ${a.llamada.duracion}` : 'En llamada'
+  const estado = terminada ? `Terminada · ${a.llamada.duracion}` : 'Reproduciendo la llamada'
   return (
     <section className="ag-llamada" aria-label={`Llamada a ${a.proveedor}`}>
       <header className="ag-llamada-cab">
@@ -1203,7 +1311,7 @@ function BloqueLlamada({ b }) {
 
 const SEVERIDAD = {
   alta: { etiqueta: 'Riesgo alto', tono: 'negative', Icon: IconAlert },
-  media: { etiqueta: 'Riesgo medio', tono: 'warning', Icon: IconClock },
+  media: { etiqueta: 'Riesgo medio', tono: 'atencion', Icon: IconClock },
   baja: { etiqueta: 'Riesgo bajo', tono: 'neutral', Icon: null, dot: true },
   controlado: { etiqueta: 'Controlado', tono: 'positive', Icon: IconCheck },
 }
@@ -1213,7 +1321,7 @@ export function ChipSeveridad({ severidad }) {
   const Icon = s.Icon
   return (
     <Tono tono={s.tono}>
-      {Icon ? <Icon size={12} strokeWidth={2.6} aria-hidden="true" /> : <span className="ag-chip-dot" aria-hidden="true" />}
+      {Icon ? <Icon size={12} strokeWidth={2.6} aria-hidden="true" /> : <span className="flp-state-dot" aria-hidden="true" />}
       {s.etiqueta}
     </Tono>
   )
@@ -1221,7 +1329,7 @@ export function ChipSeveridad({ severidad }) {
 
 const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido · sigue vigilado' }
 
-/** Radar en vivo: lee el mundo actual, así que cambia con cada novedad o decisión. */
+/** Radar en directo: lee el mundo actual, así que cambia con cada novedad o decisión. */
 export function RadarRiesgos({ compacto = false }) {
   const { mundo, enviar, ocupado } = useCtx()
   const riesgos = evaluarRiesgos(mundo)
@@ -1246,7 +1354,7 @@ export function RadarRiesgos({ compacto = false }) {
           <span className="block text-xs text-flp-muted">
             {r.jornadas.length > 1 ? `Jornadas ${r.jornadas.join(' y ')}` : `Jornada ${r.jornadas[0]}`} · {fechaLarga(r.fecha)} · {r.dias === 1 ? 'mañana' : `en ${formatear(r.dias, 'dias')}`}
             {r.probabilidad != null && ` · lluvia ${formatear(r.probabilidad, 'pct0')}`}
-            {r.exposicion != null && r.exposicion > 0 && ` · exposición máxima ${formatear(r.exposicion, 'eur')}`}
+            {r.exposicion != null && r.exposicion > 0 && ` · si ocurre, hasta ${formatear(r.exposicion, 'eur')}`}
             {r.exposicion == null && ' · impacto por estimar'}
           </span>
           {!compacto && (
@@ -1254,8 +1362,8 @@ export function RadarRiesgos({ compacto = false }) {
               <Tx value={r.respuesta} />
             </p>
           )}
-          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(PREGUNTA[r.id])} aria-label={`${r.aviso && r.estado === 'abierto' ? 'Preparar aviso' : 'Ver respuesta'}: ${renderTexto(r.titulo)}`}>
-            {r.aviso && r.estado === 'abierto' ? 'Preparar aviso' : 'Ver respuesta'} <IconChevronRight size={14} aria-hidden="true" />
+          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(PREGUNTA[r.id])} aria-label={`${r.aviso && r.estado === 'abierto' ? 'Preparar aviso' : 'Ver qué propone'}: ${renderTexto(r.titulo)}`}>
+            {r.aviso && r.estado === 'abierto' ? 'Preparar aviso' : 'Ver qué propone'} <IconChevronRight size={14} aria-hidden="true" />
           </button>
         </li>
       ))}
@@ -1266,7 +1374,7 @@ export function RadarRiesgos({ compacto = false }) {
 function BloqueRiesgos() {
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Riesgos de producción · en vivo</span>}>Radar de riesgos</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Riesgos de producción · en directo</span>}>Riesgos de las próximas jornadas</Titulo>
       <RadarRiesgos />
     </div>
   )
@@ -1278,9 +1386,13 @@ function BloquePlan() {
   const marca = {}
   for (const r of riesgos) for (const n of r.jornadas) if (!marca[n] || (SEVERIDAD_ORDEN[r.severidad] ?? 9) < (SEVERIDAD_ORDEN[marca[n].severidad] ?? 9)) marca[n] = r
   const semanas = [...new Set(mundo.rodaje.jornadas.map((j) => j.semana))]
+  const js = mundo.rodaje.jornadas
+  const altos = riesgos.filter((r) => r.severidad === 'alta').length
+  const medios = riesgos.filter((r) => r.severidad === 'media').length
+  const resumen = `Jornadas ${js[0].n} a ${js[js.length - 1].n} · ${altos} ${altos === 1 ? 'riesgo alto' : 'riesgos altos'} y ${medios} ${medios === 1 ? 'medio' : 'medios'} · plan de ejemplo`
   return (
-    <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Plan de ejemplo</span>}>Próximas jornadas</Titulo>
+    <div className="ag-panel ag-panel--plegable">
+      <Desplegable titulo="Calendario de las próximas jornadas" resumen={resumen} nivel={4}>
       {semanas.map((sem) => (
         <section key={sem} className="mt-3 first:mt-0" aria-label={sem}>
           <h5 className="mb-1.5 text-xs font-semibold text-flp-muted">{sem}</h5>
@@ -1308,6 +1420,7 @@ function BloquePlan() {
           </ol>
         </section>
       ))}
+      </Desplegable>
     </div>
   )
 }

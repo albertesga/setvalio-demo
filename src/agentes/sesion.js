@@ -23,7 +23,7 @@ export const EVENTOS = [
 ]
 
 const EVENTOS_POR_ID = Object.fromEntries(EVENTOS.map((e) => [e.id, e]))
-const MUTAN_DESHACIBLE = new Set(['documento/contabilizar', 'documento/aplazar', 'documento/revision', 'orden/aprobar', 'orden/rechazar', 'orden/escalar', 'partida/ajustarCef', 'informe/aprobar', 'borrador/marcarListo', 'borrador/descartar', 'riesgo/mitigar', 'riesgo/reservar', 'riesgo/aceptar'])
+const MUTAN_DESHACIBLE = new Set(['documento/contabilizar', 'documento/aplazar', 'documento/revision', 'orden/aprobar', 'orden/rechazar', 'orden/escalar', 'partida/ajustarCef', 'informe/aprobar', 'borrador/marcarListo', 'borrador/descartar', 'riesgo/mitigar', 'riesgo/reservar', 'riesgo/aceptar', 'propuesta/noLlamar', 'propuesta/elegir', 'propuesta/anadirLinea'])
 // Acciones que deshacer siempre conserva: no invalidan el deshacer anterior.
 const CONSERVADAS = new Set(['evento/recibir', 'borrador/crear'])
 
@@ -285,7 +285,7 @@ export function reducirSesion(s, a) {
     case 'tour/iniciar': {
       // El recorrido parte de la demo recién abierta para que cada paso cuente lo que pasa.
       const limpia = crearSesion({ persona: s.persona })
-      if (s.mensajes.length) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: la conversación anterior se ha cerrado.', hora: horaDe(0) })
+      if (s.mensajes.length) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: se han cerrado la conversación y las decisiones anteriores.', hora: horaDe(0) })
       return pasoTour(limpia, 0)
     }
 

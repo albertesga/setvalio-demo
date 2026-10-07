@@ -3,8 +3,9 @@
 import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja } from './comun.js'
 import { cuenta } from '../texto.js'
 import { optimizacion, totalesPropuesta, ALTERNATIVAS_POR_ID } from '../propuesta.js'
-import { componerComparacion, kpisPropuesta, textoDiferencia } from './presupuesto.js'
-import { AVISO_EXPLORATORIO } from './riesgos.js'
+import { componerComparacion, kpisPropuesta, textoDiferencia, tarjetaEleccion } from './presupuesto.js'
+import { AVISO_EXPLORATORIO, tarjetaRiesgo } from './riesgos.js'
+import { mejoresConfirmadas } from '../propuesta.js'
 import { jornadaOriginal } from '../rodaje.js'
 import { PERSONAS } from '../mundo.js'
 import { fecha as fechaLarga } from '../texto.js'
@@ -311,10 +312,12 @@ export const accion = {
           ),
         )
         if (liberada) bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
+        // Cambiar el plan sigue a mano: la tarjeta vuelve con esa única opción.
+        else bloques.push(tarjetaRiesgo(despues, a.riesgoId))
         break
       }
       case 'propuesta/noLlamar':
-        bloques.push(texto(t('No se llama a nadie. Tienes la lista de alternativas y tus requisitos para pedir presupuesto tú.')))
+        bloques.push(texto(t('No se llama a nadie. Tienes la lista de alternativas y tus requisitos para pedir presupuesto tú. Si cambias de idea, vuelve a pedir que optimice los proveedores.')))
         sugerencias.push(sug('Optimiza los proveedores de la propuesta'))
         break
       case 'propuesta/elegir': {
@@ -332,7 +335,12 @@ export const accion = {
         if (!pendientes) {
           bloques.push(texto(t('Ya has elegido en todos los costes con alternativa. Esta es la propuesta, edición {v}:', { v: v(despues.propuesta.version, 'num') })))
           bloques.push({ tipo: 'propuesta' })
+        } else {
+          // La siguiente elección, justo debajo: no hay que volver a subir a buscarla.
+          const siguiente = mejoresConfirmadas(despues).find((x) => x.mejor && !despues.propuesta.elecciones[x.linea.id])
+          if (siguiente) bloques.push(tarjetaEleccion(despues, siguiente))
         }
+        sugerencias.push(sug('Enséñame la propuesta de Itsasoa'))
         sugerencias.push(sug('Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €'))
         break
       }

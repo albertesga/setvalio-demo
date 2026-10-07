@@ -292,7 +292,7 @@ export function decisionesRiesgos(m) {
       tipo: 'riesgo',
       ref: { tipo: 'riesgo', id: r.id },
       nivel: 'aprueba',
-      rol: 'Producción ejecutiva',
+      rol: 'Line producer y producción ejecutiva',
       importe: r.reserva,
       titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, ${etiquetaJ(r.jornadas)}${r.reservaCorta ? ' (reserva corta)' : ''}`,
       entrada: PREGUNTA[r.id],

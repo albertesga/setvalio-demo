@@ -52,7 +52,7 @@ export const cumplimiento = {
   componer({ antes, despues: m, det }) {
     const reglas = [t('Criterios: factura completa, pago trazable, pedido o contrato y capítulo ICAA coherente')]
     const noHecho = [t('No ha validado ningún tratamiento fiscal: eso lo firma el fiscalista.'), t('No ha enviado nada fuera.')]
-    const nota = aviso('info', 'El fiscalista revisa y firma', t('Filmpilot prepara la documentación y avisa de lo que bloquea. La validación fiscal es del asesor.'))
+    const nota = aviso('info', 'El fiscalista revisa y firma', t('Filmpilot prepara la documentación y avisa de lo que bloquea; la validación fiscal es del fiscalista.'))
 
     if (det.eventoId === 'EV-03') {
       const dos = c.dossier(m)[0]

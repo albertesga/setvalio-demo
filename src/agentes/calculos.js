@@ -237,10 +237,10 @@ export function excepciones(mundo) {
   }
   for (const o of ordenesPendientes(mundo)) {
     const imp = impactoOrden(mundo, o.id)
-    out.push({ id: `ex-${o.id}`, tipo: 'orden', ref: { tipo: 'orden', id: o.id }, nivel: imp.nivel, rol: imp.rol, importe: o.importe, titulo: `${o.id} · ${o.proveedor}`, entrada: `Revisa la orden de compra ${o.id}` })
+    out.push({ id: `ex-${o.id}`, tipo: 'orden', ref: { tipo: 'orden', id: o.id }, nivel: imp.nivel, rol: imp.rol, importe: o.importe, titulo: `Compra a ${o.proveedor} (${o.id})`, entrada: `Revisa la orden de compra ${o.id}` })
   }
   for (const inc of incoherenciasPrevision(mundo)) {
-    out.push({ id: `ex-cef-${inc.codigo}`, tipo: 'prevision', ref: { tipo: 'cef', id: inc.codigo }, nivel: 'propone', rol: ROLES.lineProducer, importe: inc.exceso, titulo: `Previsión de ${inc.codigo} por debajo de lo comprometido`, entrada: '¿Cómo cerraremos el proyecto?' })
+    out.push({ id: `ex-cef-${inc.codigo}`, tipo: 'prevision', ref: { tipo: 'cef', id: inc.codigo }, nivel: 'propone', rol: ROLES.lineProducer, importe: inc.exceso, titulo: `${inc.codigo} ${inc.nombre}: previsión por debajo de lo comprometido`, entrada: '¿Cómo cerraremos el proyecto?' })
   }
   const peso = { aprueba: 0, propone: 1 }
   return out.sort((a, b) => peso[a.nivel] - peso[b.nivel] || b.importe - a.importe)
@@ -295,7 +295,8 @@ export function estadoDecision(mundo, ref) {
     case 'llamadas': {
       const a = mundo.propuesta?.autorizacion
       if (a === 'autorizada') return { estado: 'aprobada', por: mundo.propuesta.autorizadaPor }
-      if (a === 'rechazada') return { estado: 'rechazada', por }
+      // La tarjeta «¿Cambias de idea?» sigue abierta después de decir que no.
+      if (a === 'rechazada') return ref.retomar ? { estado: 'pendiente' } : { estado: 'rechazada', por }
       return { estado: 'pendiente' }
     }
     case 'eleccion': {
@@ -327,17 +328,22 @@ export function estadoDecision(mundo, ref) {
   }
 }
 
+/** Qué ha cambiado desde que se redactó el informe, o null si sigue al día. */
+export function motivoInformeDesactualizado(mundo, id) {
+  const inf = mundo.informes[id]
+  if (!inf) return null
+  const ahora = totales(mundo)
+  if (['gastado', 'comprometido', 'cef'].some((k) => Math.abs(ahora[k] - inf.totales[k]) > 0.004)) return 'cifras'
+  if (!inf.resumen) return null
+  const ex = excepciones(mundo)
+  if (ex.length !== inf.resumen.decisiones || ex.filter((e) => e.nivel === 'aprueba').length !== inf.resumen.conAprobacion) return 'decisiones'
+  if (Math.abs((ahora.reservas ?? 0) - (inf.resumen.reservas ?? 0)) > 0.004) return 'reservas'
+  const altos = riesgosAltos(mundo).map((r) => r.id).join(',')
+  if (inf.resumen.riesgosAltos && altos !== inf.resumen.riesgosAltos.map((r) => r.id).join(',')) return 'riesgos'
+  return Math.abs(tesoreria(mundo).minimo.saldo - inf.resumen.cajaMinima.saldo) > 0.004 ? 'caja' : null
+}
+
 /** ¿Ha cambiado el coste desde que se redactó el informe? */
 export function informeDesactualizado(mundo, id) {
-  const inf = mundo.informes[id]
-  if (!inf) return false
-  const ahora = totales(mundo)
-  if (['gastado', 'comprometido', 'cef'].some((k) => Math.abs(ahora[k] - inf.totales[k]) > 0.004)) return true
-  if (!inf.resumen) return false
-  const ex = excepciones(mundo)
-  if (ex.length !== inf.resumen.decisiones || ex.filter((e) => e.nivel === 'aprueba').length !== inf.resumen.conAprobacion) return true
-  if (Math.abs((ahora.reservas ?? 0) - (inf.resumen.reservas ?? 0)) > 0.004) return true
-  const altos = riesgosAltos(mundo).map((r) => r.id).join(',')
-  if (inf.resumen.riesgosAltos && altos !== inf.resumen.riesgosAltos.map((r) => r.id).join(',')) return true
-  return Math.abs(tesoreria(mundo).minimo.saldo - inf.resumen.cajaMinima.saldo) > 0.004
+  return motivoInformeDesactualizado(mundo, id) !== null
 }

@@ -102,7 +102,7 @@ export const informeSemanal = {
           capDesv: v(mayor.desviacion, 'eurSigned'),
         }),
       ),
-      kpisProyecto(despues, null, { claves: ['presupuesto', 'gastado', 'comprometido', 'cef', 'desviacion'] }),
+      kpisProyecto(despues),
     ]
     if (infAntes && infAntes === infDespues) {
       bloques.splice(1, 0, aviso('info', 'Sigue al día', t('Las cifras no han cambiado desde la edición {n}, así que no la rehago{aprob}.', { n: v(infDespues.edicion, 'num'), aprob: v(infDespues.estado === 'aprobado' ? ' y su aprobación sigue valiendo' : '') })))
@@ -118,9 +118,9 @@ export const informeSemanal = {
         ),
       )
     }
-    bloques.push(bloqueDesviaciones(despues, { conCausas: 'fuera' }))
+    // Lo que se decide va justo después del informe; el detalle por capítulo, plegado al final.
+    // La lista de decisiones no se repite aquí: está en «Por revisar» y en el propio informe.
     bloques.push({ tipo: 'informe', id: despues.periodo.id })
-    bloques.push({ tipo: 'decisiones' })
     bloques.push({
       tipo: 'aprobacion',
       id: `ap-informe-${despues.periodo.id}`,
@@ -136,6 +136,7 @@ export const informeSemanal = {
         { id: 'aprobar', etiqueta: 'Aprobar para compartir', variante: 'primary', accion: { tipo: 'informe/aprobar', informeId: despues.periodo.id }, rol: 'Producción ejecutiva' },
       ],
     })
+    bloques.push({ ...bloqueDesviaciones(despues, { conCausas: 'fuera' }), plegado: true })
     const sugerencias = [sug('¿Por qué se desvía Escenografía?'), sug('¿Cómo cerraremos el proyecto y llegamos con la caja?')]
     if (c.excepciones(despues).some((e) => e.tipo === 'confianza')) sugerencias.push(sug('¿Qué gastos tengo que revisar?'))
     if (c.ordenesPendientes(despues).length) sugerencias.push(sug('¿Qué órdenes de compra tengo pendientes?'))
@@ -145,7 +146,7 @@ export const informeSemanal = {
       fuentes: ['Presupuesto ICAA por partidas', 'Bandeja de documentos', 'Órdenes de compra', 'Previsión de tesorería', 'Dossier fiscal'],
       reglas: [
         t('Una factura se contabiliza sola si casa con un pedido aprobado (tolerancia {tol})', { tol: v(POLITICAS.toleranciaConciliacion, 'pct0') }),
-        t('Capítulo fuera de rango si se desvía más del {u}', { u: v(POLITICAS.umbralDesviacion, 'pct0') }),
+        t('Capítulo fuera de umbral si se desvía más del {u}', { u: v(POLITICAS.umbralDesviacion, 'pct0') }),
         t('Confianza mínima para clasificar solo: {u}', { u: v(POLITICAS.umbralConfianza, 'pct0') }),
       ],
       noHecho: [t('No ha enviado el informe a nadie.'), t('No ha aprobado ninguna compra ni contabilizado lo dudoso.'), t('No ha modificado el presupuesto.')],
@@ -158,7 +159,7 @@ export const informeSemanal = {
 export const explicarDesviacion = {
   id: 'explicar_desviacion',
   titulo: 'Explicar una desviación',
-  ejemplos: ['¿Por qué se desvía Escenografía?', 'explica la desviación del capítulo 07', '¿qué capítulos están fuera de rango?', 'por qué estamos por encima del presupuesto', 'desviación de la partida 04.01'],
+  ejemplos: ['¿Por qué se desvía Escenografía?', 'explica la desviación del capítulo 07', '¿qué capítulos están fuera de rango?', '¿Qué capítulos están fuera de umbral?', 'por qué estamos por encima del presupuesto', 'desviación de la partida 04.01'],
 
   planificar(m, det) {
     const cap = det.entidades.capitulo
@@ -216,11 +217,11 @@ export const explicarDesviacion = {
         bloqueDesviaciones(m, { conCausas: false }),
       ]
       if (cerca.length) {
-        bloques.push(aviso('aviso', 'Cerca del umbral', t('{cap} está a {margen} del umbral. Lo cruza cualquier gasto que, después de agotar los {pend} que quedan previstos en sus partidas, sume más de esa cifra al coste estimado final.', { cap: v(`${cerca[0].id} ${cerca[0].nombre}`), margen: v(cerca[0].margenUmbral, 'eur'), pend: v(Math.max(0, cerca[0].disponible), 'eur') })))
+        bloques.push(aviso('aviso', 'Cerca del umbral', t('{cap} está a {margen} del umbral. Aún quedan {pend} previstos en sus partidas; cuando se agoten, cualquier gasto de más de {margen} lo pasará.', { cap: v(`${cerca[0].id} ${cerca[0].nombre}`), margen: v(cerca[0].margenUmbral, 'eur'), pend: v(Math.max(0, cerca[0].disponible), 'eur') })))
       }
       for (const x of fuera.slice(0, 2)) sugerencias.push(sug(`¿Por qué se desvía ${x.nombre}?`))
       if (cerca[0]) sugerencias.push(sug(`Explica la desviación del capítulo ${cerca[0].id}`))
-      return { bloques, sugerencias, fuentes: ['Presupuesto ICAA por partidas'], reglas: [t('Fuera de rango: desviación mayor del {u}', { u: v(POLITICAS.umbralDesviacion, 'pct0') })], noHecho: [t('No ha cambiado ninguna previsión.')] }
+      return { bloques, sugerencias, fuentes: ['Presupuesto ICAA por partidas'], reglas: [t('Fuera de umbral: desviación mayor del {u}', { u: v(POLITICAS.umbralDesviacion, 'pct0') })], noHecho: [t('No ha cambiado ninguna previsión.')] }
     }
 
     const x = c.capitulo(m, cap)
@@ -231,7 +232,7 @@ export const explicarDesviacion = {
     if (!d || x.desviacion <= 0) {
       bloques.push(texto(t('{cap} no tiene sobrecoste: {desv} ({pct}) sobre presupuesto.', { cap: v(`${x.id} ${x.nombre}`), desv: v(x.desviacion, 'eurSigned'), pct: v(x.desviacionPct, 'pctSigned') })))
       bloques.push(tablaPartidas(m, cap))
-      sugerencias.push(sug('¿Qué capítulos están fuera de rango?'))
+      sugerencias.push(sug('¿Qué capítulos están fuera de umbral?'))
       return { bloques, sugerencias, fuentes: ['Presupuesto ICAA por partidas'], reglas: [], noHecho: [t('No ha cambiado ninguna previsión.')] }
     }
 
@@ -371,7 +372,7 @@ export const prevision = {
     if (tes.negativas.length) {
       const cobro = tes.semanas.find((s) => s.cobros > 0)
       const ops = []
-      if (cobro) ops.push(t('Pedir que el cobro de {sem} ({imp}: {concepto}) se adelante.', { sem: v(cobro.semana), imp: v(cobro.cobros, 'eur'), concepto: v(cobro.concepto) }))
+      if (cobro) ops.push(t('Pedir que se adelante el cobro de {sem}: {imp} ({concepto}).', { sem: v(cobro.semana), imp: v(cobro.cobros, 'eur'), concepto: v(cobro.concepto) }))
       ops.push(t('Disponer de la póliza de crédito durante las semanas en negativo.'))
       ops.push(t('Acordar con proveedores aplazar pagos no críticos de esas semanas.'))
       bloques.push(lista('Opciones para cubrir la caja', ops.map((tx) => ({ texto: tx })), 'propone'))
@@ -423,19 +424,19 @@ export const resumen = {
     return {
       bloques: [
         texto(
-          t('Día {dia} de {total} de rodaje. Coste estimado final {cef} ({pct} sobre presupuesto) y {n} pendientes.', {
+          t('{dia} de {total} jornadas rodadas. Coste estimado final {cef} ({pct} sobre presupuesto) y {n} por revisar.', {
             dia: v(m.proyecto.diaActual, 'num'),
             total: v(m.proyecto.diasRodaje, 'num'),
             cef: v(tot.cef, 'eur'),
             pct: v(tot.desviacionPct, 'pctSigned'),
-            n: cuenta(ex.length, 'decisión', 'decisiones'),
+            n: v(ex.length, 'num'),
           }),
         ),
         kpisProyecto(m),
         ...(altos.length ? [texto(t('Riesgos de rodaje (agente exploratorio, datos de ejemplo): {n}. El primero: {r}.', { n: cuenta(altos.length, 'alto', 'altos'), r: altos[0].titulo }))] : []),
         { tipo: 'decisiones' },
       ],
-      sugerencias: [sug('Prepárame el informe semanal de coste'), sug('¿Qué riesgos hay para las próximas jornadas?'), sug('¿Qué capítulos están fuera de rango?')],
+      sugerencias: [sug('Prepárame el informe semanal de coste'), sug('¿Qué riesgos hay para las próximas jornadas?'), sug('¿Qué capítulos están fuera de umbral?')],
       fuentes: ['Presupuesto ICAA por partidas', 'Cola de excepciones'],
       reglas: [],
       noHecho: [t('Solo ha leído datos.')],

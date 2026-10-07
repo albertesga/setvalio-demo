@@ -50,7 +50,7 @@ export const ayuda = {
             { texto: t('Contabiliza solo la factura que casa con un pedido aprobado.') },
             { texto: t('Una compra de más de {imp} la aprueba line producer.', { imp: v(POLITICAS.umbralImporteOc, 'eur') }) },
             { texto: t('Si deja su capítulo por encima del {u}, la aprueba producción ejecutiva.', { u: v(POLITICAS.umbralDesviacion, 'pct0') }) },
-            { texto: t('Lo fiscal lo valida el fiscalista. Los correos y los pagos nunca salen del asistente.') },
+            { texto: t('Lo fiscal lo valida el fiscalista. Filmpilot no envía correos ni hace pagos.') },
             { texto: t('Riesgos de producción avisa sin que se lo pidas. Cambiar el plan lo decide line producer; reservar dinero o asumir el riesgo, producción ejecutiva.') },
           ],
         },
@@ -67,7 +67,7 @@ const ALCANCE = {
   fase_posterior: {
     titulo: 'Fase posterior',
     texto: t('Production Rescue —planes de recuperación para producciones en apuros— queda para una fase posterior. No está en esta demo. Hoy puedo ayudarte a ver dónde está la presión.'),
-    sugerencias: ['¿Qué capítulos están fuera de rango?', '¿Cómo cerraremos el proyecto y llegamos con la caja?'],
+    sugerencias: ['¿Qué capítulos están fuera de umbral?', '¿Cómo cerraremos el proyecto y llegamos con la caja?'],
   },
   pagos: {
     titulo: 'Sin pagos',
@@ -81,7 +81,7 @@ export const fueraAlcance = {
   titulo: 'Fuera de alcance',
   ejemplos: ['Activa el Production Rescue', 'rescata la producción', 'paga la factura de Grúas', 'haz la transferencia al hotel'],
   planificar(m, det) {
-    return [paso('orquestador', t('Comprueba si la petición está en el alcance'), { tipo: 'plan', salida: det.motivo === 'pagos' ? t('Pagos: fuera del asistente') : t('Fase posterior') })]
+    return [paso('orquestador', t('Comprueba si la petición está en el alcance'), { tipo: 'plan', salida: det.motivo === 'pagos' ? t('Pagos: Filmpilot no los hace') : t('Fase posterior') })]
   },
   componer({ det }) {
     const a = ALCANCE[det.motivo] ?? ALCANCE.fase_posterior
@@ -89,7 +89,7 @@ export const fueraAlcance = {
       bloques: [aviso(det.motivo === 'pagos' ? 'info' : 'fase', a.titulo, a.texto), { tipo: 'lista', titulo: 'Puedes pedir', items: a.sugerencias.map((x) => ({ texto: t('{x}', { x: v(x) }), entrada: x })) }],
       sugerencias: a.sugerencias.map(sug),
       fuentes: [],
-      reglas: [t('El asistente no ejecuta pagos ni envía comunicaciones')],
+      reglas: [t('Filmpilot no hace pagos ni envía comunicaciones')],
       noHecho: [t('No ha hecho nada fuera de su alcance.')],
     }
   },

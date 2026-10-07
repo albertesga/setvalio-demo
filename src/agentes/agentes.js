@@ -52,7 +52,7 @@ export const AGENTES = {
     nombre: 'Control de costes',
     codigo: 'CC',
     rol: 'Compara presupuesto, gastado, comprometido y previsión por capítulo.',
-    hace: 'Calcula desviaciones y el impacto de cada compra. Pide aprobación si un capítulo supera el umbral.',
+    hace: 'Calcula desviaciones y el impacto de cada compra. Pide aprobación si un capítulo pasa del umbral: un 8 % por encima de su presupuesto.',
     niveles: ['ejecuta', 'aprueba'],
   },
   informes: {

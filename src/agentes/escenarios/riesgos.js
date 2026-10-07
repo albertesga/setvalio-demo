@@ -9,7 +9,7 @@ import { t, v, c, paso, sug, texto, aviso, lista } from './comun.js'
 export const AVISO_EXPLORATORIO = aviso(
   'exploratorio',
   'Exploratorio',
-  t('El agente de riesgos se exploró como idea; no forma parte del alcance decidido. Plan de rodaje, previsión del tiempo, convocatorias y permisos son datos de ejemplo: no consulta ningún servicio externo.'),
+  t('El agente de riesgos es una idea en estudio: aún no está en el producto. Plan de rodaje, previsión del tiempo, convocatorias y permisos son datos de ejemplo: no consulta ningún servicio externo.'),
 )
 
 const NO_HECHO = [t('No ha enviado ningún aviso: los mensajes al equipo quedan como borradores.'), t('No ha cambiado el plan de rodaje ni la previsión sin tu decisión.')]
@@ -97,9 +97,11 @@ export function tarjetaRiesgo(m, id) {
   if (!soloCambiarPlan) acciones.push({ id: 'rechazar', etiqueta: reservada ? 'Asumirlo y liberar la reserva' : 'Asumir el riesgo', variante: 'secondary', accion: { tipo: 'riesgo/aceptar', riesgoId: id }, rol: 'Producción ejecutiva' })
   const impacto = [{ etiqueta: lluvia ? 'Cambiar el orden de jornadas' : 'Replanificar las noches', antes: cef, despues: lluvia ? base : cef, formato: 'eur' }]
   if (acciones.some((a) => a.id === 'reservar')) {
-    impacto.push({ etiqueta: lluvia ? `Reservar el impacto esperado (${formatear(r.probabilidad, 'pct0')} de ${formatear(r.exposicion, 'eur')})` : 'Reservar el coste si se repite', antes: cef, despues: base + r.reserva, formato: 'eur' })
+    impacto.push({ etiqueta: lluvia ? `Reservar el impacto esperado (${formatear(r.probabilidad, 'pct0')} de ${formatear(r.exposicion, 'eur')})` : 'Reservar el coste si se repiten', antes: cef, despues: base + r.reserva, formato: 'eur' })
   }
-  if (!soloCambiarPlan) impacto.push({ etiqueta: reservada ? 'Asumir el riesgo y liberar la reserva' : 'Asumir el riesgo sin reservar', antes: cef, despues: base, formato: 'eur' })
+  // Asumir parece gratis en la tabla: la etiqueta dice lo que se arriesga.
+  const siOcurre = lluvia ? `si llueve, hasta ${formatear(r.exposicion, 'eur')} más` : `si se repiten, unos ${formatear(r.exposicion, 'eur')} más`
+  if (!soloCambiarPlan) impacto.push({ etiqueta: `${reservada ? 'Asumir el riesgo y liberar la reserva' : 'Asumir el riesgo sin reservar'} (${siOcurre})`, antes: cef, despues: base, formato: 'eur' })
   return {
     tipo: 'aprobacion',
     id: `ap-${id}-${d?.estado ?? 'abierto'}-${r.reserva ?? 0}`,
@@ -107,7 +109,7 @@ export function tarjetaRiesgo(m, id) {
     agente: 'riesgos',
     nivel: 'aprueba',
     rol: 'Line producer',
-    nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Reservar o asumir el riesgo lo decide producción ejecutiva.',
+    nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Cambiar el plan lo decide line producer; reservar o asumir el riesgo, producción ejecutiva.',
     entradaActual: PREGUNTA[id],
     titulo: r.titulo,
     resumen: lluvia
@@ -120,7 +122,7 @@ export function tarjetaRiesgo(m, id) {
         })
       : t('Las noches anteriores generaron horas extra y quedan dos más. Si se repiten, el coste estimado final subiría unos {exp}. Una citación más tardía reduce las horas extra, aunque no las elimina.', { exp: v(r.exposicion, 'eur') }),
     impactoTitulo: 'Opción',
-    impactoColumnas: ['Coste final ahora', 'Después'],
+    impactoColumnas: ['Coste estimado final ahora', 'Con esta opción'],
     impacto,
     recomendacion: soloCambiarPlan ? null : lluvia ? t('Recomiendo cambiar el orden: elimina el riesgo sin coste en la previsión.') : t('Recomiendo replanificar: reduce las horas extra sin tocar la previsión.'),
     acciones,
