@@ -86,7 +86,13 @@ export const aprobarOc = {
       if (o.estado !== 'Pendiente') {
         const ed = c.estadoDecision(m, { tipo: 'orden', id })
         return {
-          bloques: [texto(t('{id} ({prov}, {imp}) ya está {estado}{por}.', { id: v(id, 'id'), prov: v(o.proveedor), imp: v(o.importe, 'eur'), estado: v(o.estado.toLowerCase()), por: v(ed.por ? ` por ${ed.por}` : '') }))],
+          bloques: [
+            texto(
+              o.importeAprobado !== undefined && o.importeAprobado < o.importe - 0.004
+                ? t('{id} ({prov}) está aprobada por {aprob} de {imp}{por}. El resto no se ha comprometido.', { id: v(id, 'id'), prov: v(o.proveedor), aprob: v(o.importeAprobado, 'eur'), imp: v(o.importe, 'eur'), por: v(ed.por ? `, por decisión de ${ed.por}` : '') })
+                : t('{id} ({prov}, {imp}) ya está {estado}{por}.', { id: v(id, 'id'), prov: v(o.proveedor), imp: v(o.importe, 'eur'), estado: v(o.estado.toLowerCase()), por: v(ed.por ? ` por ${ed.por}` : '') }),
+            ),
+          ],
           sugerencias: [sug('¿Qué órdenes de compra tengo pendientes?'), sug('¿Cómo cerraremos el proyecto y llegamos con la caja?')],
           fuentes: ['Órdenes de compra'],
           reglas: [],

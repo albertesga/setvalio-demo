@@ -110,6 +110,15 @@ export function extraerEntidades(texto, mundo) {
       break
     }
   }
+  // «la compra del hotel»: si hay una sola orden pendiente o por llegar de un hotel, es esa.
+  if (!e.proveedor && !e.oc && mundo && /\bhotel\b/.test(norm) && /(compra|orden|pedido|oc\b|aprue|aprob)/.test(norm)) {
+    const hoteles = Object.values(mundo.ordenes).filter((o) => /hotel/i.test(o.proveedor) && (o.estado === 'Pendiente' || o.estado === 'Por llegar'))
+    if (hoteles.length === 1) {
+      e.oc = hoteles[0].id
+      e.ocConocida = true
+      e.proveedor = hoteles[0].proveedor
+    }
+  }
   if (e.proveedor && mundo) {
     if (!e.documento) {
       const docs = Object.values(mundo.documentos).filter((d) => d.proveedor === e.proveedor && d.estado !== 'contabilizada')
@@ -154,16 +163,16 @@ export function extraerEntidades(texto, mundo) {
 // Léxico: frases (+3), raíces con peso y refuerzo por entidad.
 export const LEXICO = {
   informe_semanal: {
-    frases: ['informe semanal', 'informe de coste', 'informe de costes', 'cost report', 'cierre semanal', 'informe de la semana', 'reporte semanal', 'prepara el informe', 'aprueba el informe', 'informe para produccion'],
+    frases: ['informe semanal', 'informe de coste', 'informe de costes', 'cost report', 'cierre semanal', 'informe de la semana', 'reporte semanal', 'prepara el informe', 'informe para produccion', 'aprueba el informe', 'aprobar el informe'],
     raices: { informe: 2, report: 2, semanal: 3 },
   },
   factura_nueva: {
-    frases: ['nueva factura', 'factura nueva', 'ha llegado', 'han llegado', 'procesa la factura', 'procesa la', 'facturas nuevas', 'buzon', 'concilia la factura'],
+    frases: ['nueva factura', 'factura nueva', 'ha llegado', 'han llegado', 'procesa la factura', 'procesa la', 'facturas nuevas', 'buzon', 'concilia la factura', 'sin pedido', 'facturas sin pedido'],
     raices: { factura: 1, lleg: 2, recib: 2, proces: 2, concili: 2, entrant: 2, contabiliz: 2 },
     entidades: { documento: 2 },
   },
   revisar_gasto: {
-    frases: ['baja confianza', 'gastos pendientes', 'bandeja de gastos', 'tengo que revisar', 'tengo pendiente', 'gastos dudosos', 'que gastos'],
+    frases: ['baja confianza', 'gastos pendientes', 'bandeja de gastos', 'gastos dudosos', 'que gastos', 'gastos tengo que revisar'],
     raices: { bandeja: 2, ticket: 3, ocr: 3, confianza: 3, clasific: 2, revis: 1, gasto: 1, dudos: 2 },
   },
   explicar_desviacion: {
@@ -173,7 +182,7 @@ export const LEXICO = {
   },
   aprobar_oc: {
     frases: ['orden de compra', 'ordenes de compra', 'solicitud de compra', 'solicitudes de compra', 'pedidos pendientes', 'compras pendientes'],
-    raices: { aprob: 2, orden: 2, autoriz: 2, rechaz: 2, pedido: 1, compra: 1, impacto: 1 },
+    raices: { aprob: 2, aprue: 2, orden: 2, autoriz: 2, rechaz: 2, pedido: 1, compra: 1, impacto: 1 },
     entidades: { oc: 4 },
   },
   prevision: {
@@ -181,8 +190,8 @@ export const LEXICO = {
     raices: { forecast: 3, cef: 3, previs: 2, cierre: 2, proyecc: 2, tesorer: 3, caja: 3, saldo: 2, liquidez: 3, cerra: 1, negativ: 1 },
   },
   cumplimiento: {
-    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic'],
-    raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1 },
+    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para'],
+    raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1 },
   },
   pedir_documentacion: {
     frases: ['pide a', 'pidele a', 'pidele', 'pedir a', 'solicita a', 'escribe a', 'escribele', 'redacta un correo', 'redacta un email', 'email al proveedor', 'correo al proveedor', 'pide la factura', 'pide los justificantes', 'documentacion que falta', 'factura completa', 'al proveedor'],
@@ -196,11 +205,11 @@ export const LEXICO = {
   },
   ayuda: {
     frases: ['que puedes hacer', 'que sabes hacer', 'como funciona', 'que agentes', 'como decides', 'quien eres', 'que haces', 'casos de uso'],
-    raices: { ayuda: 3, agente: 2, autonom: 2 },
+    raices: { ayuda: 3, agente: 2, autonom: 2, decid: 1 },
   },
   resumen: {
-    frases: ['como vamos', 'como va', 'estado del proyecto', 'como esta la produccion', 'situacion del rodaje'],
-    raices: { resum: 3, situacion: 2 },
+    frases: ['como vamos', 'como va', 'estado del proyecto', 'como esta la produccion', 'situacion del rodaje', 'que tengo pendiente', 'que decisiones', 'que tengo que aprobar', 'que tengo que decidir', 'que tengo que revisar', 'tengo que revisar', 'cuanto llevamos gastado', 'cuanto hemos gastado', 'nos estamos pasando'],
+    raices: { resum: 3, situacion: 2, gastad: 1, presupuest: 1, dinero: 1, pasando: 1 },
   },
 }
 
@@ -218,7 +227,10 @@ function puntuar(norm, tokens, entidades, mundo) {
   const out = {}
   for (const [id, lx] of Object.entries(LEXICO)) {
     let s = 0
-    for (const f of lx.frases || []) if (` ${norm} `.includes(` ${f} `) || norm.includes(f)) s += 3
+    // Frases con límites de palabra; si dos se solapan cuenta solo la más larga.
+    const halladas = (lx.frases || []).filter((f) => ` ${norm} `.includes(` ${f} `))
+    const sinSolapes = halladas.filter((f) => !halladas.some((g) => g !== f && g.length > f.length && g.includes(f)))
+    s += 3 * sinSolapes.length
     for (const [raiz, peso] of Object.entries(lx.raices || {})) if (tokens.some((tk) => tk.startsWith(raiz))) s += peso
     for (const [ent, peso] of Object.entries(lx.entidades || {})) if (entidades[ent] !== undefined) s += peso
     out[id] = s
@@ -255,6 +267,15 @@ export function detectarIntencion(texto, mundo, contexto = {}) {
 
   const puntos = puntuar(norm, tokens, entidades, mundo)
 
+  // «apruébala», «recházala»: la orden de la que se hablaba.
+  if (!entidades.oc && /\b(apruebala|aprobala|rechazala|autorizala)\b/.test(norm) && contexto.ultimasEntidades?.oc) {
+    return { intencion: 'aprobar_oc', puntuacion: 9, entidades: { ...entidades, oc: contexto.ultimasEntidades.oc }, alternativas: [], heredada: true }
+  }
+  // «envíalo», «manda el borrador»: nunca se envía; se enseña el borrador.
+  if (entidades.accionExterna === 'enviar' && (/(borrador|correo|email|mail)/.test(norm) || contexto.ultimaIntencion === 'pedir_documentacion') && !/informe/.test(norm)) {
+    const documento = entidades.documento ?? contexto.ultimasEntidades?.documento
+    return { intencion: 'pedir_documentacion', puntuacion: 9, entidades: { ...entidades, documento, quiereEnviar: true }, alternativas: [] }
+  }
   if (entidades.accionExterna === 'enviar' && !/(redact|prepar|borrador)/.test(norm)) {
     if (puntos.informe_semanal >= 2) return { intencion: 'informe_semanal', puntuacion: puntos.informe_semanal, entidades: { ...entidades, quiereEnviar: true }, alternativas: [] }
     if (/(correo|email|mail|proveedor|hotel|gestoria|ferreteria|documentacion|justificante|factura)/.test(norm)) {
@@ -268,6 +289,10 @@ export function detectarIntencion(texto, mundo, contexto = {}) {
 
   if (primero[1] >= 3 && primero[1] === segundo[1]) {
     return { intencion: 'desambiguar', puntuacion: primero[1], entidades, alternativas, opciones: [primero[0], segundo[0]] }
+  }
+  // «¿Cómo va Escenografía?»: con un capítulo, la pregunta es por su desviación.
+  if (primero[1] >= 3 && primero[0] === 'resumen' && (entidades.capitulo || entidades.partida)) {
+    return { intencion: 'explicar_desviacion', puntuacion: primero[1], entidades, alternativas }
   }
   if (primero[1] >= 3) return { intencion: primero[0], puntuacion: primero[1], entidades, alternativas }
 

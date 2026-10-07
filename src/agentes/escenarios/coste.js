@@ -70,7 +70,13 @@ export const informeSemanal = {
       paso('informes', t('Redacta el borrador para producción'), {
         tipo: 'redaccion',
         acciones: [{ tipo: 'informe/generar', periodoId: m.periodo.id, por: 'Informes' }],
-        salida: t('Borrador listo para tu revisión'),
+        salida: (antes, d) => {
+          const previo = antes.informes[m.periodo.id]
+          const nuevo = d.informes[m.periodo.id]
+          if (previo && previo === nuevo) return t('El informe sigue al día: no hay que rehacerlo')
+          if (previo) return t('Edición {n}: las cifras habían cambiado', { n: v(nuevo.edicion, 'num') })
+          return t('Borrador listo para tu revisión')
+        },
       }),
     ]
   },
@@ -79,6 +85,8 @@ export const informeSemanal = {
     const tot = c.totales(despues)
     const des = c.desviaciones(despues)
     const mayor = des.items[0]
+    const infAntes = antes.informes[despues.periodo.id]
+    const infDespues = despues.informes[despues.periodo.id]
     const contabilizadas = Object.values(despues.documentos).filter((d) => d.estado === 'contabilizada' && antes.documentos[d.id].estado !== 'contabilizada')
     const bloques = [
       texto(
@@ -94,6 +102,11 @@ export const informeSemanal = {
       ),
       kpisProyecto(despues, null, { claves: ['presupuesto', 'gastado', 'comprometido', 'cef', 'desviacion'] }),
     ]
+    if (infAntes && infAntes === infDespues) {
+      bloques.splice(1, 0, aviso('info', 'Sigue al día', t('Las cifras no han cambiado desde la edición {n}, así que no la rehago{aprob}.', { n: v(infDespues.edicion, 'num'), aprob: v(infDespues.estado === 'aprobado' ? ' y su aprobación sigue valiendo' : '') })))
+    } else if (infDespues?.sustituyeAprobada) {
+      bloques.splice(1, 0, aviso('aviso', 'Nueva edición', t('Las cifras cambiaron: esta edición sustituye a la que estaba aprobada y hay que volver a aprobarla.')))
+    }
     if (contabilizadas.length) {
       bloques.push(
         texto(
@@ -115,7 +128,7 @@ export const informeSemanal = {
       rol: 'Producción ejecutiva',
       titulo: t('Compartir el informe de {periodo}', { periodo: v(despues.periodo.etiqueta) }),
       resumen: det?.entidades?.quiereEnviar
-        ? t('Me pides enviarlo. En la demo no se envía nada: si lo apruebas, queda listo para descargar y compartir.')
+        ? t('Me pides enviarlo. En la demo no se envía ni se descarga nada: aquí solo queda registrada la aprobación.')
         : t('Antes de compartirlo fuera de la productora, alguien de producción ejecutiva tiene que revisarlo.'),
       acciones: [
         { id: 'aprobar', etiqueta: 'Aprobar para compartir', variante: 'primary', accion: { tipo: 'informe/aprobar', informeId: despues.periodo.id }, rol: 'Producción ejecutiva' },
@@ -162,7 +175,13 @@ export const explicarDesviacion = {
           return t('Consolidadas: {c} de {n} con sobrecoste', { c: v(cons.length, 'num'), n: cuenta(causas.length, 'partida', 'partidas') })
         },
       }),
-      paso('costes', t('Busca margen para compensar'), { autonomia: 'propone', salida: t('Propuestas preparadas; no cambia nada sin tu visto bueno') }),
+      paso('costes', t('Busca margen para compensar'), {
+        autonomia: 'propone',
+        salida: () => {
+          const fuera = cap ? c.capitulo(m, cap).fueraRango : c.capitulos(m).some((x) => x.fueraRango)
+          return fuera ? t('Propuestas preparadas; no cambia nada sin tu visto bueno') : t('Sin propuestas: está dentro del umbral')
+        },
+      }),
     ]
   },
 
@@ -186,7 +205,7 @@ export const explicarDesviacion = {
         bloqueDesviaciones(m, { conCausas: false }),
       ]
       if (cerca.length) {
-        bloques.push(aviso('aviso', 'Cerca del umbral', t('{cap} está a {margen} del umbral. Cualquier compra nueva lo cruza.', { cap: v(`${cerca[0].id} ${cerca[0].nombre}`), margen: v(cerca[0].margenUmbral, 'eur') })))
+        bloques.push(aviso('aviso', 'Cerca del umbral', t('{cap} está a {margen} del umbral. Lo cruza cualquier gasto que, después de agotar los {pend} que quedan previstos en sus partidas, sume más de esa cifra al coste estimado final.', { cap: v(`${cerca[0].id} ${cerca[0].nombre}`), margen: v(cerca[0].margenUmbral, 'eur'), pend: v(Math.max(0, cerca[0].disponible), 'eur') })))
       }
       for (const x of fuera.slice(0, 2)) sugerencias.push(sug(`¿Por qué se desvía ${x.nombre}?`))
       if (cerca[0]) sugerencias.push(sug(`Explica la desviación del capítulo ${cerca[0].id}`))
@@ -225,7 +244,11 @@ export const explicarDesviacion = {
     // Evidencias: documentos y órdenes del capítulo.
     const evid = [
       ...Object.values(m.documentos).filter((doc) => doc.capitulo === cap && doc.estado !== 'por_llegar').map((doc) => t('{id} · {prov}: {concepto} ({imp})', { id: v(doc.id, 'id'), prov: v(doc.proveedor), concepto: v(doc.concepto), imp: v(doc.base, 'eur') })),
-      ...Object.values(m.ordenes).filter((o) => o.capitulo === cap && !o.aliasLegacy).map((o) => t('{id} · {prov}: {concepto} ({imp}, {estado})', { id: v(o.id, 'id'), prov: v(o.proveedor), concepto: v(o.concepto), imp: v(o.importe, 'eur'), estado: v(o.estado.toLowerCase()) })),
+      ...Object.values(m.ordenes).filter((o) => o.capitulo === cap && !o.aliasLegacy).map((o) =>
+        o.importeAprobado !== undefined && o.importeAprobado < o.importe - 0.004
+          ? t('{id} · {prov}: {concepto} (aprobada por {aprob} de {imp})', { id: v(o.id, 'id'), prov: v(o.proveedor), concepto: v(o.concepto), aprob: v(o.importeAprobado, 'eur'), imp: v(o.importe, 'eur') })
+          : t('{id} · {prov}: {concepto} ({imp}, {estado})', { id: v(o.id, 'id'), prov: v(o.proveedor), concepto: v(o.concepto), imp: v(o.importe, 'eur'), estado: v(o.estado.toLowerCase()) }),
+      ),
     ]
     if (evid.length) bloques.push(lista('Documentos y pedidos del capítulo', evid.map((tx) => ({ texto: tx }))))
 

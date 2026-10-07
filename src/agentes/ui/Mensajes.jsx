@@ -1,7 +1,7 @@
 // Mensajes de la conversación y línea de trabajo de los agentes.
 
 import { useState } from 'react'
-import { IconChevronDown, IconBell } from '../../components/icons.jsx'
+import { IconChevronDown, IconBell, IconStop } from '../../components/icons.jsx'
 import { AGENTES } from '../agentes.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentTile, AutonomyBadge, StatusChip } from './Piezas.jsx'
@@ -68,7 +68,7 @@ function Traza({ msg }) {
         </span>
         <IconChevronDown size={18} className={`transition-transform ${abierta ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-      <div id={id} className={`ag-plegable ${abierta ? 'is-open' : ''}`}>
+      <div id={id} className={`ag-plegable ${abierta ? 'is-open' : ''}`} inert={abierta ? undefined : ''} aria-hidden={!abierta || undefined}>
         <div className="ag-plegable-dentro">
           <LineaTrabajo msg={msg} />
           {(t.fuentes.length > 0 || t.reglas.length > 0 || t.noHecho.length > 0) && (
@@ -122,18 +122,30 @@ function MensajeAgentes({ msg, ultimo }) {
       <header className="flex items-center gap-2.5">
         <AgentTile id="orquestador" size={32} trabajando={enCurso} />
         <div className="min-w-0 flex-1">
-          <h3 id={tituloId} className="text-sm font-extrabold text-ink">
+          <h3 id={tituloId} tabIndex={-1} className="text-sm font-extrabold text-ink focus:outline-none">
             {t.titulo}
           </h3>
           <p className="text-xs text-muted">
             <span className="tnum">{msg.hora}</span> · {msg.origen === 'evento' ? 'Novedad recibida' : msg.origen === 'accion' ? 'Los agentes aplican la decisión' : 'Orquestador'}
-            {msg.deshecho && ' · deshecho'}
+            {msg.deshecho && <strong className="font-bold text-ink"> · Deshecho</strong>}
           </p>
         </div>
         {enCurso && (
-          <button type="button" className="ag-boton-fila" onClick={() => despachar({ tipo: 'saltar' })}>
-            Ver resultado
-          </button>
+          <div className="flex flex-none gap-2">
+            <button
+              type="button"
+              className="ag-boton-fila"
+              onClick={() => {
+                despachar({ tipo: 'saltar' })
+                requestAnimationFrame(() => document.getElementById(tituloId)?.focus())
+              }}
+            >
+              Ver resultado
+            </button>
+            <button type="button" className="ag-boton-fila" onClick={() => despachar({ tipo: 'detener' })}>
+              <IconStop size={14} aria-hidden="true" /> Detener
+            </button>
+          </div>
         )}
       </header>
 

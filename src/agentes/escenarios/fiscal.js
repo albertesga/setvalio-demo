@@ -17,8 +17,8 @@ function tarjetaFiscal(m, d) {
     rol: ROLES.fiscalista,
     titulo: t('Validación territorial de {id}', { id: v(d.id, 'id') }),
     resumen: t('Factura con IGIC ({tasa}): cuenta como gasto en Canarias. Que compute para el incentivo canario lo decide el fiscalista, no un agente.', { tasa: v(d.impuesto.tasa / 100, 'pct0') }),
-    acciones: [{ id: 'enviar', etiqueta: 'Enviar al fiscalista', variante: 'primary', accion: { tipo: 'documento/revision', docId: d.id, rol: ROLES.fiscalista }, rol: null }],
-    nota: 'En la demo no sale nada: se marca como enviado.',
+    acciones: [{ id: 'enviar', etiqueta: 'Preparar para el fiscalista', variante: 'primary', accion: { tipo: 'documento/revision', docId: d.id, rol: ROLES.fiscalista }, rol: null }],
+    nota: 'En la demo no sale nada: el paquete queda preparado.',
   }
 }
 
@@ -98,7 +98,7 @@ export const cumplimiento = {
     const prox = dos.reduce((a, x) => (x.dias < a.dias ? x : a), dos[0])
     const igic = docs.find((d) => d.impuesto?.tipo === 'IGIC' && !m.revisiones[d.id])
     const bloques = [
-      texto(t('Hay {n} en el dossier. El más urgente es {doc}: vence en {dias}.', { n: cuenta(dos.length, 'bloqueante', 'bloqueantes'), doc: v(prox.documento.toLowerCase()), dias: v(prox.dias, 'dias') })),
+      texto(t('Hay {n} en el dossier. El más urgente: {doc}, que vence en {dias}.', { n: cuenta(dos.length, 'bloqueante', 'bloqueantes'), doc: v(prox.documento), dias: v(prox.dias, 'dias') })),
       bloqueDossier(m),
     ]
     if (filas.length) {
@@ -146,6 +146,7 @@ export const incentivo = {
     const canActual = c.incentivo(m, { territorio: 'canarias', pctGasto: pctActual })
     const canPedido = c.incentivo(m, { territorio: 'canarias', pctGasto: pctPedido })
     const canAyuda = c.incentivo(m, { territorio: 'canarias', pctGasto: pctPedido, ayudaIcaa: true })
+    const otro = det.entidades?.territorio && !['canarias', 'comun'].includes(det.entidades.territorio) ? c.incentivo(m, { territorio: det.entidades.territorio, pctGasto: det.entidades.porcentaje }) : null
     const plan = m.financiacion.find((f) => f.tipo === 'Deducción')
     const ayuda = canAyuda.ayuda
 
@@ -154,10 +155,20 @@ export const incentivo = {
       { id: 'can-actual', escenario: `Canarias con el gasto actual (${Math.round(pctActual * 100)} %)`, deduccion: canActual.deduccionNeta, efectivo: canActual.efectivo, nota: canActual.cumpleRequisito ? '' : `No cumple el requisito: ${canActual.requisitoLabel}` },
       { id: 'can-pedido', escenario: `Canarias con el ${Math.round(pctPedido * 100)} % del gasto`, deduccion: canPedido.deduccionNeta, efectivo: canPedido.efectivo, nota: canPedido.cumpleRequisito ? 'Cumple el requisito de gasto' : `No cumple el requisito: ${canPedido.requisitoLabel}` },
     ]
-    if (ayuda) filas.push({ id: 'can-ayuda', escenario: `Lo anterior con ${ayuda.fuente.toLowerCase()}`, deduccion: canAyuda.deduccionNeta, efectivo: canAyuda.efectivo, nota: canAyuda.topaIntensidad ? 'Recortada por el tope de intensidad' : 'La ayuda reduce la base' })
+    if (otro && otro.pctGasto > 0) filas.unshift({ id: 'otro', escenario: `${otro.territorio} con el ${Math.round(otro.pctGasto * 100)} % del gasto`, deduccion: otro.deduccionNeta, efectivo: otro.efectivo, nota: otro.cumpleRequisito ? 'Cumple el requisito de gasto' : `No cumple el requisito: ${otro.requisitoLabel}` })
+    if (ayuda) filas.push({ id: 'can-ayuda', escenario: `Lo anterior con la ${ayuda.fuente}`, deduccion: canAyuda.deduccionNeta, efectivo: canAyuda.efectivo, nota: canAyuda.topaIntensidad ? 'Recortada por el tope de intensidad' : 'La ayuda reduce la base' })
 
     const bloques = [
       aviso('exploratorio', 'Exploratorio', t('El simulador de incentivos se exploró como posible puerta de entrada; no forma parte del alcance decidido. Es una estimación orientativa y no sustituye el criterio del fiscalista.')),
+      ...(otro
+        ? [
+            texto(
+              otro.pctGasto === 0
+                ? t('Este proyecto no prevé gasto en {terr}, así que su régimen no aplica. Si quieres estimarlo, dime qué parte del gasto iría allí (su requisito: {req}). Debajo, la comparación con Canarias, donde sí rueda una parte.', { terr: v(otro.territorio), req: v(otro.requisitoLabel) })
+                : t('En {terr} con el {pct} del gasto, la deducción estimada sería {d}.', { terr: v(otro.territorio), pct: v(otro.pctGasto, 'pct0'), d: v(otro.deduccionNeta, 'eur') }),
+            ),
+          ]
+        : []),
       texto(
         canActual.cumpleRequisito
           ? t('Con el gasto actual en Canarias ({pct}) la deducción estimada es {d}.', { pct: v(pctActual, 'pct0'), d: v(canActual.deduccionNeta, 'eur') })

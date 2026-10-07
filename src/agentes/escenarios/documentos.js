@@ -18,8 +18,7 @@ export function documentoObjetivo(m, det) {
   if (det.eventoId === 'EV-01') return 'F-2026-078'
   const id = det.entidades?.documento
   if (id && m.documentos[id]) return id
-  const candidato = enBandeja(m).find((d) => casable(m, d))
-  if (candidato) return candidato.id
+  // Sin documento concreto, «¿ha llegado algo?» se responde con lo que de verdad está por llegar.
   if (m.documentos['F-2026-078'].estado === 'por_llegar') return 'F-2026-078'
   return null
 }
@@ -100,7 +99,7 @@ export const facturaNueva = {
     const id = documentoObjetivo(antes, det)
     if (!id || (antes.documentos[id].estado === 'por_llegar' && det.eventoId !== 'EV-01')) {
       const pend = enBandeja(despues)
-      const bloques = [texto(t('No ha llegado ninguna factura nueva desde el último corte. En la bandeja quedan {n} que necesitan una decisión.', { n: cuenta(pend.length, 'documento', 'documentos') })), { tipo: 'decisiones' }]
+      const bloques = [texto(t('No ha llegado ninguna factura nueva desde el último corte. En la bandeja hay {n}; abajo, los que necesitan una decisión.', { n: cuenta(pend.length, 'documento', 'documentos') })), { tipo: 'decisiones' }]
       if (despues.entrantes.includes('EV-01')) {
         bloques.push({ tipo: 'acciones', texto: t('En la demo puedes simular que entra una factura ahora.'), acciones: [{ id: 'simular', etiqueta: 'Simular llegada de una factura', entrada: { tipo: 'evento', eventoId: 'EV-01' } }] })
       }
@@ -203,7 +202,7 @@ export const revisarGasto = {
         autonomia: 'propone',
         salida: t('{a} o {b}', { a: v(c.etiquetaPartida(m, d.partida)), b: v(c.etiquetaPartida(m, d.alternativa)) }),
       }),
-      paso('excepciones', t('Te lo trae para decidir'), { tipo: 'revision', autonomia: 'aprueba', salida: t('No se contabiliza sin tu confirmación') }),
+      paso('excepciones', t('Te lo trae para decidir'), { tipo: 'revision', autonomia: 'propone', salida: t('No se contabiliza sin tu confirmación') }),
     ]
   },
 
@@ -235,8 +234,8 @@ export const revisarGasto = {
         tipo: 'aprobacion',
         id: `ap-${d.id}`,
         ref: { tipo: 'documento', id: d.id },
-        agente: 'excepciones',
-        nivel: 'aprueba',
+        agente: 'facturas',
+        nivel: 'propone',
         rol: ROLES.revisionHumana,
         titulo: t('¿En qué partida va el gasto de {prov}?', { prov: v(d.proveedor) }),
         resumen:
@@ -310,8 +309,15 @@ function borradorPara(m, d) {
   }
 }
 
+/** Le falta documentación: ticket simplificado, IGIC por validar o factura sin pedido ni contrato. */
+export function faltaDocumentacion(d) {
+  return d.estado !== 'por_llegar' && (d.tipo === 'ticket' || d.impuesto?.tipo === 'IGIC' || (!d.oc && !d.contrato) || (!d.oc && d.estado === 'en_bandeja'))
+}
+
 function documentoParaPedir(m, det) {
-  const id = det.entidades?.documento
+  let id = det.entidades?.documento
+  // Un proveedor con varios documentos: el que tiene algo pendiente.
+  if (!id && det.entidades?.proveedor) id = Object.values(m.documentos).find((d) => d.proveedor === det.entidades.proveedor && faltaDocumentacion(d))?.id
   if (id && m.documentos[id] && m.documentos[id].estado !== 'por_llegar') return id
   return null
 }
@@ -325,6 +331,7 @@ export const pedirDocumentacion = {
     const id = documentoParaPedir(m, det)
     if (!id) return [paso('cumplimiento', t('Busca qué documentación falta'), { tipo: 'revision', salida: t('Varios proveedores con algo pendiente') })]
     const d = m.documentos[id]
+    if (!faltaDocumentacion(d)) return [paso('cumplimiento', t('Revisa la documentación de {id}', { id: v(id, 'id') }), { tipo: 'revision', salida: t('No le falta nada') })]
     const borrador = borradorPara(m, d)
     return [
       paso('cumplimiento', t('Identifica qué falta en {id}', { id: v(id, 'id') }), { tipo: 'revision', salida: borrador.motivo }),
@@ -340,9 +347,12 @@ export const pedirDocumentacion = {
   componer({ despues: m, det }) {
     const id = documentoParaPedir(m, det)
     if (!id) {
-      const candidatos = enBandeja(m).filter((d) => d.tipo === 'ticket' || !d.oc || d.impuesto?.tipo === 'IGIC')
+      const candidatos = Object.values(m.documentos).filter(faltaDocumentacion)
       return {
-        bloques: [texto(t('¿A qué proveedor escribo? Estos tienen documentación pendiente:'))],
+        bloques: [
+          texto(t('¿A qué proveedor escribo? Estos tienen documentación pendiente.')),
+          { tipo: 'lista', titulo: 'Proveedores con documentación pendiente', items: candidatos.slice(0, 4).map((d) => ({ texto: t('{prov} · {id}', { prov: v(d.proveedor), id: v(d.id, 'id') }), entrada: `Pide a ${d.proveedor} la documentación que falta` })) },
+        ],
         sugerencias: candidatos.slice(0, 3).map((d) => sug(`Pide a ${d.proveedor} la documentación que falta`)),
         fuentes: ['Bandeja de documentos'],
         reglas: [],
@@ -350,8 +360,17 @@ export const pedirDocumentacion = {
       }
     }
     const d = m.documentos[id]
-    const bloques = []
-    if (det.entidades?.quiereEnviar) bloques.push(texto(t('No envío correos: te dejo el borrador para que lo revises y lo envíes tú desde tu correo.')))
+    if (!faltaDocumentacion(d)) {
+      return {
+        bloques: [texto(d.oc ? t('A {id} de {prov} no le falta documentación: casa con el pedido {oc}. No preparo ningún correo.', { id: v(id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') }) : t('A {id} de {prov} no le falta documentación: el proveedor tiene contrato marco. No preparo ningún correo.', { id: v(id, 'id'), prov: v(d.proveedor) }))],
+        sugerencias: [sug('¿Qué bloquea el dossier fiscal?')],
+        fuentes: ['Bandeja de documentos', 'Órdenes de compra'],
+        reglas: [],
+        noHecho: [t('No ha redactado ningún correo.')],
+      }
+    }
+    const bloques = [aviso('exploratorio', 'Exploratorio', t('Pedir documentación a proveedores es una capacidad posible, sin validar. El agente redacta; el correo lo envías tú.'))]
+    if (det.entidades?.quiereEnviar) bloques.push(texto(t('No envío correos: te dejo el borrador para que lo revises, lo copies y lo envíes tú desde tu correo.')))
     else bloques.push(texto(t('Borrador para {prov}. Revísalo antes de enviarlo: los campos entre corchetes los tienes que completar.', { prov: v(d.proveedor) })))
     bloques.push({ tipo: 'borrador', id: `BOR-${id}` })
     return {

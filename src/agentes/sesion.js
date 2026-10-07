@@ -190,7 +190,19 @@ export function reducirSesion(s, a) {
   switch (a.tipo) {
     case 'enviar':
       if (a.entrada.tipo === 'texto' && !String(a.entrada.texto ?? '').trim()) return s
-      return encolar(s, a.entrada)
+      // Una novedad solo llega una vez.
+      if (a.entrada.tipo === 'evento' && (!s.mundo.entrantes.includes(a.entrada.eventoId) || s.cola.some((e) => e.eventoId === a.entrada.eventoId))) return s
+      // Una misma petición no se encola dos veces.
+      if (s.cola.some((e) => JSON.stringify(e) === JSON.stringify(a.entrada))) return s
+      return encolar({ ...s, inactivo: 0 }, a.entrada)
+
+    case 'actividad':
+      return s.inactivo ? { ...s, inactivo: 0 } : s
+
+    case 'editarBorrador': {
+      const mundo = reducirVarias(s.mundo, [{ tipo: 'borrador/editar', id: a.id, asunto: a.asunto, cuerpo: a.cuerpo }])
+      return mundo === s.mundo ? s : { ...s, mundo }
+    }
 
     case 'avanzar': {
       const ms = Math.max(0, a.ms ?? 0)
@@ -227,16 +239,26 @@ export function reducirSesion(s, a) {
 
     case 'deshacer': {
       if (s.activo || s.ultimaMutacion?.mensajeId !== a.mensajeId) return s
-      const msg = s.mensajes.find((m) => m.id === a.mensajeId)
+      const idx = s.mensajes.findIndex((m) => m.id === a.mensajeId)
+      const msg = s.mensajes[idx]
       const previo = s.snapshots[a.mensajeId]
       if (!msg || !previo) return s
-      // Las novedades recibidas no se deshacen: solo lo que se decidió o contabilizó.
-      const recibidas = msg.turno.pasos.flatMap((p) => p.acciones).filter((x) => x.tipo === 'evento/recibir')
-      const mundo = reducirVarias(previo, recibidas)
+      // Se deshace solo lo que se decidió o contabilizó en ese turno. Las novedades
+      // recibidas y los borradores redactados después se conservan.
+      const conservar = (m) => m.turno.pasos.flatMap((p) => p.acciones)
+      const propias = conservar(msg).filter((x) => x.tipo === 'evento/recibir')
+      const posteriores = s.mensajes
+        .slice(idx + 1)
+        .filter((m) => m.rol === 'agentes')
+        .flatMap(conservar)
+        .filter((x) => x.tipo === 'evento/recibir' || x.tipo === 'borrador/crear')
+      const mundo = reducirVarias(previo, [...propias, ...posteriores])
       const persona = personaDe(s)
+      const decision = [...s.mensajes.slice(0, idx)].reverse().find((m) => m.rol === 'decision' || m.rol === 'novedad')
+      const que = decision?.rol === 'decision' ? decision.texto : msg.turno.titulo
       const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true } : m)), actividad: [...s.actividad] }
-      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: `${persona.nombre} ha deshecho «${msg.turno.titulo}». Las cifras vuelven a como estaban.`, hora: horaDe(n.reloj) })
-      n.actividad.unshift({ id: nuevoId(n, 'act'), hora: horaDe(n.reloj), persona: persona.nombre, texto: t('{por} deshace: {que}', { por: v(persona.nombre), que: v(msg.turno.titulo) }) })
+      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: `${persona.nombre} ha deshecho «${que}». Las cifras vuelven a como estaban.`, hora: horaDe(n.reloj) })
+      n.actividad.unshift({ id: nuevoId(n, 'act'), hora: horaDe(n.reloj), persona: persona.nombre, texto: t('{por} deshace: {que}', { por: v(persona.nombre), que: v(que) }) })
       return n
     }
 
@@ -254,8 +276,12 @@ export function reducirSesion(s, a) {
     case 'leerNovedades':
       return s.novedades ? { ...s, novedades: 0 } : s
 
-    case 'tour/iniciar':
-      return pasoTour({ ...s, cola: [] }, 0)
+    case 'tour/iniciar': {
+      // El recorrido parte de la demo recién abierta para que cada paso cuente lo que pasa.
+      const limpia = crearSesion({ persona: s.persona })
+      if (s.mensajes.length) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: la conversación anterior se ha cerrado.', hora: horaDe(0) })
+      return pasoTour(limpia, 0)
+    }
 
     case 'tour/siguiente': {
       if (!puedeAvanzarTour(s)) return s

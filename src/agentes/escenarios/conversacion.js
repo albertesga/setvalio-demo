@@ -62,12 +62,12 @@ export const ayuda = {
 const ALCANCE = {
   fase_posterior: {
     titulo: 'Fase posterior',
-    texto: t('Production Rescue —planes de recuperación para producciones en apuros— queda para una fase posterior. No está en esta demo. Hoy puedo ayudarte a ver dónde está la presión:'),
+    texto: t('Production Rescue —planes de recuperación para producciones en apuros— queda para una fase posterior. No está en esta demo. Hoy puedo ayudarte a ver dónde está la presión.'),
     sugerencias: ['¿Qué capítulos están fuera de rango?', '¿Cómo cerraremos el proyecto y llegamos con la caja?'],
   },
   pagos: {
     titulo: 'Sin pagos',
-    texto: t('No ejecuto pagos ni transferencias: salen de vuestra banca, con vuestras firmas. Sí puedo decirte qué vence y cómo queda la caja:'),
+    texto: t('No ejecuto pagos ni transferencias: salen de vuestra banca, con vuestras firmas. Sí puedo decirte qué vence y cómo queda la caja.'),
     sugerencias: ['¿Cómo cerraremos el proyecto y llegamos con la caja?', '¿Qué bloquea el dossier fiscal?'],
   },
 }
@@ -82,7 +82,7 @@ export const fueraAlcance = {
   componer({ det }) {
     const a = ALCANCE[det.motivo] ?? ALCANCE.fase_posterior
     return {
-      bloques: [aviso(det.motivo === 'pagos' ? 'info' : 'fase', a.titulo, a.texto)],
+      bloques: [aviso(det.motivo === 'pagos' ? 'info' : 'fase', a.titulo, a.texto), { tipo: 'lista', titulo: 'Puedes pedir', items: a.sugerencias.map((x) => ({ texto: t('{x}', { x: v(x) }), entrada: x })) }],
       sugerencias: a.sugerencias.map(sug),
       fuentes: [],
       reglas: [t('El asistente no ejecuta pagos ni envía comunicaciones')],
@@ -115,7 +115,10 @@ export const desambiguar = {
   componer({ det }) {
     const [a, b] = det.opciones
     return {
-      bloques: [texto(t('¿Te refieres a {a} o a {b}?', { a: v(NOMBRE_INTENCION[a] ?? a), b: v(NOMBRE_INTENCION[b] ?? b) }))],
+      bloques: [
+        texto(t('¿Te refieres a {a} o a {b}?', { a: v(NOMBRE_INTENCION[a] ?? a), b: v(NOMBRE_INTENCION[b] ?? b) })),
+        { tipo: 'lista', titulo: 'Elige una', items: [a, b].filter((x) => EJEMPLO[x]).map((x) => ({ texto: t('{x}', { x: v(EJEMPLO[x]) }), entrada: EJEMPLO[x] })) },
+      ],
       sugerencias: [a, b].filter((x) => EJEMPLO[x]).map((x) => sug(EJEMPLO[x])),
       fuentes: [],
       reglas: [],
@@ -136,7 +139,10 @@ export const noEntendido = {
     const base = ['informe_semanal', 'explicar_desviacion', 'aprobar_oc']
     const lista = [...new Set([...alt, ...base])].slice(0, 3)
     return {
-      bloques: [texto(t('No tengo un guion para esa petición: en esta demo los agentes solo trabajan con los casos preparados y no inventan respuestas. Estos sí puedo resolverlos:'))],
+      bloques: [
+        texto(t('No tengo un guion para esa petición: en esta demo los agentes solo trabajan con los casos preparados y no inventan respuestas.')),
+        { tipo: 'lista', titulo: 'Esto sí puedo resolverlo', items: lista.map((x) => ({ texto: t('{x}', { x: v(EJEMPLO[x]) }), entrada: EJEMPLO[x] })) },
+      ],
       sugerencias: lista.map((x) => sug(EJEMPLO[x])),
       fuentes: [],
       reglas: [],

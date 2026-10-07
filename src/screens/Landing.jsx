@@ -24,7 +24,7 @@ const AGENTS_PREVIEW = [
   ['FA', 'Facturas', 'Lee los documentos de la bandeja', 'Hecho'],
   ['CN', 'Conciliación', 'Cuadra cada factura con su pedido', 'Hecho'],
   ['CC', 'Control de costes', 'Escenografía queda fuera del umbral', 'Hecho'],
-  ['EX', 'Excepciones', 'Una compra deja Viajes por encima del umbral', 'Tu decisión'],
+  ['EX', 'Excepciones', 'Una compra de más de 10.000 € espera aprobación', 'Tu decisión'],
 ]
 
 const NAV = [
@@ -353,7 +353,7 @@ export default function Landing({ onNavigate }) {
               </div>
               <small>Demo con agentes simulados y datos de ejemplo: no hay un modelo de lenguaje detrás y no se envía nada.</small>
             </div>
-            <div className="landing-agents-preview" role="img" aria-label="Ejemplo: al pedir el informe semanal, Facturas, Conciliación y Control de costes hacen su parte y Excepciones deja una compra pendiente de tu decisión">
+            <div className="landing-agents-preview" role="img" aria-label="Ejemplo: al pedir el informe semanal, Facturas, Conciliación y Control de costes hacen su parte y Excepciones deja una compra de más de 10.000 euros pendiente de tu decisión">
               <div className="landing-agents-ask">Prepárame el informe semanal de coste.</div>
               <ol>
                 {AGENTS_PREVIEW.map(([code, name, task, status]) => (

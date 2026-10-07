@@ -134,12 +134,16 @@ export function Button({ variant = 'secondary', size = 'md', children, className
 export function Modal({ open, onClose, title, subtitle, children, footer, width = 'max-w-2xl' }) {
   const closeRef = useRef(null)
   const modalRef = useRef(null)
+  // onClose en un ref: si el padre lo recrea en cada render, el foco no debe saltar al botón de cerrar.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   useEffect(() => {
     if (!open) return
     const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
     closeRef.current?.focus()
     const onKey = (event) => {
-      if (event.key === 'Escape') onClose?.()
+      if (event.key === 'Escape') onCloseRef.current?.()
       if (event.key !== 'Tab') return
       const focusable = modalRef.current?.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')
       if (!focusable?.length) return
@@ -152,10 +156,10 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
     document.body.style.overflow = 'hidden'
     return () => {
       window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
+      document.body.style.overflow = previousOverflow
       previousFocus?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return (

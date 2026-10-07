@@ -2,7 +2,7 @@
 // cola de decisiones, informe, borrador) leen el mundo actual: si decides en una
 // tarjeta, todas las vistas de esa decisión cambian a la vez.
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Button } from '../../components/ui.jsx'
 import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload } from '../../components/icons.jsx'
 import { formatear, renderTexto, fecha as fechaLarga } from '../texto.js'
@@ -53,24 +53,28 @@ function BloqueAviso({ b }) {
 }
 
 function BloqueLista({ b }) {
-  const { enviar } = useCtx()
+  const { enviar, ocupado } = useCtx()
   return (
     <div className="ag-panel">
       <Titulo extra={b.nivel && <AutonomyBadge nivel={b.nivel} />}>{b.titulo}</Titulo>
       <ul className="space-y-2">
-        {b.items.map((it, i) => (
-          <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-muted">
-            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-line-strong" aria-hidden="true" />
-            <span>
-              <Tx value={it.texto} />
-              {it.entrada && (
-                <button type="button" className="ag-link ml-2" onClick={() => enviar(it.entrada)}>
-                  Ver
-                </button>
-              )}
-            </span>
-          </li>
-        ))}
+        {b.items.map((it, i) =>
+          it.entrada ? (
+            <li key={i}>
+              <button type="button" className="ag-opcion" disabled={ocupado} onClick={() => enviar(it.entrada)}>
+                <Tx value={it.texto} />
+                <IconChevronRight size={16} aria-hidden="true" />
+              </button>
+            </li>
+          ) : (
+            <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-muted">
+              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-line-strong" aria-hidden="true" />
+              <span>
+                <Tx value={it.texto} />
+              </span>
+            </li>
+          ),
+        )}
       </ul>
     </div>
   )
@@ -171,7 +175,7 @@ function BloqueTabla({ b }) {
                 {b.columnas.map((col, i) => {
                   const Tag = i === 0 ? 'th' : 'td'
                   return (
-                    <Tag key={col.id} scope={i === 0 ? 'row' : undefined} className={`${col.alinear === 'right' ? 'text-right tnum' : col.alinear === 'center' ? 'text-center' : 'text-left'}`}>
+                    <Tag key={col.id} scope={i === 0 ? 'row' : undefined} className={`${col.alinear === 'right' ? 'text-right tnum' : col.alinear === 'center' ? 'text-center' : 'text-left'} ${col.texto ? 'is-texto' : ''}`}>
                       {celda(col, fila)}
                       {i === 0 && fila.alerta && <span className="ag-chip ag-chip--negative ml-2 align-middle">Fuera de umbral</span>}
                     </Tag>
@@ -373,22 +377,23 @@ function BloqueDocumento({ b }) {
 
 // ── Aprobación ───────────────────────────────────────────────────────────────
 
+// Estados que cierran la decisión. «Pedida a otro rol» y «en revisión» siguen abiertas.
 const ESTADO_DECISION = {
   aprobada: { etiqueta: 'Aprobada', tono: 'positive' },
   rechazada: { etiqueta: 'Rechazada', tono: 'neutral' },
-  escalada: { etiqueta: 'Enviada para aprobación', tono: 'info' },
-  enviada: { etiqueta: 'Enviada al fiscalista', tono: 'info' },
-  aplazada: { etiqueta: 'En revisión', tono: 'neutral' },
+  preparada: { etiqueta: 'Paquete preparado · no enviado', tono: 'info' },
 }
 
 export function BloqueAprobacion({ b }) {
-  const { mundo, persona, decidir, ocupado } = useCtx()
+  const { mundo, persona, decidir, ocupado, enviar } = useCtx()
   const ed = c.estadoDecision(mundo, b.ref)
   const decidida = ESTADO_DECISION[ed.estado]
   const tieneRolPropio = (a) => !a.rol || puedeDecidir(persona.rol, a.rol)
   const sinPermiso = b.acciones.some((a) => a.rol && !a.soloSinPermiso) && !b.acciones.some((a) => !a.soloSinPermiso && tieneRolPropio(a))
-  const visibles = b.acciones.filter((a) => (a.soloSinPermiso ? sinPermiso : true))
+  const yaPedida = !!ed.escaladaA
+  const visibles = b.acciones.filter((a) => (a.soloSinPermiso ? sinPermiso && !yaPedida : true))
   const etiquetaRef = renderTexto(b.titulo)
+  const informeViejo = b.ref?.tipo === 'informe' && c.informeDesactualizado(mundo, b.ref.id)
 
   return (
     <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`}>
@@ -450,13 +455,25 @@ export function BloqueAprobacion({ b }) {
           <Tono tono={decidida.tono}>
             {ed.estado === 'aprobada' && <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />}
             {decidida.etiqueta}
-            {ed.estado === 'escalada' && ed.a ? ` a ${ed.a}` : ''}
           </Tono>
           {ed.por && <span className="text-xs text-muted">por {ed.por}</span>}
           {ed.estado === 'aprobada' && ed.importe !== undefined && <span className="text-xs text-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
         </div>
+      ) : informeViejo ? (
+        <div className="mt-4">
+          <p className="text-sm text-muted">Las cifras han cambiado desde esta edición: regenera el informe antes de aprobarlo.</p>
+          <Button className="mt-2" variant="secondary" disabled={ocupado} onClick={() => enviar('Regenera el informe semanal de coste')}>
+            Regenerar el informe
+          </Button>
+        </div>
       ) : (
         <>
+          {(yaPedida || ed.aplazado) && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {yaPedida && <Tono tono="info">Pendiente de {ed.escaladaA}{ed.por ? ` · pedido por ${ed.por}` : ''}</Tono>}
+              {ed.aplazado && <Tono tono="neutral">En revisión{ed.por ? ` · ${ed.por}` : ''}</Tono>}
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             {visibles.map((a) => {
               const permitido = a.soloSinPermiso || tieneRolPropio(a)
@@ -476,7 +493,7 @@ export function BloqueAprobacion({ b }) {
           </div>
           {sinPermiso && (
             <p className="mt-2 text-xs text-muted">
-              Como {persona.rol.toLowerCase()} no puedes decidir esta: la decide {b.rol}. Puedes pedir su aprobación o cambiar «Ver como».
+              Como {persona.rol.toLowerCase()} no puedes decidir esta: la decide {b.rol}. {yaPedida ? 'Ya se ha pedido; cambia «Ver como» para decidir.' : 'Puedes pedir su aprobación o cambiar «Ver como».'}
             </p>
           )}
           {visibles.some((a) => a.detalle) && (
@@ -490,7 +507,7 @@ export function BloqueAprobacion({ b }) {
                 ))}
             </p>
           )}
-          {ocupado && <p className="mt-2 text-xs text-muted">Los agentes están trabajando; podrás decidir en cuanto terminen.</p>}
+          {ocupado && <p className="mt-2 text-xs text-muted">Los agentes están trabajando: podrás decidir en cuanto terminen.</p>}
         </>
       )}
       {b.nota && <p className="mt-2 text-xs text-muted">{b.nota}</p>}
@@ -501,7 +518,7 @@ export function BloqueAprobacion({ b }) {
 // ── Cola de decisiones (en vivo) ─────────────────────────────────────────────
 
 export function ListaDecisiones({ compacta = false }) {
-  const { mundo, enviar } = useCtx()
+  const { mundo, enviar, ocupado } = useCtx()
   const ex = c.excepciones(mundo)
   if (!ex.length) return <p className="text-sm text-muted">No hay decisiones pendientes.</p>
   return (
@@ -512,11 +529,12 @@ export function ListaDecisiones({ compacta = false }) {
             <div className="flex flex-wrap items-center gap-2">
               <AutonomyBadge nivel={e.nivel} compacto={compacta} />
               <span className="text-xs text-muted">{e.rol}</span>
+              {e.aplazado && <span className="text-xs font-semibold text-muted">· en revisión</span>}
             </div>
             <div className="mt-1 text-sm font-semibold text-ink">{e.titulo}</div>
             <div className="tnum text-xs text-muted">{formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>
           </div>
-          <button type="button" className="ag-boton-fila" onClick={() => enviar(e.entrada)}>
+          <button type="button" className="ag-boton-fila" disabled={ocupado} onClick={() => enviar(e.entrada)}>
             Revisar <IconChevronRight size={15} aria-hidden="true" />
           </button>
         </li>
@@ -566,7 +584,14 @@ function BloqueInforme({ b }) {
         )}
       </header>
       <h4 className="ag-informe-titular">
-        Cerramos la semana <em>{formatear(t.desviacion, 'eurSigned')} sobre el plan</em>, con {r.capitulos[0] ? `${r.capitulos[0].nombre.toLowerCase()} como mayor presión` : 'el coste en rango'}.
+        Coste estimado final <span className="tnum">{formatear(t.desviacion, 'eurSigned')}</span> sobre presupuesto ({formatear(t.desviacionPct, 'pctSigned')}).{' '}
+        {r.capitulos[0] && r.capitulos[0].desviacion > 0 ? (
+          <>
+            La <em>mayor presión</em>, en {r.capitulos[0].nombre}.
+          </>
+        ) : (
+          'Ningún capítulo por encima del plan.'
+        )}
       </h4>
       <dl className="ag-informe-cifras">
         {[
@@ -632,10 +657,10 @@ function BloqueInforme({ b }) {
           Redactado por Informes · edición {inf.edicion} · corte {fechaLarga(mundo.corte.fecha)}
         </span>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" icon={IconDownload} onClick={() => avisar('Demo: la descarga del informe no está disponible.')}>
-            Descargar
+          <Button size="md" variant="secondary" icon={IconDownload} onClick={() => avisar('Demo: la descarga del informe no está disponible.')}>
+            Descargar (no disponible en la demo)
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onNavigate('coste')}>
+          <Button size="md" variant="ghost" onClick={() => onNavigate('coste')}>
             Ver en Control de costes
           </Button>
         </div>
@@ -647,11 +672,14 @@ function BloqueInforme({ b }) {
 // ── Borrador ─────────────────────────────────────────────────────────────────
 
 function BloqueBorrador({ b }) {
-  const { mundo, decidir, avisar, ocupado } = useCtx()
+  const { mundo, decidir, avisar, ocupado, despachar } = useCtx()
+  const uid = useId()
   const bor = mundo.borradores[b.id]
-  const [asunto, setAsunto] = useState(() => (bor ? renderTexto(bor.asunto) : ''))
-  const [cuerpo, setCuerpo] = useState(() => (bor ? [...bor.cuerpo.map(renderTexto), bor.firma].join('\n\n') : ''))
+  // Las ediciones se guardan en el mundo: otro mensaje con el mismo borrador las ve.
+  const [asunto, setAsunto] = useState(() => (bor ? bor.textoAsunto ?? renderTexto(bor.asunto) : ''))
+  const [cuerpo, setCuerpo] = useState(() => (bor ? bor.textoCuerpo ?? [...bor.cuerpo.map(renderTexto), bor.firma].join('\n\n') : ''))
   if (!bor) return null
+  const guardar = () => despachar({ tipo: 'editarBorrador', id: b.id, asunto, cuerpo })
   const cerrado = bor.estado !== 'borrador'
   const copiar = async () => {
     try {
@@ -677,19 +705,19 @@ function BloqueBorrador({ b }) {
           <dd className="font-semibold text-ink">{bor.para}</dd>
         </div>
       </dl>
-      <label className="mt-3 block text-xs font-bold text-muted" htmlFor={`${b.id}-asunto`}>
+      <label className="mt-3 block text-xs font-bold text-muted" htmlFor={`${uid}-asunto`}>
         Asunto
       </label>
-      <input id={`${b.id}-asunto`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={asunto} onChange={(e) => setAsunto(e.target.value)} disabled={cerrado} />
-      <label className="mt-3 block text-xs font-bold text-muted" htmlFor={`${b.id}-cuerpo`}>
+      <input id={`${uid}-asunto`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={asunto} onChange={(e) => setAsunto(e.target.value)} onBlur={guardar} disabled={cerrado} />
+      <label className="mt-3 block text-xs font-bold text-muted" htmlFor={`${uid}-cuerpo`}>
         Mensaje
       </label>
-      <textarea id={`${b.id}-cuerpo`} className="fp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} disabled={cerrado} />
+      <textarea id={`${uid}-cuerpo`} className="fp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} onBlur={guardar} disabled={cerrado} />
       {cuerpo.includes('[') && !cerrado && <p className="mt-1 text-xs text-warning">Completa los campos entre corchetes antes de enviarlo.</p>}
-      <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-muted">En la demo no se envía nada. En producción, el envío siempre lo confirmas tú.</p>
+      <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-muted">En la demo no se envía nada: copia el texto y envíalo tú desde tu correo.</p>
       {!cerrado && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id }, `Marcar como revisado · ${bor.para}`)}>
+          <Button variant="primary" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id, asunto, cuerpo }, `Marcar como revisado · ${bor.para}`)}>
             Marcar como revisado
           </Button>
           <Button variant="secondary" onClick={copiar}>

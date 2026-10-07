@@ -4,7 +4,7 @@
 // aplicó, el documento no está en la bandeja…) devuelve el MISMO objeto: así es
 // idempotente y la interfaz puede reintentar sin duplicar importes.
 
-import { r2, pendiente, totales, desviaciones, excepciones, dossier, tesoreria } from './calculos.js'
+import { r2, pendiente, totales, desviaciones, excepciones, dossier, tesoreria, informeDesactualizado } from './calculos.js'
 import { crearMundo } from './mundo.js'
 
 function clonar(m) {
@@ -58,7 +58,7 @@ export function reducir(m, accion) {
       let resto = d.base
       const o = d.oc ? n.ordenes[d.oc] : null
       if (o && (o.estado === 'Aprobada' || o.estado === 'Facturada')) {
-        const abierto = r2(o.importe - o.facturado)
+        const abierto = r2((o.importeAprobado ?? o.importe) - o.facturado)
         const mov = Math.min(resto, Math.max(0, abierto))
         if (mov > 0) {
           const po = n.partidas[o.partida]
@@ -68,7 +68,7 @@ export function reducir(m, accion) {
           efectos.push({ ambito: 'partida', id: partida, campo: 'gastado', antes: pd.gastado, despues: r2(pd.gastado + mov) })
           pd.gastado = r2(pd.gastado + mov)
           o.facturado = r2(o.facturado + mov)
-          if (o.facturado >= o.importe - 0.004) o.estado = 'Facturada'
+          if (o.facturado >= (o.importeAprobado ?? o.importe) - 0.004) o.estado = 'Facturada'
           resto = r2(resto - mov)
         }
       }
@@ -142,8 +142,11 @@ export function reducir(m, accion) {
     }
 
     case 'informe/generar': {
+      const id0 = accion.periodoId ?? m.periodo.id
+      // Si ya hay un informe y las cifras no han cambiado, no se regenera (ni se pierde su aprobación).
+      if (m.informes[id0] && !informeDesactualizado(m, id0)) return m
       const n = clonar(m)
-      const id = accion.periodoId ?? n.periodo.id
+      const id = id0
       const previo = n.informes[id]
       const des = desviaciones(n)
       const ex = excepciones(n)
@@ -154,6 +157,7 @@ export function reducir(m, accion) {
         periodo: n.periodo,
         estado: 'borrador',
         edicion: (previo?.edicion ?? 0) + 1,
+        sustituyeAprobada: previo?.estado === 'aprobado',
         totales: totales(n),
         resumen: {
           sobrecostes: des.resumen.sobrecostes,
@@ -170,7 +174,7 @@ export function reducir(m, accion) {
 
     case 'informe/aprobar': {
       const inf = m.informes[accion.informeId]
-      if (!inf || inf.estado === 'aprobado') return m
+      if (!inf || inf.estado === 'aprobado' || informeDesactualizado(m, accion.informeId)) return m
       const n = clonar(m)
       n.informes[accion.informeId].estado = 'aprobado'
       n.informes[accion.informeId].aprobadoPor = accion.por ?? null
@@ -184,10 +188,23 @@ export function reducir(m, accion) {
       return confirmar(n, accion, { tipo: 'borrador', id: accion.borrador.id })
     }
 
+    case 'borrador/editar': {
+      const b = m.borradores[accion.id]
+      if (!b || b.estado !== 'borrador') return m
+      if (b.textoAsunto === accion.asunto && b.textoCuerpo === accion.cuerpo) return m
+      const n = clonar(m)
+      n.borradores[accion.id].textoAsunto = accion.asunto
+      n.borradores[accion.id].textoCuerpo = accion.cuerpo
+      // Editar no es una decisión: no sube la versión ni entra en el historial.
+      return n
+    }
+
     case 'borrador/marcarListo': {
       const b = m.borradores[accion.id]
       if (!b || b.estado !== 'borrador') return m
       const n = clonar(m)
+      if (accion.asunto !== undefined) n.borradores[accion.id].textoAsunto = accion.asunto
+      if (accion.cuerpo !== undefined) n.borradores[accion.id].textoCuerpo = accion.cuerpo
       n.borradores[accion.id].estado = 'listo'
       n.borradores[accion.id].listoPor = accion.por ?? null
       return confirmar(n, accion, { tipo: 'borrador', id: accion.id })

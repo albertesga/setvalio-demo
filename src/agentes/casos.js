@@ -138,7 +138,7 @@ export const RECORRIDO = [
   { id: 'r5', titulo: 'Desviación', entrada: { tipo: 'texto', texto: '¿Por qué se desvía Escenografía?' }, nota: 'Pregunta con tus palabras. La respuesta lleva cifras y de dónde salen.' },
   { id: 'r6', titulo: 'Cierre y caja', entrada: { tipo: 'texto', texto: '¿Cómo cerraremos el proyecto y llegamos con la caja?' }, nota: 'Previsión no mueve dinero: calcula, avisa y propone.' },
   { id: 'r7', titulo: 'Dossier fiscal', entrada: { tipo: 'texto', texto: '¿Qué bloquea el dossier fiscal?' }, nota: 'Cumplimiento prepara; el fiscalista revisa y firma.' },
-  { id: 'r8', titulo: 'Pedir documentación', entrada: { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' }, nota: 'Un borrador listo para revisar. En la demo no sale ningún correo.' },
+  { id: 'r8', titulo: 'Pedir documentación (exploratorio)', entrada: { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' }, nota: 'Un borrador listo para revisar. En la demo no sale ningún correo.' },
   { id: 'r9', titulo: 'Incentivo (exploratorio)', entrada: { tipo: 'texto', texto: '¿Cuánto supondría llegar al 50 % de gasto en Canarias?' }, nota: 'Exploratorio: una estimación orientativa, fuera del alcance decidido.' },
   { id: 'r10', titulo: 'Fuera de alcance', entrada: { tipo: 'texto', texto: 'Activa el Production Rescue' }, nota: 'Cuando algo no está en el producto, lo dice.' },
 ]

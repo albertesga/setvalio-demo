@@ -30,7 +30,7 @@ export function useAgentes({ ritmo = 'normal' } = {}) {
   const activo = !!s.activo
   const activoId = s.activo?.id ?? null
   const hayCola = s.cola.length > 0
-  const esperaEventos = !s.tour && !s.eventosPausados && s.mundo.entrantes.length > 0
+  const esperaEventos = !s.tour && !s.eventosPausados && s.mundo.entrantes.length > 0 && s.mensajes.some((m) => m.rol === 'agentes')
 
   useEffect(() => {
     if (activo && reducido) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui.jsx'
-import { IconArrowUp, IconStop, IconChevronRight, IconPlay } from '../../components/icons.jsx'
+import { IconArrowUp, IconChevronRight, IconPlay, IconClock } from '../../components/icons.jsx'
 import { AGENTES, ORDEN_AGENTES } from '../agentes.js'
 import { CASOS, GRUPOS_CASOS } from '../casos.js'
 import { useCtx } from './contexto.js'
@@ -85,7 +85,7 @@ export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
         <div className="ag-recorrido-card">
           <span className="ag-caso-kicker">Primera vez</span>
           <strong className="ag-caso-titulo">Recorrido guiado</strong>
-          <span className="ag-caso-desc">Diez pasos por todos los casos de uso, con una nota en cada uno. Unos cuatro minutos; en el segundo decides tú.</span>
+          <span className="ag-caso-desc">Un paso por cada caso de uso, con una nota en cada uno. Unos cinco minutos; en el segundo decides tú.</span>
           <Button variant="secondary" className="mt-auto self-start" icon={IconPlay} onClick={() => listo && onRecorrido()} disabled={ocupado}>
             Empezar recorrido
           </Button>
@@ -135,7 +135,7 @@ export function Sugerencias({ items, onElegir, deshabilitado }) {
   )
 }
 
-export function Redactor({ ocupado, onEnviar, onDetener, inputRef }) {
+export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
   const [texto, setTexto] = useState('')
   const historial = useRef([])
   const ref = inputRef
@@ -148,7 +148,8 @@ export function Redactor({ ocupado, onEnviar, onDetener, inputRef }) {
 
   const enviar = () => {
     const limpio = texto.trim()
-    if (!limpio) return
+    // Mientras los agentes trabajan, el texto se queda en el campo hasta que terminen.
+    if (!limpio || ocupado) return
     historial.current.push(limpio)
     onEnviar(limpio)
     setTexto('')
@@ -179,22 +180,20 @@ export function Redactor({ ocupado, onEnviar, onDetener, inputRef }) {
         ref={ref}
         rows={1}
         value={texto}
-        onChange={(e) => setTexto(e.target.value)}
+        onChange={(e) => {
+          setTexto(e.target.value)
+          onEscribir?.()
+        }}
+        onFocus={() => onEscribir?.()}
         onKeyDown={onKeyDown}
         placeholder="Pregunta a los agentes… por ejemplo, ¿por qué se desvía Viajes?"
         className="ag-redactor-campo"
         autoComplete="off"
         enterKeyHint="send"
       />
-      {ocupado ? (
-        <button type="button" className="ag-redactor-boton is-stop" onClick={onDetener} aria-label="Detener a los agentes">
-          <IconStop size={18} />
-        </button>
-      ) : (
-        <button type="submit" className="ag-redactor-boton" aria-label="Enviar" disabled={!texto.trim()}>
-          <IconArrowUp size={18} strokeWidth={2.4} />
-        </button>
-      )}
+      <button type="submit" className="ag-redactor-boton" aria-label={ocupado ? 'Enviar (espera a que terminen los agentes)' : 'Enviar'} disabled={!texto.trim() || ocupado}>
+        <IconArrowUp size={18} strokeWidth={2.4} />
+      </button>
     </form>
   )
 }
@@ -208,13 +207,17 @@ export function BarraRecorrido({ tour, onSiguiente, onSalir }) {
           Recorrido guiado · {tour.indice + 1}/{tour.total}
         </span>
         <span className="block truncate text-sm font-extrabold text-ink">{tour.paso.titulo}</span>
-        {!tour.puedeAvanzar && tour.paso.espera && <span className="block text-xs text-warning">Decide en la tarjeta para continuar.</span>}
+        {!tour.puedeAvanzar && tour.paso.espera && (
+          <span className="flex items-center gap-1 text-xs font-semibold text-ink">
+            <IconClock size={13} aria-hidden="true" /> Decide en la tarjeta para continuar.
+          </span>
+        )}
       </div>
       <div className="flex flex-none gap-2">
-        <Button size="sm" variant="ghost" onClick={onSalir}>
+        <Button size="md" variant="ghost" onClick={onSalir}>
           Salir
         </Button>
-        <Button size="sm" variant="accent" onClick={onSiguiente} disabled={!tour.puedeAvanzar}>
+        <Button size="md" variant="accent" onClick={onSiguiente} disabled={!tour.puedeAvanzar}>
           {tour.ultimo ? 'Terminar' : 'Siguiente'}
         </Button>
       </div>

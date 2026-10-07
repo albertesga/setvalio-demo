@@ -412,5 +412,74 @@ test('el personaje sin permiso no puede decidir y la sesión lo anota', () => {
   assert.ok(s.mensajes.at(-1).texto.includes('Álvaro Ferrer'))
 })
 
+// ── 7. Regresiones de la revisión ─────────────────────────────────────────────
+console.log('Regresiones')
+test('una orden pedida a producción ejecutiva sigue abierta y Marta la puede aprobar', () => {
+  let m = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-02' })
+  m = reducir(m, { tipo: 'orden/escalar', ocId: 'OC-104', a: 'Producción ejecutiva', por: 'Álvaro Ferrer' })
+  const ed = c.estadoDecision(m, { tipo: 'orden', id: 'OC-104' })
+  assert.equal(ed.estado, 'pendiente')
+  assert.equal(ed.escaladaA, 'Producción ejecutiva')
+  m = reducir(m, { tipo: 'orden/aprobar', ocId: 'OC-104', por: 'Marta Cobo' })
+  assert.equal(c.estadoDecision(m, { tipo: 'orden', id: 'OC-104' }).estado, 'aprobada')
+})
+test('dejar un gasto en revisión no lo bloquea: se puede contabilizar después', () => {
+  let m = reducir(mundoBase, { tipo: 'documento/aplazar', docId: 'G-004' })
+  assert.equal(c.estadoDecision(m, { tipo: 'documento', id: 'G-004' }).estado, 'pendiente')
+  m = reducir(m, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
+  assert.equal(m.documentos['G-004'].estado, 'contabilizada')
+})
+test('una aprobación parcial se cuenta como parcial en las respuestas', () => {
+  let m = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-02' })
+  m = reducir(m, { tipo: 'orden/aprobar', ocId: 'OC-104', importe: 12_000, por: 'Marta Cobo' })
+  const txt = responder(m, { tipo: 'texto', texto: 'Revisa la orden de compra OC-104' }).turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' ')
+  assert.match(txt, /aprobada por 12\.000\s€ de 18\.400\s€/)
+})
+test('pedir otra vez el informe con las mismas cifras no borra su aprobación', () => {
+  let m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
+  m = reducir(m, { tipo: 'informe/aprobar', informeId: 'R3', por: 'Marta Cobo' })
+  const r = responder(m, { tipo: 'texto', texto: 'informe semanal' })
+  assert.equal(r.mundo.informes.R3.estado, 'aprobado')
+  assert.equal(r.mundo.informes.R3.edicion, 1)
+})
+test('«¿Han llegado facturas nuevas?» no presenta como nueva una factura anterior', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' })
+  assert.equal(r.mundo.documentos['F-2026-067'].estado, 'en_bandeja')
+  assert.ok(r.turno.bloques.some((b) => b.tipo === 'acciones'), 'ofrece simular la llegada')
+})
+test('no se pide documentación de una factura que casa con su pedido', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: 'escribe al proveedor de la factura F-2026-067' })
+  assert.equal(Object.keys(r.mundo.borradores).length, 0)
+})
+test('el ticket ya contabilizado sigue pudiendo pedir su factura completa', () => {
+  const m = reducir(mundoBase, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
+  const r = responder(m, { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' })
+  assert.ok(r.mundo.borradores['BOR-G-004'])
+})
+test('la salida de Previsión tras contabilizar el ticket coincide con la partida', () => {
+  const r = responder(mundoBase, { tipo: 'accion', accion: { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01', por: 'Marta Cobo' } })
+  const salida = renderTexto(r.turno.pasos.find((p) => p.agente === 'prevision').salida)
+  assert.match(salida, /\+127\s€/)
+})
+test('una novedad no llega dos veces', () => {
+  let s = crearSesion()
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  s = correr(s, 8_000)
+  const n = s.mensajes.length
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  assert.equal(s.mensajes.length, n)
+})
+test('deshacer conserva el borrador redactado después', () => {
+  let s = crearSesion()
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/aprobar', ocId: 'OC-106' }, etiqueta: 'Aprobar OC-106' } })
+  s = correr(s, 6_000)
+  const decision = s.mensajes.filter((m) => m.rol === 'agentes').at(-1)
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' } })
+  s = correr(s, 6_000)
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: decision.id })
+  assert.equal(s.mundo.ordenes['OC-106'].estado, 'Pendiente')
+  assert.ok(s.mundo.borradores['BOR-G-004'], 'el borrador sigue')
+})
+
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)
 if (fallos) process.exit(1)

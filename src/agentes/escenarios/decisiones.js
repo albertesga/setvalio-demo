@@ -33,9 +33,10 @@ export const accion = {
         const d = m.documentos[a.docId]
         return [
           paso('facturas', t('Registra la partida {p}', { p: v(a.partida ?? d.partida, 'id') }), { tipo: 'plan', acciones: [a], salida: t('{id} contabilizado', { id: v(a.docId, 'id') }) }),
-          paso('prevision', t('Recalcula la partida'), { salida: (antes, dd) => {
+          paso('prevision', t('Recalcula la partida'), { salida: (_, dd) => {
             const p = a.partida ?? d.partida
-            const dif = dd.partidas[p].cef - antes.partidas[p].cef
+            // Contra el mundo del inicio del turno: el paso anterior ya contabilizó.
+            const dif = dd.partidas[p].cef - m.partidas[p].cef
             return Math.abs(dif) > 0.004 ? t('Coste estimado final {d}', { d: v(dif, 'eurSigned') }) : t('Sin cambio en la previsión')
           } }),
           ...regInf,
@@ -44,7 +45,7 @@ export const accion = {
       case 'documento/aplazar':
         return [paso('excepciones', t('Deja {id} en la bandeja', { id: v(a.docId, 'id') }), { tipo: 'plan', acciones: [a], salida: t('Volverá a salir en el próximo informe') })]
       case 'documento/revision':
-        return [paso('cumplimiento', t('Prepara el paquete para el fiscalista'), { tipo: 'redaccion', acciones: [a], salida: t('Factura, criterios y motivo de la revisión') })]
+        return [paso('cumplimiento', t('Prepara el paquete para el fiscalista'), { tipo: 'redaccion', acciones: [a], salida: t('Factura, criterios y motivo; sin enviar') })]
       case 'partida/ajustarCef':
         return [paso('prevision', t('Ajusta la previsión de {p}', { p: v(a.codigo, 'id') }), { tipo: 'plan', acciones: [a], salida: t('Nuevo coste estimado final {cef}', { cef: v(a.cef, 'eur') }) }), ...regInf]
       case 'informe/aprobar':
@@ -70,16 +71,35 @@ export const accion = {
         const o = despues.ordenes[a.ocId]
         const capA = c.capitulo(antes, o.capitulo)
         const capD = c.capitulo(despues, o.capitulo)
+        const parcial = o.importeAprobado !== undefined && o.importeAprobado < o.importe - 0.004
+        const cambiaCap = Math.abs(capD.desviacionPct - capA.desviacionPct) > 0.00005
         bloques.push(
           texto(
-            t('{id} aprobada por {por}. {cap} pasa de {a} a {b} y el coste estimado final del proyecto queda en {cef}.', {
-              id: v(o.id, 'id'),
-              por: v(por),
-              cap: v(`${capD.id} ${capD.nombre}`),
-              a: v(capA.desviacionPct, 'pctSigned'),
-              b: v(capD.desviacionPct, 'pctSigned'),
-              cef: v(c.totales(despues).cef, 'eur'),
-            }),
+            parcial
+              ? t('{id} aprobada por {por} solo por {imp}, lo que la previsión ya tenía para {p}. Los {resto} restantes quedan sin aprobar: si hacen falta, tendrán que pedirse aparte. El coste estimado final no cambia: {cef}.', {
+                  id: v(o.id, 'id'),
+                  por: v(por),
+                  imp: v(o.importeAprobado, 'eur'),
+                  p: v(o.partida, 'id'),
+                  resto: v(o.importe - o.importeAprobado, 'eur'),
+                  cef: v(c.totales(despues).cef, 'eur'),
+                })
+              : cambiaCap
+                ? t('{id} aprobada por {por}. {cap} pasa de {a} a {b} y el coste estimado final del proyecto queda en {cef}.', {
+                    id: v(o.id, 'id'),
+                    por: v(por),
+                    cap: v(`${capD.id} ${capD.nombre}`),
+                    a: v(capA.desviacionPct, 'pctSigned'),
+                    b: v(capD.desviacionPct, 'pctSigned'),
+                    cef: v(c.totales(despues).cef, 'eur'),
+                  })
+                : t('{id} aprobada por {por}. Cabía en lo previsto: {cap} se queda en {b} y el coste estimado final en {cef}.', {
+                    id: v(o.id, 'id'),
+                    por: v(por),
+                    cap: v(`${capD.id} ${capD.nombre}`),
+                    b: v(capD.desviacionPct, 'pctSigned'),
+                    cef: v(c.totales(despues).cef, 'eur'),
+                  }),
           ),
         )
         bloques.push(kpisProyecto(despues, antes, { claves: ['comprometido', 'cef', 'desviacion'] }))
@@ -93,7 +113,7 @@ export const accion = {
         break
       }
       case 'orden/escalar':
-        bloques.push(texto(t('{id} queda a la espera de {rol}. En la demo no se notifica a nadie; puedes cambiar a esa persona en «Ver como» y decidir.', { id: v(a.ocId, 'id'), rol: v(a.a) })))
+        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie: cambia a esa persona en «Ver como» y decide en la misma tarjeta.', { id: v(a.ocId, 'id'), rol: v(a.a) })))
         break
       case 'documento/contabilizar': {
         const d = despues.documentos[a.docId]
@@ -107,14 +127,14 @@ export const accion = {
         break
       case 'documento/revision':
         bloques.push(texto(t('Paquete preparado para el fiscalista: la factura, los criterios de elegibilidad y el motivo de la revisión.')))
-        bloques.push(aviso('info', 'No se ha enviado nada', t('En la demo se marca como enviado. En producción lo enviarías tú desde aquí, con confirmación.')))
+        bloques.push(aviso('info', 'No se ha enviado nada', t('Queda preparado, sin enviar. Hacérselo llegar al fiscalista lo decides tú.')))
         break
       case 'partida/ajustarCef':
         bloques.push(texto(t('Previsión de {p} ajustada por {por}.', { p: v(a.codigo, 'id'), por: v(por) })))
         bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion', 'disponible'] }))
         break
       case 'informe/aprobar':
-        bloques.push(texto(t('Informe aprobado por {por}. Queda listo para descargar y compartir; en la demo no se envía.', { por: v(por) })))
+        bloques.push(texto(t('Informe aprobado por {por}. En la demo no se descarga ni se envía: queda registrada la aprobación.', { por: v(por) })))
         break
       case 'borrador/marcarListo':
         bloques.push(texto(t('Borrador revisado. No se ha enviado: en producción el envío también lo confirmas tú.')))

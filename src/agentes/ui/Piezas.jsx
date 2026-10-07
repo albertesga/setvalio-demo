@@ -98,12 +98,15 @@ export function Tono({ tono = 'neutral', children, className = '' }) {
 export function Hoja({ abierta, onCerrar, titulo, lado = 'abajo', children, id }) {
   const ref = useRef(null)
   const cerrarRef = useRef(null)
+  // El efecto depende solo de «abierta»: si dependiera de onCerrar, cada render movería el foco.
+  const onCerrarRef = useRef(onCerrar)
+  onCerrarRef.current = onCerrar
   useEffect(() => {
     if (!abierta) return
     const previo = document.activeElement
     cerrarRef.current?.focus()
     const onKey = (e) => {
-      if (e.key === 'Escape') onCerrar()
+      if (e.key === 'Escape') onCerrarRef.current()
       if (e.key !== 'Tab') return
       const f = ref.current?.querySelectorAll('button:not([disabled]), select, textarea, input, a[href], [tabindex]:not([tabindex="-1"])')
       if (!f?.length) return
@@ -122,7 +125,7 @@ export function Hoja({ abierta, onCerrar, titulo, lado = 'abajo', children, id }
       window.removeEventListener('keydown', onKey)
       previo?.focus?.()
     }
-  }, [abierta, onCerrar])
+  }, [abierta])
 
   return (
     <div className={`ag-hoja ag-hoja--${lado} ${abierta ? 'is-open' : ''}`} aria-hidden={!abierta} inert={abierta ? undefined : ''}>

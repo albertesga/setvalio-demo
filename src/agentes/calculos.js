@@ -190,7 +190,7 @@ export function conciliar(mundo, docId) {
   const o = mundo.ordenes[d.oc]
   if (!o) return { resultado: 'oc_desconocida', oc: d.oc }
   if (o.estado !== 'Aprobada' && o.estado !== 'Facturada') return { resultado: 'oc_no_aprobada', oc: o.id, orden: o }
-  const abierto = r2(o.importe - o.facturado)
+  const abierto = r2((o.importeAprobado ?? o.importe) - o.facturado)
   const diferencia = r2(d.base - abierto)
   const ok = Math.abs(diferencia) <= POLITICAS.toleranciaConciliacion * Math.max(abierto, 1)
   return { resultado: ok ? 'ok' : 'diferencia', oc: o.id, orden: o, abierto, diferencia }
@@ -208,7 +208,7 @@ export function elegibilidad(mundo, docId) {
   const territorial = d.impuesto?.tipo === 'IGIC'
   if (territorial) {
     const revisada = mundo.revisiones[d.id]
-    criterios.push({ id: 'territorio', etiqueta: 'Validación territorial', ok: null, detalle: revisada ? 'Enviada al fiscalista' : 'IGIC: gasto en Canarias, lo valida el fiscalista' })
+    criterios.push({ id: 'territorio', etiqueta: 'Validación territorial', ok: null, detalle: revisada ? 'Paquete preparado para el fiscalista' : 'IGIC: gasto en Canarias, lo valida el fiscalista' })
   }
   const estado = criterios.some((c) => c.ok === false) ? 'revisar' : criterios.some((c) => c.ok === null) ? 'condicionado' : 'elegible'
   return { criterios, estado, territorio: territorial ? 'canarias' : 'comun' }
@@ -220,11 +220,11 @@ export function excepciones(mundo) {
   for (const d of Object.values(mundo.documentos)) {
     if (d.estado !== 'en_bandeja') continue
     if (confianzaBaja(d)) {
-      out.push({ id: `ex-${d.id}`, tipo: 'confianza', ref: { tipo: 'documento', id: d.id }, nivel: 'aprueba', rol: ROLES.revisionHumana, importe: d.base, titulo: `${d.proveedor}: partida dudosa`, entrada: '¿Qué gastos tengo que revisar?' })
+      out.push({ id: `ex-${d.id}`, tipo: 'confianza', ref: { tipo: 'documento', id: d.id }, nivel: 'propone', rol: ROLES.revisionHumana, aplazado: !!d.aplazado, importe: d.base, titulo: `${d.proveedor}: partida dudosa`, entrada: '¿Qué gastos tengo que revisar?' })
     } else if (d.impuesto?.tipo === 'IGIC') {
       if (!mundo.revisiones[d.id]) out.push({ id: `ex-${d.id}`, tipo: 'fiscal', ref: { tipo: 'revision', id: d.id }, nivel: 'aprueba', rol: ROLES.fiscalista, importe: d.base, titulo: `${d.proveedor}: IGIC por validar`, entrada: `Revisa el IGIC de la factura ${d.id}` })
     } else if (!d.oc) {
-      out.push({ id: `ex-${d.id}`, tipo: 'sin_pedido', ref: { tipo: 'documento', id: d.id }, nivel: 'aprueba', rol: ROLES.lineProducer, importe: d.base, titulo: `${d.proveedor}: factura sin pedido`, entrada: `Procesa la factura ${d.id}` })
+      out.push({ id: `ex-${d.id}`, tipo: 'sin_pedido', ref: { tipo: 'documento', id: d.id }, nivel: 'aprueba', rol: ROLES.lineProducer, aplazado: !!d.aplazado, importe: d.base, titulo: `${d.proveedor}: factura sin pedido`, entrada: `Procesa la factura ${d.id}` })
     }
   }
   for (const o of ordenesPendientes(mundo)) {
@@ -263,17 +263,20 @@ export function estadoDecision(mundo, ref) {
       if (!o) return { estado: 'pendiente' }
       if (o.estado === 'Aprobada' || o.estado === 'Facturada') return { estado: 'aprobada', por, importe: o.importeAprobado }
       if (o.estado === 'Rechazada') return { estado: 'rechazada', por }
-      if (o.escaladaA) return { estado: 'escalada', por, a: o.escaladaA }
-      return { estado: o.estado === 'Por llegar' ? 'por_llegar' : 'pendiente' }
+      if (o.estado === 'Por llegar') return { estado: 'por_llegar' }
+      // Pedir aprobación no cierra la decisión: la sigue teniendo quien tiene el rol.
+      if (o.escaladaA) return { estado: 'pendiente', escaladaA: o.escaladaA, por }
+      return { estado: 'pendiente' }
     }
     case 'documento': {
       const d = mundo.documentos[ref.id]
       if (d?.estado === 'contabilizada') return { estado: 'aprobada', por, partida: d.partida }
-      if (d?.aplazado) return { estado: 'aplazada', por }
+      // Dejar en revisión tampoco la cierra: se puede decidir más tarde.
+      if (d?.aplazado) return { estado: 'pendiente', aplazado: true, por }
       return { estado: 'pendiente' }
     }
     case 'revision':
-      return mundo.revisiones[ref.id] ? { estado: 'enviada', por: mundo.revisiones[ref.id].por } : { estado: 'pendiente' }
+      return mundo.revisiones[ref.id] ? { estado: 'preparada', por: mundo.revisiones[ref.id].por } : { estado: 'pendiente' }
     case 'cef':
       return mundo.ajustesCef[ref.id] ? { estado: 'aprobada', por: mundo.ajustesCef[ref.id].por } : { estado: 'pendiente' }
     case 'informe': {
@@ -297,5 +300,9 @@ export function informeDesactualizado(mundo, id) {
   const inf = mundo.informes[id]
   if (!inf) return false
   const ahora = totales(mundo)
-  return ['gastado', 'comprometido', 'cef'].some((k) => Math.abs(ahora[k] - inf.totales[k]) > 0.004)
+  if (['gastado', 'comprometido', 'cef'].some((k) => Math.abs(ahora[k] - inf.totales[k]) > 0.004)) return true
+  if (!inf.resumen) return false
+  const ex = excepciones(mundo)
+  if (ex.length !== inf.resumen.decisiones || ex.filter((e) => e.nivel === 'aprueba').length !== inf.resumen.conAprobacion) return true
+  return Math.abs(tesoreria(mundo).minimo.saldo - inf.resumen.cajaMinima.saldo) > 0.004
 }

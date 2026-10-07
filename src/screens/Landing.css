@@ -135,7 +135,7 @@
 .landing-button--dark:hover { background: #50304A; }
 .landing-hero-text-link { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; color: var(--lv-paper); font-size: 14px; font-weight: 700; text-decoration: underline; text-decoration-color: rgb(244 241 232 / .65); text-underline-offset: 6px; }
 .landing-hero-text-link:hover { text-decoration-color: var(--lv-paper); }
-.landing-hero :where(button, a):focus-visible, .landing-close-section :where(button, a):focus-visible, .landing-fiscal-section :where(button, a):focus-visible { outline-color: var(--lv-lime); }
+.landing-hero :where(button, a):focus-visible, .landing-close-section :where(button, a):focus-visible, .landing-fiscal-section :where(button, a):focus-visible, .landing-agents-section :where(button, a):focus-visible { outline-color: var(--lv-lime); }
 .landing-hero-caption { display: flex; align-items: center; gap: 13px; color: #F0E7EA; font-size: 11px; }
 .landing-hero-caption > span:first-child { color: var(--lv-lime); font-weight: 800; }
 .landing-caption-divider { width: 1px; height: 15px; background: rgb(244 241 232 / .6); }

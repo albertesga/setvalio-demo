@@ -71,12 +71,17 @@ function PildoraDemo() {
 function MenuMas({ ritmo, setRitmo, onReiniciar, onNavigate }) {
   const [abierto, setAbierto] = useState(false)
   const ref = useRef(null)
+  const botonRef = useRef(null)
   useEffect(() => {
     if (!abierto) return
     const fuera = (e) => {
       if (!ref.current?.contains(e.target)) setAbierto(false)
     }
-    const esc = (e) => e.key === 'Escape' && setAbierto(false)
+    const esc = (e) => {
+      if (e.key !== 'Escape') return
+      setAbierto(false)
+      botonRef.current?.focus()
+    }
     document.addEventListener('mousedown', fuera)
     document.addEventListener('keydown', esc)
     return () => {
@@ -86,11 +91,11 @@ function MenuMas({ ritmo, setRitmo, onReiniciar, onNavigate }) {
   }, [abierto])
   return (
     <div ref={ref} className="relative">
-      <button type="button" className="ag-icon-button" aria-label="Más opciones" aria-expanded={abierto} onClick={() => setAbierto((v) => !v)}>
+      <button ref={botonRef} type="button" className="ag-icon-button" aria-label="Más opciones" aria-expanded={abierto} aria-controls="ag-mas-opciones" onClick={() => setAbierto((v) => !v)}>
         <IconMore size={20} />
       </button>
       {abierto && (
-        <div className="ag-popover ag-popover--menu" role="menu">
+        <div id="ag-mas-opciones" className="ag-popover ag-popover--menu">
           <label className="block px-3 pb-1 pt-2 text-xs font-bold text-muted" htmlFor="ag-ritmo">
             Ritmo de los agentes
           </label>
@@ -101,13 +106,13 @@ function MenuMas({ ritmo, setRitmo, onReiniciar, onNavigate }) {
               </option>
             ))}
           </select>
-          <button type="button" role="menuitem" className="ag-menu-item" onClick={() => { setAbierto(false); onNavigate('panel') }}>
+          <button type="button" className="ag-menu-item" onClick={() => { setAbierto(false); onNavigate('panel') }}>
             Abrir la demo clásica
           </button>
-          <button type="button" role="menuitem" className="ag-menu-item" onClick={() => { setAbierto(false); onNavigate('landing') }}>
+          <button type="button" className="ag-menu-item" onClick={() => { setAbierto(false); onNavigate('landing') }}>
             Volver a la portada
           </button>
-          <button type="button" role="menuitem" className="ag-menu-item text-negative" onClick={() => { setAbierto(false); onReiniciar() }}>
+          <button type="button" className="ag-menu-item text-negative" onClick={() => { setAbierto(false); onReiniciar() }}>
             Reiniciar la demo
           </button>
         </div>
@@ -155,10 +160,27 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const [cerca, setCerca] = useState(true)
   const [nuevos, setNuevos] = useState(false)
 
-  const enviar = useCallback((texto) => despachar({ tipo: 'enviar', entrada: { tipo: 'texto', texto } }), [despachar])
-  const enviarEntrada = useCallback((entrada) => despachar({ tipo: 'enviar', entrada }), [despachar])
-  const decidir = useCallback((accion, etiqueta) => despachar({ tipo: 'enviar', entrada: { tipo: 'accion', accion, etiqueta } }), [despachar])
+  const anclado = useRef(true)
+  // Lo que se pide desde una hoja, una tarjeta o una sugerencia: cierra la hoja,
+  // vuelve a seguir la conversación y devuelve el foco al redactor (no en pantallas táctiles).
+  const trasPedir = useCallback(() => {
+    setHoja(null)
+    anclado.current = true
+    if (!window.matchMedia?.('(pointer: coarse)').matches) requestAnimationFrame(() => inputRef.current?.focus())
+  }, [])
+  const enviarEntrada = useCallback(
+    (entrada) => {
+      despachar({ tipo: 'enviar', entrada })
+      trasPedir()
+    },
+    [despachar, trasPedir],
+  )
+  const enviar = useCallback((texto) => enviarEntrada({ tipo: 'texto', texto }), [enviarEntrada])
+  const decidir = useCallback((accion, etiqueta) => enviarEntrada({ tipo: 'accion', accion, etiqueta }), [enviarEntrada])
   const avisar = useCallback((texto) => pushToast?.(texto), [pushToast])
+  const cerrarHoja = useCallback(() => setHoja(null), [])
+  const cerrarAgente = useCallback(() => setAgenteAbierto(null), [])
+  const escribir = useCallback(() => despachar({ tipo: 'actividad' }), [despachar])
 
   // Recorrido pedido desde la portada.
   const tourPedido = useRef(false)
@@ -172,7 +194,6 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   // Desplazamiento. Mientras los agentes trabajan, sigue el final; cuando llega la
   // respuesta, la deja empezando arriba para leerla desde el principio. Si la
   // persona sube a leer otra cosa, deja de moverla y ofrece «Nuevos mensajes».
-  const anclado = useRef(true)
   const posicionados = useRef(new Set())
   const alFinal = (suave = true) => {
     const el = scrollRef.current
@@ -198,7 +219,10 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const ultimoMsg = s.mensajes[s.mensajes.length - 1]
   const firma = `${s.mensajes.length}-${ultimoMsg?.bloquesVisibles ?? 0}-${ultimoMsg?.estadoPasos?.join('') ?? ''}`
   useEffect(() => {
-    if (!ultimoMsg) return
+    if (!ultimoMsg) {
+      posicionados.current.clear()
+      return
+    }
     if (!anclado.current) {
       setNuevos(true)
       return
@@ -213,6 +237,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         const top = art.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 12
         el.scrollTo({ top, behavior: reducido ? 'auto' : 'smooth' })
       }
+      // La persona está leyendo la respuesta: lo que llegue después no la mueve.
+      anclado.current = false
       return
     }
     alFinal()
@@ -256,16 +282,23 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             aria-selected={pestana === id}
             aria-controls={`${pref}-tabpanel-${id}`}
             tabIndex={pestana === id ? 0 : -1}
-            className={`ag-tab ${id === 'casos' ? 'xl:hidden' : ''}`}
+            className={`ag-tab ${id === 'casos' && pref === 'lateral' ? 'ag-tab--casos' : ''}`}
             onClick={() => {
               setPestana(id)
               if (id === 'actividad') despachar({ tipo: 'leerNovedades' })
             }}
             onKeyDown={(e) => {
-              const orden = ['actividad', 'decisiones', 'casos']
-              const i = orden.indexOf(pestana)
-              if (e.key === 'ArrowRight') setPestana(orden[(i + 1) % orden.length])
-              if (e.key === 'ArrowLeft') setPestana(orden[(i + orden.length - 1) % orden.length])
+              const visibles = [...e.currentTarget.parentElement.querySelectorAll('[role="tab"]')].filter((el) => el.offsetParent !== null)
+              const i = visibles.indexOf(e.currentTarget)
+              let sig = null
+              if (e.key === 'ArrowRight') sig = visibles[(i + 1) % visibles.length]
+              if (e.key === 'ArrowLeft') sig = visibles[(i + visibles.length - 1) % visibles.length]
+              if (e.key === 'Home') sig = visibles[0]
+              if (e.key === 'End') sig = visibles[visibles.length - 1]
+              if (!sig) return
+              e.preventDefault()
+              sig.click()
+              sig.focus()
             }}
           >
             {etiqueta}
@@ -303,10 +336,10 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             </p>
             <p className="truncate text-xs text-muted">
               Rodaje, día {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje}
-              <span className="md:hidden"> · demo simulada</span>
+              <span className="ag-solo-compacto"> · demo simulada</span>
             </p>
           </div>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="ag-header-acciones">
             <PildoraDemo />
             {!s.tour && (
               <button type="button" className="ag-boton-fila" onClick={() => despachar({ tipo: 'tour/iniciar' })} disabled={ocupado}>
@@ -325,12 +358,12 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             </select>
             <MenuMas ritmo={ritmo} setRitmo={setRitmo} onReiniciar={() => despachar({ tipo: 'reiniciar' })} onNavigate={onNavigate} />
           </div>
-          <div className="flex items-center gap-1 lg:hidden">
+          <div className="ag-header-movil">
             <button type="button" className="ag-icon-button relative" aria-label={`Actividad y decisiones${s.novedades ? `, ${s.novedades} novedades` : pendientes ? `, ${pendientes} decisiones pendientes` : ''}`} onClick={() => abrirHoja('actividad')}>
               <IconBell size={20} />
               {(s.novedades > 0 || pendientes > 0) && <span className="ag-badge tnum">{s.novedades || pendientes}</span>}
             </button>
-            <button type="button" className="ag-icon-button md:hidden" aria-label="Menú" onClick={() => abrirHoja('menu')}>
+            <button type="button" className="ag-icon-button" aria-label="Menú: agentes, casos y opciones" onClick={() => abrirHoja('menu')}>
               <IconMenu size={20} />
             </button>
           </div>
@@ -388,7 +421,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                 </p>
               )}
               {!tour && <Sugerencias items={sugerencias} onElegir={enviar} deshabilitado={ocupado} />}
-              <Redactor ocupado={ocupado} inputRef={inputRef} onEnviar={enviar} onDetener={() => despachar({ tipo: 'detener' })} />
+              <Redactor ocupado={ocupado} inputRef={inputRef} onEnviar={enviar} onEscribir={escribir} />
               <p className="ag-pie-nota">Agentes simulados con datos de ejemplo. No se envía nada ni se mueve dinero.</p>
             </div>
           </main>
@@ -398,11 +431,11 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
           </aside>
         </div>
 
-        <Hoja abierta={hoja === 'actividad'} onCerrar={() => setHoja(null)} titulo="Actividad y decisiones" id="ag-hoja-actividad">
+        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Actividad y decisiones" id="ag-hoja-actividad">
           {hoja === 'actividad' && panelDerecho('hoja')}
         </Hoja>
 
-        <Hoja abierta={hoja === 'menu'} onCerrar={() => setHoja(null)} titulo="Agentes y opciones" id="ag-hoja-menu">
+        <Hoja abierta={hoja === 'menu'} onCerrar={cerrarHoja} titulo="Agentes y opciones" id="ag-hoja-menu">
           <div className="space-y-5">
             <PildoraDemo />
             {!s.tour && (
@@ -476,7 +509,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
           </div>
         </Hoja>
 
-        <DetalleAgente id={agenteAbierto} onCerrar={() => setAgenteAbierto(null)} />
+        <DetalleAgente id={agenteAbierto} onCerrar={cerrarAgente} />
         <Anunciador s={s} />
       </div>
     </AgentesCtx.Provider>
