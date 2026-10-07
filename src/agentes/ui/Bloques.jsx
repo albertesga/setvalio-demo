@@ -825,9 +825,6 @@ function BloqueInforme({ b }) {
           <FilmpilotButton size="md" variant="secondary" icon={IconDownload} onClick={() => avisar('Demo: la descarga del informe no está disponible.')}>
             Descargar (no disponible en la demo)
           </FilmpilotButton>
-          <FilmpilotButton size="md" variant="ghost" onClick={() => onNavigate('coste')}>
-            Ver en Control de costes
-          </FilmpilotButton>
         </div>
       </footer>
     </article>
@@ -1001,7 +998,7 @@ function BloqueCaja({ b }) {
   )
 }
 
-// ── Acciones y enlaces ───────────────────────────────────────────────────────
+// ── Acciones ───────────────────────────────────────────────────────
 
 function BloqueAcciones({ b }) {
   const { enviarEntrada, ocupado } = useCtx()
@@ -1018,16 +1015,6 @@ function BloqueAcciones({ b }) {
         ))}
       </div>
     </div>
-  )
-}
-
-function BloqueEnlace({ b }) {
-  const { onNavigate } = useCtx()
-  return (
-    <button type="button" className="ag-enlace" onClick={() => onNavigate(b.ruta, b.contexto)}>
-      {b.etiqueta} <span className="text-xs font-semibold text-flp-muted">· demo clásica</span>
-      <IconChevronRight size={16} aria-hidden="true" />
-    </button>
   )
 }
 
@@ -1447,7 +1434,6 @@ const REGISTRO = {
   checklist: BloqueChecklist,
   caja: BloqueCaja,
   acciones: BloqueAcciones,
-  enlace: BloqueEnlace,
   propuesta: BloquePropuesta,
   llamada: BloqueLlamada,
   riesgos: BloqueRiesgos,

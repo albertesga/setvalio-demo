@@ -119,14 +119,14 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     despachar({ tipo: 'actividad' })
   }, [despachar])
 
-  // Recorrido pedido desde la portada.
-  const tourPedido = useRef(false)
+  // Lo que pide la portada al abrir los agentes: el recorrido o una pregunta de ejemplo.
+  const pedidoAtendido = useRef(null)
   useEffect(() => {
-    if (contexto?.tour && !tourPedido.current && !s.tour) {
-      tourPedido.current = true
-      despachar({ tipo: 'tour/iniciar' })
-    }
-  }, [contexto, s.tour, despachar])
+    if (!contexto || pedidoAtendido.current === contexto) return
+    pedidoAtendido.current = contexto
+    if (contexto.tour && !s.tour) despachar({ tipo: 'tour/iniciar' })
+    else if (contexto.pregunta) enviar(contexto.pregunta)
+  }, [contexto, s.tour, despachar, enviar])
 
   // Al empezar el recorrido, el foco va a su barra: ahí están el paso, la nota y «Siguiente».
   const enRecorrido = !!s.tour

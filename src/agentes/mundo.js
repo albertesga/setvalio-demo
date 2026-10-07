@@ -4,7 +4,7 @@
 // con lo que los totales de partida son exactamente TOTALES. No se usa
 // costeProyectoDemo (mezcla el presupuesto del proyecto con el CEF estático).
 //
-// Corte fijo: lunes 1 de junio de 2026. Lo que la demo clásica fecha después
+// Corte fijo: lunes 1 de junio de 2026. Lo que src/lib/data.js fecha después
 // (bandeja de gastos, órdenes de compra) se re-fecha aquí antes del corte; cada
 // copia indica de dónde sale. Un solo esquema de pedidos: OC-NNN.
 

@@ -1,6 +1,5 @@
-// Componentes de marca Filmpilot (Brand Kit v1). Solo los usan la portada y el
-// prototipo de agentes; las pantallas clásicas siguen con components/Brand.jsx.
-// Estilos en ./filmpilot.css (prefijo flp-).
+// Componentes de marca Filmpilot (Brand Kit v1) para la portada y el prototipo de
+// agentes. Estilos en ./filmpilot.css (prefijo flp-).
 
 import { SIMBOLO, SEMILLA, GLIFOS } from './glifos.js'
 

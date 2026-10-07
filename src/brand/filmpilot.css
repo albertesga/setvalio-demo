@@ -1,9 +1,8 @@
 /* Filmpilot · capa de marca (Brand Kit v1) con prefijo flp-.
-   El kit trae clases .fp-* y variables --fp-*, pero esos nombres ya los usa el
-   design system clásico (src/index.css y el Button de ui.jsx), que sigue con
-   SetValio. Por eso no se cargan brand.css ni tokens.css del kit: sus valores
-   viven aquí, con otro prefijo y solo dentro de .flp-theme. Las fuentes las
-   declara public/brand/filmpilot/styles/fonts.css (enlazado en index.html).
+   Los valores de tokens.css y brand.css del kit están copiados aquí con el
+   prefijo flp- (el kit usa fp-), y las clases solo actúan dentro de .flp-theme.
+   Las fuentes las declara public/brand/filmpilot/styles/fonts.css (enlazado en
+   index.html).
 
    Reglas del kit que hay que respetar:
    - Señal (#FFE24A) solo para la acción principal, lo que está «Por revisar»
@@ -53,7 +52,6 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-/* index.css fuerza Manrope en h1-h3: dentro de la marca heredan la fuente. */
 .flp-theme :is(h1, h2, h3, h4, h5, h6) { font-family: inherit; }
 .flp-theme ::selection { background: var(--flp-signal); color: var(--flp-carbon); }
 .flp-theme :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {

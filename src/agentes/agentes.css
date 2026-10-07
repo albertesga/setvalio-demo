@@ -399,10 +399,6 @@ button.ag-acceso:disabled { opacity: .6; cursor: not-allowed; }
 }
 .ag-opcion:hover:not(:disabled) { border-color: var(--flp-carbon); }
 .ag-opcion:disabled { opacity: .6; cursor: not-allowed; }
-.ag-enlace {
-  display: inline-flex; min-height: 44px; align-items: center; gap: 6px; justify-self: start; padding: 0 2px;
-  color: var(--flp-carbon); font-size: 14px; font-weight: 500; text-decoration: underline; text-underline-offset: 4px;
-}
 
 /* Informe: hoja de papel */
 .ag-informe {

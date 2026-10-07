@@ -138,11 +138,6 @@ export function OpcionesDemo({ s, despachar, ritmo, setRitmo, ocupado, onNavigat
       )}
 
       <div className="flex flex-col gap-1 border-t border-flp-line pt-4">
-        <button type="button" className="ag-menu-item" onClick={() => onNavigate('panel')}>
-          <span>
-            Abrir la demo clásica <span className="text-xs font-normal text-flp-muted">(pantallas de gestión, marca anterior)</span>
-          </span>
-        </button>
         <button type="button" className="ag-menu-item" onClick={() => onNavigate('landing')}>
           <IconArrowLeft size={16} aria-hidden="true" /> Volver a la portada
         </button>

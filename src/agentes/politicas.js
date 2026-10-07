@@ -1,7 +1,7 @@
-// Reglas de autonomía. Son las que ya usa la demo clásica:
-// - desviación de capítulo por encima del 8 % (src/lib/coste.js, Compras)
-// - orden de compra de más de 10.000 € (Compras)
-// - gasto no electrónico con confianza por debajo del 80 % (Facturas)
+// Reglas de autonomía de los agentes:
+// - desviación de capítulo por encima del 8 %
+// - orden de compra de más de 10.000 €
+// - gasto no electrónico con confianza por debajo del 80 %
 
 export const POLITICAS = {
   umbralDesviacion: 0.08,

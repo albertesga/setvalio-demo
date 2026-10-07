@@ -278,7 +278,6 @@ export const explicarDesviacion = {
         if (oc.estado === 'Pendiente') sugerencias.push(sug(`Revisa la orden de compra ${oc.id}`))
       }
     }
-    bloques.push({ tipo: 'enlace', etiqueta: 'Abrir en Control de costes', ruta: 'coste', contexto: { capituloId: cap } })
     if (cap !== '04') sugerencias.push(sug('¿Por qué se desvía Escenografía?'))
     if (cap !== '07') sugerencias.push(sug('¿Y el 07?'))
     sugerencias.push(sug('¿Cómo cerraremos el proyecto y llegamos con la caja?'))

@@ -1,6 +1,6 @@
 # Identidad de Filmpilot
 
-La identidad aprobada es el **Filmpilot Brand Kit v1**. Se aplica a la portada y al prototipo de agentes (`?vista=agentes`). Las pantallas clásicas de la demo siguen con SetValio ([identidad-setvalio.md](identidad-setvalio.md)) hasta que se migren.
+La identidad aprobada es el **Filmpilot Brand Kit v1**. Se aplica a toda la demo: la portada y el prototipo de agentes (`?vista=agentes`).
 
 ## Nombre y voz
 
@@ -19,7 +19,7 @@ La identidad aprobada es el **Filmpilot Brand Kit v1**. Se aplica a la portada y
 | Geometría del símbolo y de los glifos (en línea, `currentColor`) | `src/brand/glifos.js` |
 | Familias de agentes | `FAMILIAS` en `src/agentes/agentes.js` |
 
-**Prefijo `flp-`, no `fp-`.** El kit trae clases `.fp-*` y variables `--fp-*`, pero esos nombres ya los usa el design system clásico (`src/index.css`, el `Button` de `ui.jsx`). Por eso no se cargan `brand.css` ni `tokens.css` del kit: sus valores están copiados en `src/brand/filmpilot.css` con prefijo `flp-`, y las clases solo actúan dentro de `.flp-theme`. En Tailwind hay claves nuevas (`flp-*` en colores, `font-flp-sans`, `font-flp-mono`, `rounded-flp-sm|md|lg`); no se ha cambiado ningún token existente.
+**Prefijo `flp-`.** No se cargan `brand.css` ni `tokens.css` del kit (que usan `.fp-*` y `--fp-*`): sus valores están copiados en `src/brand/filmpilot.css` con prefijo `flp-`, y las clases solo actúan dentro de `.flp-theme`. Tailwind solo tiene las claves de la marca: colores `flp-*`, `font-flp-sans`, `font-flp-mono` y `rounded-flp-sm|md|lg` (y `font-sans` es Instrument Sans).
 
 Orden de las hojas (`src/main.jsx`): marca, Tailwind y después las de cada pantalla. Así una utilidad de Tailwind puede ajustar una clase de marca, y `Landing.css` o `agentes.css` pueden ajustar ambas.
 
@@ -62,4 +62,4 @@ Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por re
 
 ## Metadatos
 
-`index.html` usa el favicon, el `site.webmanifest` y la imagen social del kit (`social/og-filmpilot.png`) con URL absoluta bajo `https://albertesga.github.io/setvalio-demo/`. El `theme-color` lo fija `App.jsx` por ruta: tiza en portada y agentes, ciruela en las pantallas clásicas.
+`index.html` usa el favicon, el `site.webmanifest` y la imagen social del kit (`social/og-filmpilot.png`) con URL absoluta bajo `https://albertesga.github.io/setvalio-demo/`. El `theme-color` es tiza (`#F5F4EF`).

@@ -792,10 +792,14 @@ test('cada agente pertenece a una familia de la marca y el Orquestador a ninguna
   assert.equal(ORDEN_FAMILIAS.flatMap(agentesDeFamilia).length, ORDEN_AGENTES.length - 1, 'todo agente sale en el carril, salvo el Orquestador')
   for (const f of ORDEN_FAMILIAS) assert.ok(agentesDeFamilia(f).length > 0, `${f}: familia vacía`)
 })
-test('el texto de los agentes no menciona la marca anterior', () => {
-  const dir = new URL('../src/agentes/', import.meta.url)
-  const ficheros = readdirSync(dir, { recursive: true }).filter((f) => /\.(js|jsx)$/.test(f))
-  for (const f of ficheros) assert.ok(!/SetValio/i.test(readFileSync(new URL(f, dir), 'utf8')), `${f} menciona SetValio`)
+test('ni la portada ni los agentes mencionan la marca anterior ni la demo clásica', () => {
+  const dir = new URL('../src/', import.meta.url)
+  const ficheros = readdirSync(dir, { recursive: true }).filter((f) => /\.(js|jsx|css)$/.test(f))
+  for (const f of ficheros) {
+    const src = readFileSync(new URL(f, dir), 'utf8')
+    assert.ok(!/SetValio/i.test(src), `${f} menciona SetValio`)
+    assert.ok(!/demo cl[aá]sica/i.test(src), `${f} menciona la demo clásica`)
+  }
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

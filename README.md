@@ -1,17 +1,12 @@
 # Filmpilot
 
-Prototipo de control financiero para productoras de cine y televisión, con un
-equipo de agentes que prepara, cuadra y vigila. La portada y el prototipo de
-agentes llevan la marca **Filmpilot**; las pantallas clásicas de la demo
-conservan todavía la de SetValio (ver [Marca](#marca)).
- Conecta el
-presupuesto del proyecto con incentivos, ayudas, financiación, compras, gasto real
-y documentación fiscal. Todos los datos son de demostración y viven en memoria;
-no hay backend ni persistencia.
+Prototipo de Filmpilot: un equipo de agentes que prepara el presupuesto, controla
+el coste y vigila el rodaje de producciones de cine y televisión. Tiene dos
+pantallas: la **portada** y el **prototipo de agentes**. Todos los datos son de
+demostración y viven en memoria; no hay backend ni persistencia.
 
-El proyecto precargado es **La última función**. La aplicación permite cambiar de
-proyecto, editar el presupuesto por los 12 capítulos ICAA y ver cómo se propaga
-el nuevo total a las pantallas conectadas.
+El proyecto de ejemplo es **La última función**, un largometraje en rodaje
+(15 de 30 jornadas).
 
 ## Arranque
 
@@ -26,52 +21,47 @@ compilar la versión estática: `npm run build`.
 La demo pública está en [GitHub Pages](https://albertesga.github.io/setvalio-demo/).
 Cada cambio en `main` se publica automáticamente con el flujo de `.github/workflows/pages.yml`.
 
-## Recorrido
+## Portada
 
-1. **Proyecto y presupuesto:** cartera, proyecto activo, presupuesto por capítulos y resumen.
-2. **Retorno:** optimizador de incentivos, escenarios, ayudas compatibles y tope de intensidad.
-3. **Financiación:** fuentes, calendario de cobros y previsión de caja.
-4. **Rodaje:** órdenes de compra, control de costes, proveedores y bandeja de gastos.
-5. **Justificación:** elegibilidad por gasto, dossier fiscal, informes y consola multi-cliente.
+Cuenta qué es Filmpilot y lleva a los agentes. Cada etapa de «Cómo funciona»
+(presupuesto, incentivos, financiación, rodaje, justificación) abre los agentes
+con una pregunta de ejemplo, y las cifras que enseña son las mismas que ellos
+responden.
 
 ## Agentes (prototipo conversacional)
 
-Desde la portada, **Probar los agentes** abre una conversación con los agentes de
-Filmpilot sobre La última función (también con `?vista=agentes`). La pantalla de
-inicio tiene tres accesos (el informe semanal, «¿Cómo vamos?» y el recorrido
-guiado) y el resto de casos plegado; todo lo que no es conversación (ver como
-otro rol, ritmo, reinicio, demo clásica) está detrás del botón **Demo** de la
-cabecera. Los agentes se agrupan en tres familias, cada una con su glifo:
+**Probar los agentes** abre una conversación con los agentes de Filmpilot sobre
+La última función (también con `?vista=agentes`). La pantalla de inicio tiene
+tres accesos (el informe semanal, «¿Cómo vamos?» y el recorrido guiado) y el
+resto de casos plegado; lo que no es conversación (ver como otro rol, velocidad,
+reinicio) está detrás del botón **Demo** de la cabecera.
+
+Los agentes se agrupan en tres familias, cada una con su glifo:
 **Presupuesto** (Presupuesto, Proveedores, Control de costes y Riesgos),
 **Financiación** (Conciliación, Excepciones y Previsión) y **Documentación**
-(Facturas, Informes y Cumplimiento). Los estados usan el vocabulario de la marca:
-En espera, Trabajando, Por revisar y Completado. Un Orquestador
-reparte cada petición entre Facturas, Conciliación, Excepciones, Previsión,
-Control de costes, Informes y Cumplimiento. Cada paso muestra si el agente
-**ejecuta**, **propone** o **pide aprobación**; las decisiones las toma una persona
-en su tarjeta y cambian las cifras de toda la conversación. Mientras se conversa
-llegan novedades de ejemplo (una factura, una solicitud de compra, un vencimiento)
-y un recorrido guiado enseña todos los casos de uso.
+(Facturas, Informes y Cumplimiento). Un Orquestador reparte cada petición. Los
+estados usan el vocabulario de la marca: En espera, Trabajando, Por revisar y
+Completado. Cada paso muestra si el agente **ejecuta**, **propone** o **pide
+aprobación**; las decisiones las toma una persona en su tarjeta y cambian las
+cifras de toda la conversación. Mientras se conversa llegan novedades de ejemplo
+(una factura, una solicitud de compra, un vencimiento, avisos de rodaje) y un
+recorrido guiado enseña todos los casos de uso.
 
-Incluye un caso **por validar**, sobre el proyecto en desarrollo *Itsasoa*: la
+Incluye un caso **sin validar**, sobre el proyecto en desarrollo *Itsasoa*: la
 **primera propuesta de presupuesto**. Aportas los costes que ya tienes hablados
 con proveedores (en la conversación o con el formulario), el agente Presupuesto
 estima por capítulo lo que falta por detallar y lo compara con el objetivo.
 Después, Proveedores busca alternativas más baratas en un directorio de ejemplo,
-descarta las que no cumplen tus requisitos (por ejemplo, el alcance de una grúa),
-te pide permiso para llamar y, si lo das, enseña cada llamada: cómo se presenta,
-qué confirma y el precio final. Tú eliges el proveedor y la propuesta se recalcula.
-Las llamadas son simuladas: no se llama a nadie.
+descarta las que no cumplen tus requisitos, te pide permiso para llamar y, si lo
+das, enseña cada llamada: cómo se presenta, qué confirma y el precio final. Tú
+eliges el proveedor y la propuesta se recalcula. Las llamadas son simuladas.
 
 **Riesgos de producción** (exploratorio) es un agente proactivo que vigila el plan
-de rodaje de La última función: un parte de riesgos llega solo al empezar a
-conversar, los avisos urgentes (orden del día sin publicar, más lluvia) llegan
-mientras hablas y la pestaña «Riesgos» muestra el radar en vivo. Detecta lluvia en
-un exterior, una ausencia, un permiso pendiente, una orden del día sin publicar,
-horas extra y un cambio de localización mal comunicado; propone una respuesta
-(cambiar el orden de jornadas, un aviso al equipo en borrador) y, si hay dinero en
-juego, calcula el impacto y propone una reserva que solo sube el coste estimado
-final si producción ejecutiva la aprueba. Plan, previsión del tiempo,
+de rodaje: un parte de riesgos llega solo al empezar a conversar, los avisos
+urgentes llegan mientras hablas y la pestaña «Riesgos» muestra el radar en
+directo. Propone una respuesta (cambiar el orden de jornadas, un aviso al equipo
+en borrador) y, si hay dinero en juego, una reserva que solo sube el coste
+estimado final si producción ejecutiva la aprueba. Plan, previsión del tiempo,
 convocatorias y permisos son de ejemplo.
 
 Es una demo **simulada y guionizada**: no hay modelo de lenguaje, no se envía nada
@@ -80,26 +70,22 @@ y ninguna cifra está escrita a mano en los guiones. El motor vive en `src/agent
 `npm run check:agentes` lo comprueba en Node: cifras frente a `src/lib`, frases de
 ejemplo, transiciones, recorrido y deshacer.
 
-La ruta **Design system** documenta en vivo los tokens y componentes compartidos
-de las pantallas clásicas.
-
 ## Marca
 
-- **Filmpilot** (Brand Kit v1): portada y prototipo de agentes. Assets en
-  `public/brand/filmpilot/`, tokens y clases con prefijo `flp-` en
-  `src/brand/filmpilot.css` y componentes en `src/brand/Filmpilot.jsx`. Reglas
-  de uso en [docs/identidad-filmpilot.md](docs/identidad-filmpilot.md).
-- **SetValio**: pantallas clásicas de la demo (panel, presupuesto, costes…),
-  pendientes de migrar. Ver [docs/identidad-setvalio.md](docs/identidad-setvalio.md).
+Filmpilot Brand Kit v1. Assets en `public/brand/filmpilot/`, tokens y clases con
+prefijo `flp-` en `src/brand/filmpilot.css` y componentes en
+`src/brand/Filmpilot.jsx`. Reglas de uso en
+[docs/identidad-filmpilot.md](docs/identidad-filmpilot.md).
 
 ## Datos y límites
 
-- `src/lib/proyectos.js` define el proyecto y su presupuesto por capítulos; el
-  total se deriva de ellos.
-- `src/lib/incentivos.js` calcula escenarios y combinación con ayudas. Es una
-  estimación orientativa, no asesoramiento fiscal.
+- `src/lib/data.js` y `src/lib/proyectos.js` son los datos de ejemplo de los que
+  parte el mundo de los agentes (`src/agentes/mundo.js`).
+- `src/lib/incentivos.js` calcula escenarios de deducción y su combinación con
+  ayudas ([reglas](docs/reglas-optimizador-v2.md)). Es una estimación orientativa,
+  no asesoramiento fiscal.
 - `src/lib/format.js` formatea importes y porcentajes en `es-ES`.
-- Las acciones de exportación y subida son demostrativas, no entregables reales.
+- Las descargas y envíos son demostrativos: no se genera ni se manda nada.
 
 Las cifras de ejemplo no corresponden a una producción real. Antes de usar
 Filmpilot comercialmente, comprueba la disponibilidad legal del nombre y del

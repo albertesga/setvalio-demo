@@ -196,7 +196,6 @@ export const incentivo = {
       bloques.push(texto(t('Con la ayuda ({ayuda}), deducción y ayudas no pueden pasar del {cap} del coste ({tope}): la deducción se recorta a {d}.', { ayuda: v(ayuda.importe, 'eur'), cap: v(canAyuda.capPct, 'pct0'), tope: v(canAyuda.capIntensidad, 'eur'), d: v(canAyuda.deduccionNeta, 'eur') })))
     }
     if (plan) bloques.push(texto(t('El plan de financiación cuenta con {imp} de incentivo ({estado}). Conviene revisar esa cifra con el fiscalista.', { imp: v(plan.importe, 'eur'), estado: v(plan.estado.toLowerCase()) })))
-    bloques.push({ tipo: 'enlace', etiqueta: 'Abrir el optimizador de incentivos', ruta: 'incentivos' })
     return {
       bloques,
       sugerencias: [sug('¿Qué bloquea el dossier fiscal?'), sug('Prepárame el informe semanal de coste')],
