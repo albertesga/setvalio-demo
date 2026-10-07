@@ -3,6 +3,7 @@
 export const AGENTES = {
   orquestador: {
     id: 'orquestador',
+    familia: null,
     nombre: 'Orquestador',
     codigo: 'OR',
     rol: 'Entiende la petición, reparte el trabajo y reúne la respuesta.',
@@ -11,6 +12,7 @@ export const AGENTES = {
   },
   facturas: {
     id: 'facturas',
+    familia: 'documentacion',
     nombre: 'Facturas',
     codigo: 'FA',
     rol: 'Lee facturas y tickets, extrae los campos y propone la partida.',
@@ -19,6 +21,7 @@ export const AGENTES = {
   },
   conciliacion: {
     id: 'conciliacion',
+    familia: 'financiacion',
     nombre: 'Conciliación',
     codigo: 'CN',
     rol: 'Cuadra cada factura con su orden de compra y su partida.',
@@ -27,6 +30,7 @@ export const AGENTES = {
   },
   excepciones: {
     id: 'excepciones',
+    familia: 'financiacion',
     nombre: 'Excepciones',
     codigo: 'EX',
     rol: 'Separa lo que no cuadra y lo lleva a quien decide.',
@@ -35,6 +39,7 @@ export const AGENTES = {
   },
   prevision: {
     id: 'prevision',
+    familia: 'financiacion',
     nombre: 'Previsión',
     codigo: 'PR',
     rol: 'Recalcula el coste estimado final y la caja.',
@@ -43,6 +48,7 @@ export const AGENTES = {
   },
   costes: {
     id: 'costes',
+    familia: 'presupuesto',
     nombre: 'Control de costes',
     codigo: 'CC',
     rol: 'Compara presupuesto, gastado, comprometido y previsión por capítulo.',
@@ -51,6 +57,7 @@ export const AGENTES = {
   },
   informes: {
     id: 'informes',
+    familia: 'documentacion',
     nombre: 'Informes',
     codigo: 'IN',
     rol: 'Redacta el informe semanal para producción.',
@@ -59,6 +66,7 @@ export const AGENTES = {
   },
   cumplimiento: {
     id: 'cumplimiento',
+    familia: 'documentacion',
     nombre: 'Cumplimiento',
     codigo: 'CU',
     rol: 'Revisa elegibilidad fiscal, impuestos y el dossier.',
@@ -67,6 +75,7 @@ export const AGENTES = {
   },
   presupuesto: {
     id: 'presupuesto',
+    familia: 'presupuesto',
     nombre: 'Presupuesto',
     codigo: 'PS',
     rol: 'Monta la propuesta de presupuesto por capítulos ICAA.',
@@ -75,6 +84,7 @@ export const AGENTES = {
   },
   proveedores: {
     id: 'proveedores',
+    familia: 'presupuesto',
     nombre: 'Proveedores',
     codigo: 'PV',
     rol: 'Busca proveedores más baratos y confirma precios por teléfono.',
@@ -83,6 +93,7 @@ export const AGENTES = {
   },
   riesgos: {
     id: 'riesgos',
+    familia: 'presupuesto',
     nombre: 'Riesgos de producción',
     codigo: 'RG',
     rol: 'Vigila el plan de rodaje y avisa de lo que puede alterarlo.',
@@ -92,7 +103,22 @@ export const AGENTES = {
   },
 }
 
+// Familias de la marca Filmpilot: cada una tiene su glifo (src/brand/glifos.js).
+// El Orquestador no pertenece a ninguna: lleva el símbolo de Filmpilot.
+export const FAMILIAS = {
+  presupuesto: { id: 'presupuesto', nombre: 'Presupuesto', descriptor: 'Prepara la propuesta, busca proveedores y vigila coste y rodaje.' },
+  financiacion: { id: 'financiacion', nombre: 'Financiación', descriptor: 'Cuadra cada pago con su pedido y anticipa la caja.' },
+  documentacion: { id: 'documentacion', nombre: 'Documentación', descriptor: 'Lee facturas, redacta informes y prepara el dossier fiscal.' },
+}
+
+export const ORDEN_FAMILIAS = ['presupuesto', 'financiacion', 'documentacion']
+
 export const ORDEN_AGENTES = ['orquestador', 'presupuesto', 'proveedores', 'facturas', 'conciliacion', 'excepciones', 'prevision', 'costes', 'informes', 'cumplimiento', 'riesgos']
+
+/** Agentes de una familia, en el orden de ORDEN_AGENTES. */
+export function agentesDeFamilia(familia) {
+  return ORDEN_AGENTES.filter((id) => AGENTES[id].familia === familia)
+}
 
 export const AUTONOMIA = {
   ejecuta: {

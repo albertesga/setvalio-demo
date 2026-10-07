@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { IconChevronDown, IconBell, IconStop } from '../../components/icons.jsx'
 import { AGENTES } from '../agentes.js'
 import { useCtx } from './contexto.js'
-import { Tx, AgentTile, AutonomyBadge, StatusChip } from './Piezas.jsx'
+import { Tx, AgentAvatar, AutonomyBadge, StatusChip, nombresCortos } from './Piezas.jsx'
 import { Bloque } from './Bloques.jsx'
 
 function nombresAgentes(ids) {
@@ -22,14 +22,14 @@ function LineaTrabajo({ msg }) {
         const conPrevio = p.paralelo && i > 0
         return (
           <li key={p.id} className={`ag-linea-paso is-${estado}`}>
-            <AgentTile id={p.agente} size={28} trabajando={estado === 'en_curso'} />
+            <AgentAvatar id={p.agente} size={28} trabajando={estado === 'en_curso'} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm font-bold text-ink">{a.nombre}</span>
+                <span className="text-sm font-medium text-flp-ink">{a.nombre}</span>
                 {conPrevio && <span className="ag-paralelo">a la vez</span>}
                 {p.autonomia !== 'ejecuta' && <AutonomyBadge nivel={p.autonomia} />}
               </div>
-              <div className="text-sm text-muted">
+              <div className="text-sm text-flp-muted">
                 <Tx value={p.titulo} />
               </div>
               {estado === 'hecho' && p.salida && (
@@ -54,15 +54,10 @@ function Traza({ msg }) {
   return (
     <div className="ag-traza">
       <button type="button" className="ag-traza-boton" aria-expanded={abierta} aria-controls={id} onClick={() => setAbierta((v) => !v)}>
-        <span className="flex -space-x-1.5" aria-hidden="true">
-          {t.agentes.slice(0, 5).map((a) => (
-            <AgentTile key={a} id={a} size={28} className="ring-2 ring-canvas" />
-          ))}
-        </span>
         <span className="min-w-0 flex-1 text-left">
-          <strong className="text-ink">Cómo lo han hecho</strong>
-          <span className="block truncate text-xs text-muted">
-            {agentes.length ? `${agentes.length} ${agentes.length === 1 ? 'agente' : 'agentes'} · ` : ''}
+          <strong className="font-medium text-flp-ink">Cómo lo han hecho</strong>
+          <span className="block truncate text-xs text-flp-muted">
+            {agentes.length ? `${nombresCortos(agentes)} · ` : ''}
             {t.pasos.length} pasos{msg.estado === 'detenido' ? ' · detenido' : ''}
           </span>
         </span>
@@ -120,14 +115,14 @@ function MensajeAgentes({ msg, ultimo }) {
   return (
     <article id={`msg-${msg.id}`} className={`ag-msg-agentes ${msg.deshecho ? 'is-deshecho' : ''}`} aria-labelledby={tituloId} aria-busy={enCurso || undefined}>
       <header className="flex items-center gap-2.5">
-        <AgentTile id="orquestador" size={32} trabajando={enCurso} />
+        <AgentAvatar id="orquestador" size={32} trabajando={enCurso} />
         <div className="min-w-0 flex-1">
-          <h3 id={tituloId} tabIndex={-1} className="text-sm font-extrabold text-ink focus:outline-none">
+          <h3 id={tituloId} tabIndex={-1} className="text-base font-medium leading-snug text-flp-ink focus:outline-none">
             {t.titulo}
           </h3>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-flp-muted">
             <span className="tnum">{msg.hora}</span> · {msg.origen === 'evento' ? 'Novedad recibida' : msg.origen === 'accion' ? 'Los agentes aplican la decisión' : 'Orquestador'}
-            {msg.deshecho && <strong className="font-bold text-ink"> · Deshecho</strong>}
+            {msg.deshecho && <strong className="font-semibold text-flp-ink"> · Deshecho</strong>}
           </p>
         </div>
         {enCurso && (
@@ -159,7 +154,7 @@ function MensajeAgentes({ msg, ultimo }) {
         </div>
       )}
 
-      {msg.estado === 'detenido' && <p className="mt-3 text-sm text-muted">Detenido. Los pasos completados quedan registrados; el resto no se ha hecho.</p>}
+      {msg.estado === 'detenido' && <p className="mt-3 text-sm text-flp-muted">Detenido. Los pasos completados quedan registrados; el resto no se ha hecho.</p>}
 
       {bloques.length > 0 && (
         <div className="ag-bloques">
@@ -172,7 +167,7 @@ function MensajeAgentes({ msg, ultimo }) {
       )}
 
       {!enCurso && deshacible === msg.id && !msg.deshecho && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-flp-muted">
           <span>¿No era esto?</span>
           <button type="button" className="ag-link" disabled={ocupado} onClick={() => despachar({ tipo: 'deshacer', mensajeId: msg.id })}>
             Deshacer
@@ -216,7 +211,7 @@ function MensajeNovedad({ msg }) {
       <span>
         <strong>Novedad</strong> · {msg.titulo}
       </span>
-      <span className="tnum text-xs text-muted">{msg.hora}</span>
+      <span className="tnum text-xs text-flp-muted">{msg.hora}</span>
     </div>
   )
 }
@@ -224,11 +219,11 @@ function MensajeNovedad({ msg }) {
 function MensajeGuia({ msg }) {
   return (
     <div className="ag-msg-guia" role="note">
-      <span className="text-xs font-bold text-muted">
+      <span className="flp-kicker text-flp-muted">
         Recorrido guiado · paso {msg.indice + 1} de {msg.total}
       </span>
-      <strong className="mt-0.5 block text-sm text-ink">{msg.titulo}</strong>
-      <p className="mt-1 text-sm leading-relaxed text-muted">{msg.nota}</p>
+      <strong className="mt-0.5 block text-sm text-flp-ink">{msg.titulo}</strong>
+      <p className="mt-1 text-sm leading-relaxed text-flp-muted">{msg.nota}</p>
     </div>
   )
 }

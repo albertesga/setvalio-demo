@@ -1,14 +1,15 @@
-// Paneles laterales: agentes, casos de uso, actividad y decisiones.
+// Paneles laterales: agentes por familia, casos de uso, actividad, decisiones y riesgos.
 
-import { Modal } from '../../components/ui.jsx'
+import { useId, useRef } from 'react'
+import { AgentGlyph, StateChip } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconPlay, IconPause } from '../../components/icons.jsx'
-import { AGENTES, ORDEN_AGENTES, AUTONOMIA } from '../agentes.js'
+import { AGENTES, ORDEN_AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, agentesDeFamilia } from '../agentes.js'
 import { CASOS } from '../casos.js'
 import { EVENTOS } from '../sesion.js'
 import * as c from '../calculos.js'
 import { fechaCorta } from '../texto.js'
 import { useCtx } from './contexto.js'
-import { Tx, AgentTile, AutonomyBadge, Tono } from './Piezas.jsx'
+import { Tx, AgentAvatar, AutonomyBadge, Tono, Hoja } from './Piezas.jsx'
 import { ListaDecisiones, decisionesAbiertas, RadarRiesgos } from './Bloques.jsx'
 import { riesgosAltos } from '../rodaje.js'
 
@@ -30,70 +31,96 @@ export function estadoAgentes(s) {
   return out
 }
 
-export function AgentRail({ estados, onAbrir, compacto = false }) {
+function FilaAgente({ id, e, onAbrir }) {
+  const a = AGENTES[id]
+  const trabajando = e.estado === 'trabajando'
+  const revisar = !trabajando && e.espera > 0
   return (
-    <ul className={compacto ? 'flex flex-col items-center gap-1.5' : 'space-y-0.5'}>
-      {ORDEN_AGENTES.map((id) => {
-        const a = AGENTES[id]
-        const e = estados[id]
-        const trabajando = e.estado === 'trabajando'
-        return (
-          <li key={id}>
-            <button type="button" className={`ag-agente ${compacto ? 'is-compacto' : ''} ${trabajando ? 'is-working' : ''}`} onClick={() => onAbrir(id)} aria-label={compacto ? `${a.nombre}: ${trabajando ? 'trabajando' : e.espera ? `${e.espera} decisiones pendientes` : 'disponible'}` : undefined} title={compacto ? a.nombre : undefined}>
-              <AgentTile id={id} size={32} trabajando={trabajando} esperando={!trabajando && e.espera > 0} />
-              {!compacto && (
-                <span className="min-w-0 flex-1 text-left">
-                  <span className="block text-sm font-bold text-ink">{a.nombre}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {trabajando ? (
-                      <>
-                        <span className="font-semibold text-info">Trabajando · </span>
-                        <Tx value={e.detalle} />
-                      </>
-                    ) : e.espera ? (
-                      <span className="font-semibold text-warning">
-                        {e.espera} {e.espera === 1 ? 'decisión espera' : 'decisiones esperan'} a una persona
-                      </span>
-                    ) : (
-                      'Disponible'
-                    )}
-                  </span>
-                </span>
-              )}
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+    <li>
+      <button type="button" className={`ag-agente ${trabajando ? 'is-working' : ''}`} onClick={() => onAbrir(id)}>
+        <AgentAvatar id={id} size={32} trabajando={trabajando} revisar={revisar} />
+        <span className="min-w-0 flex-1 text-left">
+          <span className="block text-sm font-medium text-flp-ink">{a.nombre}</span>
+          {trabajando ? (
+            <span className="block truncate text-xs text-flp-muted">
+              <span className="font-medium text-flp-ink">Trabajando · </span>
+              <Tx value={e.detalle} />
+            </span>
+          ) : revisar ? (
+            <StateChip state="review" className="mt-0.5">
+              {e.espera} por revisar
+            </StateChip>
+          ) : (
+            <span className="block text-xs text-flp-muted">{a.exploratorio ? 'En espera · exploratorio' : 'En espera'}</span>
+          )}
+        </span>
+      </button>
+    </li>
+  )
+}
+
+/** Carril de agentes: el Orquestador arriba y las tres familias de la marca debajo. */
+export function AgentesPorFamilia({ estados, onAbrir }) {
+  const uid = useId().replace(/:/g, '')
+  return (
+    <div className="ag-familias">
+      <ul>
+        <FilaAgente id="orquestador" e={estados.orquestador} onAbrir={onAbrir} />
+      </ul>
+      {ORDEN_FAMILIAS.map((f) => (
+        <section key={f} className="ag-familia" aria-labelledby={`${uid}-${f}`}>
+          <div className="ag-familia-cab">
+            <AgentGlyph family={f} size={20} />
+            <h3 id={`${uid}-${f}`} className="flp-kicker">
+              {FAMILIAS[f].nombre}
+            </h3>
+          </div>
+          <p className="ag-familia-desc">{FAMILIAS[f].descriptor}</p>
+          <ul>
+            {agentesDeFamilia(f).map((id) => (
+              <FilaAgente key={id} id={id} e={estados[id]} onAbrir={onAbrir} />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   )
 }
 
 export function DetalleAgente({ id, onCerrar }) {
   const { enviar } = useCtx()
-  const a = id ? AGENTES[id] : null
-  const casos = a ? CASOS.filter((x) => x.agentes.includes(id)).slice(0, 3) : []
+  // Conserva el último agente mientras la hoja se cierra, para que no se vacíe a medio camino.
+  const ultimo = useRef(null)
+  if (id) ultimo.current = id
+  const aid = ultimo.current
+  const a = aid ? AGENTES[aid] : null
+  const casos = a ? CASOS.filter((x) => x.agentes.includes(aid)).slice(0, 3) : []
   return (
-    <Modal open={!!a} onClose={onCerrar} title={a?.nombre ?? ''} subtitle={a?.rol} width="max-w-lg">
+    <Hoja abierta={!!id} onCerrar={onCerrar} titulo={a?.nombre ?? 'Agente'} subtitulo={a ? (a.familia ? `Familia ${FAMILIAS[a.familia].nombre}` : 'Reparte el trabajo entre los demás') : undefined} id="ag-hoja-agente">
       {a && (
         <div className="space-y-5">
-          <div className="flex items-center gap-3">
-            <AgentTile id={id} size={48} />
-            <p className="text-sm leading-relaxed text-muted">{a.hace}</p>
+          <div className="flex items-start gap-3">
+            <AgentAvatar id={aid} size={48} />
+            <div>
+              <p className="text-sm font-medium text-flp-ink">{a.rol}</p>
+              <p className="mt-1 text-sm leading-relaxed text-flp-muted">{a.hace}</p>
+              {a.exploratorio && <span className="ag-etiqueta-capacidad mt-2">Exploratorio</span>}
+            </div>
           </div>
           <div>
-            <h4 className="mb-2 text-xs font-bold text-muted">Cómo actúa</h4>
+            <h3 className="flp-kicker mb-2 text-flp-muted">Cómo actúa</h3>
             <ul className="space-y-2">
               {a.niveles.map((n) => (
-                <li key={n} className="flex items-start gap-3">
+                <li key={n} className="flex flex-wrap items-start gap-x-3 gap-y-1">
                   <AutonomyBadge nivel={n} />
-                  <span className="text-sm text-muted">{AUTONOMIA[n].descripcion}</span>
+                  <span className="text-sm text-flp-muted">{AUTONOMIA[n].descripcion}</span>
                 </li>
               ))}
             </ul>
           </div>
           {casos.length > 0 && (
             <div>
-              <h4 className="mb-2 text-xs font-bold text-muted">Pídele algo</h4>
+              <h3 className="flp-kicker mb-2 text-flp-muted">Pídele algo</h3>
               <div className="flex flex-wrap gap-2">
                 {casos.map((x) => (
                   <button
@@ -113,23 +140,29 @@ export function DetalleAgente({ id, onCerrar }) {
           )}
         </div>
       )}
-    </Modal>
+    </Hoja>
   )
 }
 
 const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Por validar' }
 
-export function CasosTracker({ vistos }) {
+export function casosVistos(vistos) {
+  return CASOS.filter((x) => vistos.includes(x.id)).length
+}
+
+export function CasosTracker({ vistos, cabecera = true }) {
   const { enviar, ocupado } = useCtx()
-  const n = CASOS.filter((x) => vistos.includes(x.id)).length
+  const n = casosVistos(vistos)
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-xs font-bold text-muted">Casos de uso</h2>
-        <span className="tnum text-xs font-semibold text-ink">
-          {n} de {CASOS.length} vistos
-        </span>
-      </div>
+      {cabecera && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="flp-kicker text-flp-muted">Casos de uso</h2>
+          <span className="tnum text-xs font-medium text-flp-ink">
+            {n} de {CASOS.length} vistos
+          </span>
+        </div>
+      )}
       <div className="ag-progreso" role="progressbar" aria-valuenow={n} aria-valuemin={0} aria-valuemax={CASOS.length} aria-label="Casos de uso vistos">
         <span style={{ width: `${(n / CASOS.length) * 100}%` }} />
       </div>
@@ -157,9 +190,9 @@ export function CasosTracker({ vistos }) {
 function ItemActividad({ it }) {
   return (
     <li className="ag-actividad-item">
-      <span className="tnum w-12 flex-none pt-1 text-xs text-muted">{it.previa ? fechaCorta(it.fecha) : it.hora}</span>
+      <span className="tnum w-12 flex-none pt-1 text-xs text-flp-muted">{it.previa ? fechaCorta(it.fecha) : it.hora}</span>
       {it.agente ? (
-        <AgentTile id={it.agente} size={28} />
+        <AgentAvatar id={it.agente} size={28} />
       ) : (
         <span className="ag-persona" aria-hidden="true">
           {(it.persona ?? '?')
@@ -170,12 +203,12 @@ function ItemActividad({ it }) {
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-snug text-ink">
+        <p className="text-sm leading-snug text-flp-ink">
           {it.agente && <strong>{AGENTES[it.agente].nombre} · </strong>}
           <Tx value={it.texto} />
         </p>
         {it.salida && (
-          <p className="mt-0.5 text-xs text-muted">
+          <p className="mt-0.5 text-xs text-flp-muted">
             <Tx value={it.salida} />
           </p>
         )}
@@ -211,7 +244,7 @@ export function PanelActividad({ s }) {
         </div>
       </div>
       {quedan > 0 && (
-        <div className="mb-4 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs text-muted">
+        <div className="mb-4 rounded-flp-sm border border-dashed border-flp-control bg-flp-surface px-3 py-2.5 text-xs text-flp-muted">
           {s.mensajes.some((m) => m.rol === 'agentes')
             ? `Quedan ${quedan} ${quedan === 1 ? 'novedad' : 'novedades'} de ejemplo por llegar mientras conversas.`
             : 'Cuando empieces a conversar irán llegando avisos de riesgos, facturas y solicitudes de ejemplo.'}
@@ -222,7 +255,7 @@ export function PanelActividad({ s }) {
       )}
       {sesion.length > 0 && (
         <>
-          <h3 className="mb-1 text-xs font-bold text-muted">Esta sesión</h3>
+          <h3 className="flp-kicker mb-1 text-flp-muted">Esta sesión</h3>
           <ul className="mb-4">
             {sesion.map((it) => (
               <ItemActividad key={it.id} it={it} />
@@ -230,7 +263,7 @@ export function PanelActividad({ s }) {
           </ul>
         </>
       )}
-      <h3 className="mb-1 text-xs font-bold text-muted">Antes de entrar</h3>
+      <h3 className="flp-kicker mb-1 text-flp-muted">Antes de entrar</h3>
       <ul>
         {previas.map((it) => (
           <ItemActividad key={it.id} it={it} />
@@ -264,15 +297,15 @@ export function PanelDecisiones({ s }) {
   const NOMBRE_RIESGO = { 'RG-1': 'la lluvia de la jornada 18', 'RG-5': 'las horas extra de noche' }
   return (
     <div>
-      <h3 className="mb-2 text-xs font-bold text-muted">Pendientes</h3>
+      <h3 className="flp-kicker mb-2 text-flp-muted">Esperan una decisión</h3>
       <ListaDecisiones compacta />
       {decididas.length > 0 && (
         <>
-          <h3 className="mb-2 mt-5 text-xs font-bold text-muted">Decididas en esta sesión</h3>
+          <h3 className="flp-kicker mb-2 mt-5 text-flp-muted">Decididas en esta sesión</h3>
           <ul className="space-y-2">
             {decididas.map((h) => (
-              <li key={h.version} className="text-sm text-muted">
-                <strong className="text-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-semibold text-ink">{h.ref.tipo === 'riesgo' ? NOMBRE_RIESGO[h.ref.id] ?? 'un riesgo' : h.ref.id}</span>
+              <li key={h.version} className="text-sm text-flp-muted">
+                <strong className="text-flp-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-semibold text-flp-ink">{h.ref.tipo === 'riesgo' ? NOMBRE_RIESGO[h.ref.id] ?? 'un riesgo' : h.ref.id}</span>
               </li>
             ))}
           </ul>
@@ -289,15 +322,15 @@ export function PanelRiesgos({ s }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <AgentTile id="riesgos" size={28} />
+        <AgentAvatar id="riesgos" size={28} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-ink">Riesgos de producción</p>
-          <p className="text-xs text-muted">{altos ? `${altos} ${altos === 1 ? 'riesgo alto abierto' : 'riesgos altos abiertos'}` : 'Sin riesgos altos abiertos'} · vigila las jornadas que quedan</p>
+          <p className="text-sm font-medium text-flp-ink">Riesgos de producción</p>
+          <p className="text-xs text-flp-muted">{altos ? `${altos} ${altos === 1 ? 'riesgo alto abierto' : 'riesgos altos abiertos'}` : 'Sin riesgos altos abiertos'} · vigila las jornadas que quedan</p>
         </div>
         <span className="ag-etiqueta-capacidad">Exploratorio</span>
       </div>
       <RadarRiesgos compacto />
-      <p className="mt-3 text-xs text-muted">Plan, previsión del tiempo, convocatorias y permisos son de ejemplo.</p>
+      <p className="mt-3 text-xs text-flp-muted">Plan, previsión del tiempo, convocatorias y permisos son de ejemplo.</p>
     </div>
   )
 }

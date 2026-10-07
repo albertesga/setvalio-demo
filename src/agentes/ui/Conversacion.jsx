@@ -1,39 +1,31 @@
 // Estado inicial, redactor, sugerencias y barra del recorrido guiado.
 
 import { useEffect, useRef, useState } from 'react'
-import { Button } from '../../components/ui.jsx'
+import { FilmpilotButton, StateChip } from '../../brand/Filmpilot.jsx'
 import { IconArrowUp, IconChevronRight, IconPlay, IconClock } from '../../components/icons.jsx'
-import { AGENTES, ORDEN_AGENTES } from '../agentes.js'
+import { AGENTES } from '../agentes.js'
 import { CASOS, GRUPOS_CASOS } from '../casos.js'
-import { useCtx } from './contexto.js'
+import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos } from '../rodaje.js'
-import { AgentTile, AutonomyBadge } from './Piezas.jsx'
+import { useCtx } from './contexto.js'
+import { AutonomyBadge, Desplegable, nombresCortos } from './Piezas.jsx'
+import { AgentesPorFamilia } from './Paneles.jsx'
 
 const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Por validar' }
 
-function TarjetaCaso({ caso, onElegir, destacado = false, deshabilitado }) {
+function TarjetaCaso({ caso, onElegir, deshabilitado }) {
   return (
-    <button type="button" className={`ag-caso ${destacado ? 'ag-caso--hero' : ''}`} onClick={() => onElegir(caso.prompt)} disabled={deshabilitado}>
-      {destacado && <span className="ag-caso-kicker">Recorrido completo</span>}
+    <button type="button" className="ag-caso" onClick={() => onElegir(caso.prompt)} disabled={deshabilitado}>
       <span className="flex items-start justify-between gap-2">
         <strong className="ag-caso-titulo">{caso.titulo}</strong>
         {ETIQUETA_CAPACIDAD[caso.capacidad] && <span className="ag-etiqueta-capacidad">{ETIQUETA_CAPACIDAD[caso.capacidad]}</span>}
       </span>
       <span className="ag-caso-desc">{caso.descripcion}</span>
       <span className="ag-caso-prompt">«{caso.prompt}»</span>
-      <span className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3">
-        <span className="flex -space-x-1.5" aria-label={`Agentes: ${caso.agentes.map((a) => AGENTES[a].nombre).join(', ')}`}>
-          {caso.agentes.slice(0, 6).map((a) => (
-            <AgentTile key={a} id={a} size={28} className="ring-2 ring-canvas" />
-          ))}
-        </span>
+      <span className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
+        <span className="text-xs text-flp-muted">{nombresCortos(caso.agentes.map((a) => AGENTES[a].nombre))}</span>
         <AutonomyBadge nivel={caso.nivel} />
       </span>
-      {destacado && (
-        <span className="ag-caso-cta">
-          Pedir el informe <IconChevronRight size={16} aria-hidden="true" />
-        </span>
-      )}
     </button>
   )
 }
@@ -48,102 +40,104 @@ function useListo(ms) {
   return listo
 }
 
-export function Inicio({ persona, onAbrirAgente, onRecorrido }) {
+/** Inicio: tres accesos (informe, cómo vamos, recorrido) y el resto plegado. */
+export function Inicio({ persona, estados, onAbrirAgente, onRecorrido }) {
   const { enviar: enviarCtx, mundo, ocupado } = useCtx()
   const listo = useListo(400)
   const enviar = (texto) => listo && enviarCtx(texto)
   const hero = CASOS.find((x) => x.grupo === 'hero')
+  const otros = CASOS.filter((x) => x.grupo !== 'hero')
   const nombre = persona.nombre.split(' ')[0]
+  const pendientes = decisionesAbiertas(mundo).length
+  const altos = evaluarRiesgos(mundo).filter((r) => r.severidad === 'alta').length
   return (
     <div className="ag-inicio">
-      <p className="ag-inicio-kicker">
+      <p className="flp-kicker text-flp-muted">
         {mundo.proyecto.titulo} · Rodaje, día {mundo.proyecto.diaActual} de {mundo.proyecto.diasRodaje} · lunes 1 de junio de 2026
       </p>
       <h1 className="ag-inicio-titulo">
-        Buenos días, {nombre}. ¿Qué <em>revisamos</em> hoy?
+        Buenos días, {nombre}. <span className="block">¿Qué revisamos hoy?</span>
       </h1>
       <p className="ag-inicio-lead">
-        Once agentes preparan el presupuesto, controlan el coste y vigilan el rodaje de tus producciones. Hacen solos lo rutinario y reversible, te proponen lo dudoso y te piden aprobación cuando hay dinero comprometido, riesgo fiscal o hay que hablar con alguien de fuera.
+        Un equipo de agentes. Una producción bajo control. <span className="text-flp-muted">Hacen solos lo rutinario, te proponen lo dudoso y te piden aprobación cuando hay dinero o riesgo en juego.</span>
       </p>
 
-      <FranjaRiesgos />
+      <div className="ag-accesos">
+        <button type="button" className="ag-acceso ag-acceso--principal" onClick={() => enviar(hero.prompt)} disabled={ocupado}>
+          <span className="flp-kicker text-flp-muted">Empieza aquí</span>
+          <strong className="ag-acceso-titulo">{hero.titulo}</strong>
+          <span className="ag-acceso-desc">{hero.descripcion}</span>
+          <span className="text-xs text-flp-muted">Con {nombresCortos(hero.agentes.map((a) => AGENTES[a].nombre))}</span>
+          <span className="flp-button flp-button--primary ag-acceso-cta" aria-hidden="true">
+            Pedir el informe <IconChevronRight size={16} />
+          </span>
+        </button>
 
-      <ul className="ag-leyenda" aria-label="Niveles de autonomía">
-        <li>
-          <AutonomyBadge nivel="ejecuta" />
-          <span>Contabiliza una factura que casa con su pedido.</span>
-        </li>
-        <li>
-          <AutonomyBadge nivel="propone" />
-          <span>Sugiere la partida de un ticket dudoso.</span>
-        </li>
-        <li>
-          <AutonomyBadge nivel="aprueba" />
-          <span>Una compra que deja un capítulo por encima del umbral.</span>
-        </li>
-      </ul>
+        <div className="ag-acceso">
+          <span className="flp-kicker text-flp-muted">Ahora mismo</span>
+          <strong className="ag-acceso-titulo">¿Cómo vamos?</strong>
+          <span className="flex flex-wrap gap-1.5">
+            <StateChip state={pendientes ? 'review' : 'idle'}>{pendientes ? `${pendientes} por revisar` : 'Nada por revisar'}</StateChip>
+            <StateChip state={altos ? 'error' : 'idle'}>{altos ? `${altos} ${altos === 1 ? 'riesgo alto' : 'riesgos altos'}` : 'Sin riesgos altos'}</StateChip>
+          </span>
+          <span className="ag-acceso-desc">Lo que espera tu decisión y lo que puede alterar las próximas jornadas. Riesgos de producción es exploratorio.</span>
+          <span className="mt-auto flex flex-wrap gap-2 pt-2">
+            <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={() => enviar('¿Cómo vamos?')}>
+              Ver el resumen
+            </FilmpilotButton>
+            <FilmpilotButton size="sm" variant="ghost" disabled={ocupado} onClick={() => enviar('¿Qué riesgos hay para las próximas jornadas?')}>
+              Ver los riesgos
+            </FilmpilotButton>
+          </span>
+        </div>
 
-      <div className="ag-casos-hero">
-        <TarjetaCaso caso={hero} onElegir={enviar} destacado deshabilitado={ocupado} />
-        <div className="ag-recorrido-card">
-          <span className="ag-caso-kicker">Primera vez</span>
-          <strong className="ag-caso-titulo">Recorrido guiado</strong>
-          <span className="ag-caso-desc">Un paso por cada caso de uso, con una nota en cada uno. Unos cinco minutos; en el segundo decides tú.</span>
-          <Button variant="secondary" className="mt-auto self-start" icon={IconPlay} onClick={() => listo && onRecorrido()} disabled={ocupado}>
+        <div className="ag-acceso">
+          <span className="flp-kicker text-flp-muted">Primera vez</span>
+          <strong className="ag-acceso-titulo">Recorrido guiado</strong>
+          <span className="ag-acceso-desc">Un paso por cada caso de uso, con una nota en cada uno. Unos cinco minutos; en el segundo decides tú.</span>
+          <FilmpilotButton size="sm" variant="secondary" icon={IconPlay} className="mt-auto self-start" onClick={() => listo && onRecorrido()} disabled={ocupado}>
             Empezar recorrido
-          </Button>
+          </FilmpilotButton>
         </div>
       </div>
 
-      {GRUPOS_CASOS.map((g) => (
-        <section key={g.id} className="mt-7" aria-labelledby={`grupo-${g.id}`}>
-          <h2 id={`grupo-${g.id}`} className="mb-3 text-sm font-extrabold text-ink">
-            {g.titulo}
-          </h2>
-          <div className="ag-casos-grid">
-            {CASOS.filter((x) => x.grupo === g.id).map((x) => (
-              <TarjetaCaso key={x.id} caso={x} onElegir={enviar} deshabilitado={ocupado} />
-            ))}
-          </div>
-        </section>
-      ))}
-
-      <section className="mt-7 xl:hidden" aria-labelledby="conoce-agentes">
-        <h2 id="conoce-agentes" className="mb-3 text-sm font-extrabold text-ink">
-          Conoce a los agentes
-        </h2>
-        <div className="ag-agentes-scroll">
-          {ORDEN_AGENTES.map((id) => (
-            <button key={id} type="button" className="ag-agente-mini" onClick={() => onAbrirAgente(id)}>
-              <AgentTile id={id} size={32} />
-              <span>{AGENTES[id].nombre}</span>
-            </button>
+      <div className="ag-inicio-mas">
+        <Desplegable titulo={`Más casos de uso (${otros.length})`} resumen="Presupuesto y proveedores, cierre de semana, facturas, dossier fiscal y riesgos">
+          {GRUPOS_CASOS.map((g) => (
+            <section key={g.id} className="mt-4 first:mt-1" aria-labelledby={`grupo-${g.id}`}>
+              <h3 id={`grupo-${g.id}`} className="flp-kicker mb-2 text-flp-muted">
+                {g.titulo}
+              </h3>
+              <div className="ag-casos-grid">
+                {CASOS.filter((x) => x.grupo === g.id).map((x) => (
+                  <TarjetaCaso key={x.id} caso={x} onElegir={enviar} deshabilitado={ocupado} />
+                ))}
+              </div>
+            </section>
           ))}
-        </div>
-      </section>
-    </div>
-  )
-}
+        </Desplegable>
 
-function FranjaRiesgos() {
-  const { mundo, enviar, ocupado } = useCtx()
-  const riesgos = evaluarRiesgos(mundo)
-  const altos = riesgos.filter((r) => r.severidad === 'alta').length
-  const medios = riesgos.filter((r) => r.severidad === 'media').length
-  return (
-    <div className="ag-franja-riesgos" role="note">
-      <AgentTile id="riesgos" size={32} />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-ink">
-          Riesgos de producción vigila las jornadas que quedan <span className="ag-etiqueta-capacidad ml-1">Exploratorio</span>
-        </p>
-        <p className="text-xs text-muted">
-          {altos} {altos === 1 ? 'riesgo alto' : 'riesgos altos'} y {medios} {medios === 1 ? 'medio' : 'medios'} esta semana y la próxima. El parte llega solo cuando empiezas a conversar.
-        </p>
+        <Desplegable titulo="Cómo actúan los agentes" resumen="Ejecutan, proponen o piden aprobación">
+          <ul className="ag-leyenda" aria-label="Niveles de autonomía">
+            <li>
+              <AutonomyBadge nivel="ejecuta" />
+              <span>Contabiliza una factura que casa con su pedido.</span>
+            </li>
+            <li>
+              <AutonomyBadge nivel="propone" />
+              <span>Sugiere la partida de un ticket dudoso.</span>
+            </li>
+            <li>
+              <AutonomyBadge nivel="aprueba" />
+              <span>Una compra que deja un capítulo por encima del umbral.</span>
+            </li>
+          </ul>
+        </Desplegable>
+
+        <Desplegable className="xl:hidden" titulo="Conoce a los agentes" resumen="El Orquestador y tres familias: presupuesto, financiación y documentación">
+          <AgentesPorFamilia estados={estados} onAbrir={onAbrirAgente} />
+        </Desplegable>
       </div>
-      <Button variant="secondary" disabled={ocupado} onClick={() => enviar('¿Qué riesgos hay para las próximas jornadas?')}>
-        Ver el parte
-      </Button>
     </div>
   )
 }
@@ -227,25 +221,25 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
 export function BarraRecorrido({ tour, onSiguiente, onSalir }) {
   if (!tour) return null
   return (
-    <div className="ag-tourbar" role="region" aria-label="Recorrido guiado">
+    <div className="ag-tourbar flp-dark" role="region" aria-label="Recorrido guiado">
       <div className="min-w-0 flex-1">
-        <span className="text-xs font-bold text-muted">
-          Recorrido guiado · {tour.indice + 1}/{tour.total}
+        <span className="flp-kicker text-flp-muted">
+          Recorrido guiado · <span className="tnum">{tour.indice + 1}/{tour.total}</span>
         </span>
-        <span className="block truncate text-sm font-extrabold text-ink">{tour.paso.titulo}</span>
+        <span className="block truncate text-sm font-medium text-flp-ink">{tour.paso.titulo}</span>
         {!tour.puedeAvanzar && tour.paso.espera && (
-          <span className="flex items-center gap-1 text-xs font-semibold text-ink">
+          <span className="flex items-center gap-1 text-xs text-flp-ink">
             <IconClock size={13} aria-hidden="true" /> Decide en la tarjeta para continuar.
           </span>
         )}
       </div>
       <div className="flex flex-none gap-2">
-        <Button size="md" variant="ghost" onClick={onSalir}>
+        <FilmpilotButton variant="ghost" onClick={onSalir}>
           Salir
-        </Button>
-        <Button size="md" variant="accent" onClick={onSiguiente} disabled={!tour.puedeAvanzar}>
+        </FilmpilotButton>
+        <FilmpilotButton variant="primary" onClick={onSiguiente} disabled={!tour.puedeAvanzar}>
           {tour.ultimo ? 'Terminar' : 'Siguiente'}
-        </Button>
+        </FilmpilotButton>
       </div>
     </div>
   )

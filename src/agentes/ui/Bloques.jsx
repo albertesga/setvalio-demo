@@ -3,7 +3,7 @@
 // tarjeta, todas las vistas de esa decisión cambian a la vez.
 
 import { useEffect, useId, useState } from 'react'
-import { Button } from '../../components/ui.jsx'
+import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload, IconPlay, IconClock } from '../../components/icons.jsx'
 import { formatear, renderTexto, fecha as fechaLarga } from '../texto.js'
 import * as c from '../calculos.js'
@@ -14,14 +14,14 @@ import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS }
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
 import { useMovimientoReducido } from '../useAgentes.js'
-import { Tx, AutonomyBadge, Tono, AgentTile } from './Piezas.jsx'
+import { Tx, AutonomyBadge, Tono, AgentAvatar } from './Piezas.jsx'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
 
 function Titulo({ children, extra }) {
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <h4 className="text-sm font-extrabold text-ink">{children}</h4>
+      <h4 className="text-sm font-semibold text-flp-ink">{children}</h4>
       {extra}
     </div>
   )
@@ -47,9 +47,9 @@ function BloqueAviso({ b }) {
           {b.tono === 'aviso' && <IconAlert size={12} strokeWidth={2.6} aria-hidden="true" />}
           {etiqueta}
         </Tono>
-        {b.titulo && b.titulo !== etiqueta && <strong className="text-sm text-ink">{b.titulo}</strong>}
+        {b.titulo && b.titulo !== etiqueta && <strong className="text-sm text-flp-ink">{b.titulo}</strong>}
       </div>
-      <p className="text-sm leading-relaxed text-muted">
+      <p className="text-sm leading-relaxed text-flp-muted">
         <Tx value={b.texto} />
       </p>
     </div>
@@ -71,13 +71,13 @@ function BloqueLista({ b }) {
               </button>
             </li>
           ) : (
-            <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-muted">
+            <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-flp-muted">
               {b.numerada ? (
                 <span className="ag-numero tnum" aria-hidden="true">
                   {i + 1}
                 </span>
               ) : (
-                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-line-strong" aria-hidden="true" />
+                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-flp-control" aria-hidden="true" />
               )}
               <span>
                 <Tx value={it.texto} />
@@ -95,12 +95,14 @@ function BloqueLista({ b }) {
 function BloqueKpis({ b }) {
   return (
     <div className="ag-panel ag-panel--flush">
-      {b.titulo && <div className="border-b border-line px-4 py-2.5 text-xs font-bold text-muted">{b.titulo}</div>}
+      {b.titulo && <div className="border-b border-flp-line px-4 py-2.5 text-xs font-semibold text-flp-muted">{b.titulo}</div>}
       <dl className="ag-kpis">
         {b.items.map((k) => (
           <div key={k.id} className="ag-kpi">
             <dt>{k.etiqueta}</dt>
-            <dd className={`tnum ${k.tono === 'warning' ? 'text-warning' : 'text-ink'}`}>{fmt(k.valor, k.formato)}</dd>
+            <dd className="tnum text-flp-ink">
+              {k.tono === 'warning' ? <span className="ag-resalte">{fmt(k.valor, k.formato)}</span> : fmt(k.valor, k.formato)}
+            </dd>
             {k.antes !== undefined ? (
               <span className="ag-kpi-antes">
                 antes <s className="tnum">{fmt(k.antes, k.formato)}</s>
@@ -154,20 +156,20 @@ function BloqueTabla({ b }) {
     if (col.id === 'agente' && fila.agenteId)
       return (
         <span className="flex items-center gap-2">
-          <AgentTile id={fila.agenteId} size={28} />
-          <strong className="text-ink">{val}</strong>
+          <AgentAvatar id={fila.agenteId} size={28} />
+          <strong className="text-flp-ink">{val}</strong>
         </span>
       )
     const texto = fmt(val, col.formato)
     if (col.tono && typeof val === 'number') {
-      const tono = val > 0.0005 ? 'text-negative' : val < -0.0005 ? 'text-positive' : 'text-muted'
+      const tono = val > 0.0005 ? 'text-flp-error' : val < -0.0005 ? 'text-flp-success' : 'text-flp-muted'
       return <span className={`font-semibold ${tono}`}>{texto}</span>
     }
     return texto
   }
   return (
     <div className="ag-panel ag-panel--flush">
-      {b.titulo && <div className="px-4 pt-3.5 text-sm font-extrabold text-ink">{b.titulo}</div>}
+      {b.titulo && <div className="px-4 pt-3.5 text-sm font-semibold text-flp-ink">{b.titulo}</div>}
       <div className="ag-tabla-scroll" tabIndex={0} role="region" aria-label={b.titulo || 'Tabla'}>
         <table className="ag-tabla">
           <thead>
@@ -233,7 +235,7 @@ function BloqueDesviaciones({ b }) {
   const escala = Math.max(b.umbral * 1.4, ...b.items.map((x) => Math.abs(x.desviacionPct)))
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-muted">Umbral {formatear(b.umbral, 'pct0')}</span>}>Desviación por capítulo</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Umbral {formatear(b.umbral, 'pct0')}</span>}>Desviación por capítulo</Titulo>
       <ul className="space-y-3">
         {b.items.map((x) => {
           const ancho = Math.min(50, (Math.abs(x.desviacionPct) / escala) * 50)
@@ -241,7 +243,7 @@ function BloqueDesviaciones({ b }) {
             <li key={x.id}>
               <div className="ag-desv-fila">
                 <span className="ag-desv-nombre">
-                  <span className="tnum text-muted">{x.id}</span> {x.nombre}
+                  <span className="tnum text-flp-muted">{x.id}</span> {x.nombre}
                 </span>
                 <span className="ag-desv-barra" aria-hidden="true">
                   <span className="ag-desv-eje" />
@@ -249,8 +251,8 @@ function BloqueDesviaciones({ b }) {
                   <span className={`ag-desv-valor ${x.desviacion > 0 ? 'is-sobre' : 'is-bajo'}`} style={x.desviacion > 0 ? { left: '50%', width: `${ancho}%` } : { right: '50%', width: `${ancho}%` }} />
                 </span>
                 <span className="ag-desv-cifra tnum">
-                  <strong className={x.desviacion > 0 ? 'text-negative' : 'text-positive'}>{formatear(x.desviacion, 'eurSigned')}</strong>
-                  <span className="text-muted"> {formatear(x.desviacionPct, 'pctSigned')}</span>
+                  <strong className={x.desviacion > 0 ? 'text-flp-error' : 'text-flp-success'}>{formatear(x.desviacion, 'eurSigned')}</strong>
+                  <span className="text-flp-muted"> {formatear(x.desviacionPct, 'pctSigned')}</span>
                 </span>
                 <span className="ag-desv-chip">{chipDesviacion(x, b.umbral)}</span>
               </div>
@@ -259,9 +261,9 @@ function BloqueDesviaciones({ b }) {
                   {x.causas.map((p) => (
                     <li key={p.codigo}>
                       <span>
-                        <span className="tnum text-muted">{p.codigo}</span> {p.nombre}
+                        <span className="tnum text-flp-muted">{p.codigo}</span> {p.nombre}
                       </span>
-                      <span className="tnum font-semibold text-ink">{formatear(p.desviacion, 'eurSigned')}</span>
+                      <span className="tnum font-semibold text-flp-ink">{formatear(p.desviacion, 'eurSigned')}</span>
                       {p.desviacion > 0 && <Tono tono={p.consolidada ? 'neutral' : 'info'}>{p.consolidada ? 'Consolidada' : `Prevista · quedan ${formatear(p.pendiente, 'eur')}`}</Tono>}
                     </li>
                   ))}
@@ -272,14 +274,14 @@ function BloqueDesviaciones({ b }) {
         })}
       </ul>
       {b.resumen && (
-        <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
-          Sobrecostes <strong className="tnum text-ink">{formatear(b.resumen.sobrecostes, 'eurSigned')}</strong> · ahorros <strong className="tnum text-ink">{formatear(b.resumen.ahorros, 'eurSigned')}</strong> {b.resumen.reservas > 0 && (
+        <p className="mt-4 border-t border-flp-line pt-3 text-xs text-flp-muted">
+          Sobrecostes <strong className="tnum text-flp-ink">{formatear(b.resumen.sobrecostes, 'eurSigned')}</strong> · ahorros <strong className="tnum text-flp-ink">{formatear(b.resumen.ahorros, 'eurSigned')}</strong> {b.resumen.reservas > 0 && (
             <>
               {' '}
-              · reservas de riesgos <strong className="tnum text-ink">{formatear(b.resumen.reservas, 'eurSigned')}</strong>
+              · reservas de riesgos <strong className="tnum text-flp-ink">{formatear(b.resumen.reservas, 'eurSigned')}</strong>
             </>
           )}{' '}
-          · neto <strong className="tnum text-ink">{formatear(b.resumen.neto, 'eurSigned')}</strong>
+          · neto <strong className="tnum text-flp-ink">{formatear(b.resumen.neto, 'eurSigned')}</strong>
         </p>
       )}
     </div>
@@ -289,14 +291,14 @@ function BloqueDesviaciones({ b }) {
 // ── Documento ────────────────────────────────────────────────────────────────
 
 function Confianza({ valor }) {
-  if (valor == null) return <span className="text-xs text-muted">Dato estructurado</span>
+  if (valor == null) return <span className="text-xs text-flp-muted">Dato estructurado</span>
   const baja = valor < 0.8
   return (
     <span className="flex items-center gap-2">
       <span className="ag-meter" aria-hidden="true">
         <span className={baja ? 'is-baja' : ''} style={{ width: `${valor * 100}%` }} />
       </span>
-      <span className={`tnum text-xs font-bold ${baja ? 'text-warning' : 'text-ink'}`}>{formatear(valor, 'pct0')}</span>
+      <span className={`tnum text-xs font-semibold text-flp-ink ${baja ? 'ag-resalte' : ''}`}>{formatear(valor, 'pct0')}</span>
       {baja && <span className="sr-only">confianza baja</span>}
     </span>
   )
@@ -311,11 +313,11 @@ function BloqueDocumento({ b }) {
     <div className="ag-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold text-muted">
+          <div className="text-xs font-semibold text-flp-muted">
             {d.tipo === 'ticket' ? 'Ticket' : 'Factura'} {d.id} · {fechaLarga(d.fecha)}
           </div>
-          <div className="mt-0.5 text-base font-extrabold text-ink">{d.proveedor}</div>
-          <div className="text-sm text-muted">{d.concepto}</div>
+          <div className="mt-0.5 text-base font-semibold text-flp-ink">{d.proveedor}</div>
+          <div className="text-sm text-flp-muted">{d.concepto}</div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Tono tono="neutral">{d.origen}</Tono>
@@ -342,24 +344,24 @@ function BloqueDocumento({ b }) {
         </div>
         <div>
           <dt>Total</dt>
-          <dd className="tnum font-extrabold">{formatear(d.total, 'eurCents')}</dd>
+          <dd className="tnum font-semibold">{formatear(d.total, 'eurCents')}</dd>
         </div>
       </dl>
-      <div className="mt-3 border-t border-line pt-3">
-        <div className="mb-2 text-xs font-bold text-muted">Lectura de Facturas</div>
+      <div className="mt-3 border-t border-flp-line pt-3">
+        <div className="mb-2 text-xs font-semibold text-flp-muted">Lectura de Facturas</div>
         <ul className="space-y-2">
           {b.campos.map((f) => (
             <li key={f.etiqueta} className="ag-campo">
-              <span className="text-xs text-muted">{f.etiqueta}</span>
-              <span className="truncate text-sm font-semibold text-ink">{f.formato ? formatear(f.valor, f.formato) : f.valor}</span>
+              <span className="text-xs text-flp-muted">{f.etiqueta}</span>
+              <span className="truncate text-sm font-semibold text-flp-ink">{f.formato ? formatear(f.valor, f.formato) : f.valor}</span>
               <Confianza valor={f.confianza} />
             </li>
           ))}
         </ul>
       </div>
       {conc && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-sm">
-          <span className="text-xs font-bold text-muted">Conciliación</span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-flp-line pt-3 text-sm">
+          <span className="text-xs font-semibold text-flp-muted">Conciliación</span>
           {conc.resultado === 'ok' && (
             <Tono tono="positive">
               <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />
@@ -372,15 +374,15 @@ function BloqueDocumento({ b }) {
         </div>
       )}
       {b.elegibilidad && (
-        <div className="mt-3 border-t border-line pt-3">
-          <div className="mb-2 text-xs font-bold text-muted">Elegibilidad fiscal · Cumplimiento</div>
+        <div className="mt-3 border-t border-flp-line pt-3">
+          <div className="mb-2 text-xs font-semibold text-flp-muted">Elegibilidad fiscal · Cumplimiento</div>
           <ul className="grid gap-1.5 sm:grid-cols-2">
             {b.elegibilidad.criterios.map((cr) => (
               <li key={cr.id} className="flex items-start gap-2 text-sm">
                 <Check ok={cr.ok} />
                 <span>
-                  <span className="font-semibold text-ink">{cr.etiqueta}</span>
-                  <span className="block text-xs text-muted">{cr.detalle}</span>
+                  <span className="font-semibold text-flp-ink">{cr.etiqueta}</span>
+                  <span className="block text-xs text-flp-muted">{cr.detalle}</span>
                 </span>
               </li>
             ))}
@@ -419,22 +421,22 @@ export function BloqueAprobacion({ b }) {
   return (
     <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <AgentTile id={b.agente} size={28} />
-        <span className="text-xs font-bold text-muted">{AGENTES[b.agente]?.nombre}</span>
+        <AgentAvatar id={b.agente} size={28} />
+        <span className="text-xs font-semibold text-flp-muted">{AGENTES[b.agente]?.nombre}</span>
         <AutonomyBadge nivel={b.nivel} />
         {b.rol && <Tono tono="neutral">Decide: {b.rol}</Tono>}
       </div>
-      <h4 className="mt-3 text-base font-extrabold leading-snug text-ink">
+      <h4 className="mt-3 text-base font-semibold leading-snug text-flp-ink">
         <Tx value={b.titulo} />
       </h4>
-      {b.subtitulo && <p className="mt-0.5 text-xs text-muted">{b.subtitulo}</p>}
+      {b.subtitulo && <p className="mt-0.5 text-xs text-flp-muted">{b.subtitulo}</p>}
       {b.resumen && (
-        <p className="mt-2 text-sm leading-relaxed text-muted">
+        <p className="mt-2 text-sm leading-relaxed text-flp-muted">
           <Tx value={b.resumen} />
         </p>
       )}
       {b.motivos?.length > 0 && (
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-sm text-flp-muted">
           Pide aprobación porque{' '}
           {b.motivos.map((m, i) => (
             <span key={i}>
@@ -455,10 +457,10 @@ export function BloqueAprobacion({ b }) {
           {b.impacto.map((f) => (
             <div role="row" key={f.etiqueta} className={f.alerta ? 'is-alerta' : ''}>
               <span role="cell">{f.etiqueta}</span>
-              <span role="cell" className="tnum text-right text-muted">
+              <span role="cell" className="tnum text-right text-flp-muted">
                 {formatear(f.antes, f.formato)}
               </span>
-              <span role="cell" className={`tnum text-right font-bold ${f.alerta ? 'text-negative' : 'text-ink'}`}>
+              <span role="cell" className={`tnum text-right font-semibold ${f.alerta ? 'text-flp-error' : 'text-flp-ink'}`}>
                 {formatear(f.despues, f.formato)}
                 {f.alerta && <span className="sr-only"> (supera el umbral)</span>}
               </span>
@@ -467,7 +469,7 @@ export function BloqueAprobacion({ b }) {
         </div>
       )}
       {b.recomendacion && (
-        <p className="mt-3 text-sm font-semibold text-ink">
+        <p className="mt-3 text-sm font-semibold text-flp-ink">
           <Tx value={b.recomendacion} />
         </p>
       )}
@@ -480,8 +482,8 @@ export function BloqueAprobacion({ b }) {
             })()}
             {decidida.etiqueta}
           </Tono>
-          {ed.por && <span className="text-xs text-muted">por {ed.por}</span>}
-          {ed.importe !== undefined && ed.importe !== null && <span className="text-xs text-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
+          {ed.por && <span className="text-xs text-flp-muted">por {ed.por}</span>}
+          {ed.importe !== undefined && ed.importe !== null && <span className="text-xs text-flp-muted tnum">· {formatear(ed.importe, 'eur')}</span>}
           {ed.estado === 'desactualizada' && b.entradaActual && (
             <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar(b.entradaActual)}>
               Ver la situación actual
@@ -490,10 +492,10 @@ export function BloqueAprobacion({ b }) {
         </div>
       ) : informeViejo ? (
         <div className="mt-4">
-          <p className="text-sm text-muted">Las cifras han cambiado desde esta edición: regenera el informe antes de aprobarlo.</p>
-          <Button className="mt-2" variant="secondary" disabled={ocupado} onClick={() => enviar('Regenera el informe semanal de coste')}>
+          <p className="text-sm text-flp-muted">Las cifras han cambiado desde esta edición: regenera el informe antes de aprobarlo.</p>
+          <FilmpilotButton className="mt-2" variant="secondary" disabled={ocupado} onClick={() => enviar('Regenera el informe semanal de coste')}>
             Regenerar el informe
-          </Button>
+          </FilmpilotButton>
         </div>
       ) : (
         <>
@@ -512,7 +514,7 @@ export function BloqueAprobacion({ b }) {
             {visibles.map((a) => {
               const permitido = a.soloSinPermiso || tieneRolPropio(a)
               return (
-                <Button
+                <FilmpilotButton
                   key={a.id}
                   variant={a.variante === 'primary' && permitido ? 'primary' : 'secondary'}
                   size="md"
@@ -521,22 +523,22 @@ export function BloqueAprobacion({ b }) {
                   title={a.detalle ? renderTexto(a.detalle) : undefined}
                 >
                   {a.etiqueta}
-                </Button>
+                </FilmpilotButton>
               )
             })}
           </div>
           {!sinPermiso && visibles.some((a) => !a.soloSinPermiso && !tieneRolPropio(a)) && (
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-flp-muted">
               Como {persona.rol.toLowerCase()} puedes {visibles.filter((a) => !a.soloSinPermiso && tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' o ')}; {visibles.filter((a) => !a.soloSinPermiso && !tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' y ')} lo decide {visibles.find((a) => !a.soloSinPermiso && !tieneRolPropio(a)).rol.toLowerCase()}.
             </p>
           )}
           {sinPermiso && (
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-flp-muted">
               Como {persona.rol.toLowerCase()} no puedes decidir esta: la decide {b.rol}. {yaPedida ? 'Ya se ha pedido; cambia «Ver como» para decidir.' : 'Puedes pedir su aprobación o cambiar «Ver como».'}
             </p>
           )}
           {visibles.some((a) => a.detalle) && (
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-flp-muted">
               {visibles
                 .filter((a) => a.detalle)
                 .map((a) => (
@@ -546,10 +548,10 @@ export function BloqueAprobacion({ b }) {
                 ))}
             </p>
           )}
-          {ocupado && <p className="mt-2 text-xs text-muted">Los agentes están trabajando: podrás decidir en cuanto terminen.</p>}
+          {ocupado && <p className="mt-2 text-xs text-flp-muted">Los agentes están trabajando: podrás decidir en cuanto terminen.</p>}
         </>
       )}
-      {b.nota && <p className="mt-2 text-xs text-muted">{b.nota}</p>}
+      {b.nota && <p className="mt-2 text-xs text-flp-muted">{b.nota}</p>}
     </section>
   )
 }
@@ -561,7 +563,7 @@ export { decisionesAbiertas }
 export function ListaDecisiones({ compacta = false }) {
   const { mundo, enviar, ocupado } = useCtx()
   const ex = decisionesAbiertas(mundo)
-  if (!ex.length) return <p className="text-sm text-muted">No hay decisiones pendientes.</p>
+  if (!ex.length) return <p className="text-sm text-flp-muted">No hay decisiones pendientes.</p>
   return (
     <ul className="ag-decisiones">
       {ex.map((e) => (
@@ -569,11 +571,11 @@ export function ListaDecisiones({ compacta = false }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <AutonomyBadge nivel={e.nivel} compacto={compacta} />
-              <span className="text-xs text-muted">{e.rol}</span>
-              {e.aplazado && <span className="text-xs font-semibold text-muted">· en revisión</span>}
+              <span className="text-xs text-flp-muted">{e.rol}</span>
+              {e.aplazado && <span className="text-xs font-semibold text-flp-muted">· en revisión</span>}
             </div>
-            <div className="mt-1 text-sm font-semibold text-ink">{e.titulo}</div>
-            {e.importe > 0 && <div className="tnum text-xs text-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Reserva propuesta ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
+            <div className="mt-1 text-sm font-semibold text-flp-ink">{e.titulo}</div>
+            {e.importe > 0 && <div className="tnum text-xs text-flp-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Reserva propuesta ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
           </div>
           <button type="button" className="ag-boton-fila" disabled={ocupado} onClick={() => enviar(e.entrada)}>
             Revisar <IconChevronRight size={15} aria-hidden="true" />
@@ -589,7 +591,7 @@ function BloqueDecisiones() {
   const n = decisionesAbiertas(mundo).length
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-muted">Excepciones · en vivo</span>}>{n ? `Decisiones pendientes (${n})` : 'Decisiones pendientes'}</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Excepciones · en vivo</span>}>{n ? `Decisiones pendientes (${n})` : 'Decisiones pendientes'}</Titulo>
       <ListaDecisiones />
     </div>
   )
@@ -712,12 +714,12 @@ function BloqueInforme({ b }) {
           Redactado por Informes · edición {inf.edicion} · corte {fechaLarga(mundo.corte.fecha)}
         </span>
         <div className="flex flex-wrap gap-2">
-          <Button size="md" variant="secondary" icon={IconDownload} onClick={() => avisar('Demo: la descarga del informe no está disponible.')}>
+          <FilmpilotButton size="md" variant="secondary" icon={IconDownload} onClick={() => avisar('Demo: la descarga del informe no está disponible.')}>
             Descargar (no disponible en la demo)
-          </Button>
-          <Button size="md" variant="ghost" onClick={() => onNavigate('coste')}>
+          </FilmpilotButton>
+          <FilmpilotButton size="md" variant="ghost" onClick={() => onNavigate('coste')}>
             Ver en Control de costes
-          </Button>
+          </FilmpilotButton>
         </div>
       </footer>
     </article>
@@ -749,40 +751,44 @@ function BloqueBorrador({ b }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <AutonomyBadge nivel="propone" />
-          <span className="text-xs text-muted">Borrador · {bor.canal === 'email' ? 'correo' : bor.canal}</span>
+          <span className="text-xs text-flp-muted">Borrador · {bor.canal === 'email' ? 'correo' : bor.canal}</span>
         </div>
         {bor.estado === 'listo' && <Tono tono="positive">Revisado{bor.listoPor ? ` por ${bor.listoPor}` : ''} · no enviado</Tono>}
         {bor.estado === 'descartado' && <Tono tono="neutral">Descartado</Tono>}
       </div>
       <dl className="mt-3 space-y-2 text-sm">
         <div className="flex gap-2">
-          <dt className="w-16 flex-none text-muted">Para</dt>
-          <dd className="font-semibold text-ink">{bor.para}</dd>
+          <dt className="w-16 flex-none text-flp-muted">Para</dt>
+          <dd className="font-semibold text-flp-ink">{bor.para}</dd>
         </div>
       </dl>
-      <label className="mt-3 block text-xs font-bold text-muted" htmlFor={`${uid}-asunto`}>
+      <label className="mt-3 block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-asunto`}>
         Asunto
       </label>
-      <input id={`${uid}-asunto`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={asunto} onChange={(e) => setAsunto(e.target.value)} onBlur={guardar} disabled={cerrado} />
-      <label className="mt-3 block text-xs font-bold text-muted" htmlFor={`${uid}-cuerpo`}>
+      <input id={`${uid}-asunto`} className="flp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={asunto} onChange={(e) => setAsunto(e.target.value)} onBlur={guardar} disabled={cerrado} />
+      <label className="mt-3 block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-cuerpo`}>
         Mensaje
       </label>
-      <textarea id={`${uid}-cuerpo`} className="fp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} onBlur={guardar} disabled={cerrado} />
-      {cuerpo.includes('[') && !cerrado && <p className="mt-1 text-xs text-warning">Completa los campos entre corchetes antes de enviarlo.</p>}
-      <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-muted">
+      <textarea id={`${uid}-cuerpo`} className="flp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} onBlur={guardar} disabled={cerrado} />
+      {cuerpo.includes('[') && !cerrado && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-flp-ink">
+          <IconAlert size={13} aria-hidden="true" /> Completa los campos entre corchetes antes de enviarlo.
+        </p>
+      )}
+      <p className="mt-3 rounded-flp-sm bg-flp-bg px-3 py-2 text-xs text-flp-muted">
         {bor.canal === 'email' ? 'En la demo no se envía nada: copia el texto y envíalo tú desde tu correo.' : 'En la demo no se envía nada: copia el texto y mándalo tú por el canal del equipo.'}
       </p>
       {!cerrado && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id, asunto, cuerpo }, `Marcar como revisado · ${bor.para}`)}>
+          <FilmpilotButton variant="primary" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id, asunto, cuerpo }, `Marcar como revisado · ${bor.para}`)}>
             Marcar como revisado
-          </Button>
-          <Button variant="secondary" onClick={copiar}>
+          </FilmpilotButton>
+          <FilmpilotButton variant="secondary" onClick={copiar}>
             Copiar texto
-          </Button>
-          <Button variant="ghost" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/descartar', id: b.id }, `Descartar borrador · ${bor.para}`)}>
+          </FilmpilotButton>
+          <FilmpilotButton variant="ghost" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/descartar', id: b.id }, `Descartar borrador · ${bor.para}`)}>
             Descartar
-          </Button>
+          </FilmpilotButton>
         </div>
       )}
     </section>
@@ -795,17 +801,17 @@ function BloqueChecklist({ b }) {
   return (
     <div className="ag-panel">
       <Titulo>{b.titulo}</Titulo>
-      <ul className="divide-y divide-line">
+      <ul className="divide-y divide-flp-line">
         {b.items.map((it) => (
           <li key={it.id} className="flex flex-wrap items-start justify-between gap-2 py-2.5 first:pt-0">
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink">{it.documento}</div>
-              <div className="text-xs text-muted">
+              <div className="text-sm font-semibold text-flp-ink">{it.documento}</div>
+              <div className="text-xs text-flp-muted">
                 {it.responsable} · {it.evidencia}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`tnum text-xs font-semibold ${it.dias <= 7 ? 'text-negative' : 'text-muted'}`}>
+              <span className={`tnum text-xs font-semibold ${it.dias <= 7 ? 'text-flp-error' : 'text-flp-muted'}`}>
                 vence {fechaLarga(it.deadline)} · {formatear(it.dias, 'dias')}
               </span>
               <Tono tono="negative">
@@ -816,7 +822,7 @@ function BloqueChecklist({ b }) {
           </li>
         ))}
       </ul>
-      {b.nota && <p className="mt-3 border-t border-line pt-3 text-xs text-muted">{b.nota}</p>}
+      {b.nota && <p className="mt-3 border-t border-flp-line pt-3 text-xs text-flp-muted">{b.nota}</p>}
     </div>
   )
 }
@@ -852,11 +858,11 @@ function BloqueCaja({ b }) {
               {b.semanas.map((s) => (
                 <tr key={s.semana} className={s.saldo < 0 ? 'is-alerta' : ''}>
                   <th scope="row" className="text-left">
-                    {s.semana} <span className="font-normal text-muted">{s.fechas}</span>
+                    {s.semana} <span className="font-normal text-flp-muted">{s.fechas}</span>
                   </th>
                   <td className="tnum text-right">{formatear(s.cobros, 'eur')}</td>
                   <td className="tnum text-right">{formatear(s.pagos, 'eur')}</td>
-                  <td className={`tnum text-right font-bold ${s.saldo < 0 ? 'text-negative' : 'text-ink'}`}>{formatear(s.saldo, 'eur')}</td>
+                  <td className={`tnum text-right font-semibold ${s.saldo < 0 ? 'text-flp-error' : 'text-flp-ink'}`}>{formatear(s.saldo, 'eur')}</td>
                 </tr>
               ))}
             </tbody>
@@ -879,8 +885,8 @@ function BloqueCaja({ b }) {
           })}
         </ol>
       )}
-      <p className="mt-3 text-xs text-muted">
-        Saldo hoy <strong className="tnum text-ink">{formatear(b.saldoHoy, 'eur')}</strong>. Las semanas en negativo van en rojo y con su cifra.
+      <p className="mt-3 text-xs text-flp-muted">
+        Saldo hoy <strong className="tnum text-flp-ink">{formatear(b.saldoHoy, 'eur')}</strong>. Las semanas en negativo van en rojo y con su cifra.
         {b.semanas.some((s) => s.antes !== undefined) && ' La marca indica el saldo antes de tu decisión.'}
       </p>
     </div>
@@ -893,14 +899,14 @@ function BloqueAcciones({ b }) {
   const { enviarEntrada, ocupado } = useCtx()
   return (
     <div className="ag-panel flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-muted">
+      <p className="text-sm text-flp-muted">
         <Tx value={b.texto} />
       </p>
       <div className="flex flex-wrap gap-2">
         {b.acciones.map((a) => (
-          <Button key={a.id} variant="accent" disabled={ocupado} onClick={() => enviarEntrada(a.entrada)}>
+          <FilmpilotButton key={a.id} variant="secondary" icon={IconPlay} disabled={ocupado} onClick={() => enviarEntrada(a.entrada)}>
             {a.etiqueta}
-          </Button>
+          </FilmpilotButton>
         ))}
       </div>
     </div>
@@ -911,7 +917,7 @@ function BloqueEnlace({ b }) {
   const { onNavigate } = useCtx()
   return (
     <button type="button" className="ag-enlace" onClick={() => onNavigate(b.ruta, b.contexto)}>
-      {b.etiqueta} <span className="text-xs font-semibold text-muted">· demo clásica</span>
+      {b.etiqueta} <span className="text-xs font-semibold text-flp-muted">· demo clásica</span>
       <IconChevronRight size={16} aria-hidden="true" />
     </button>
   )
@@ -938,13 +944,13 @@ function FormularioCoste({ onCerrar }) {
   return (
     <form className="ag-form-coste" onSubmit={enviarForm}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-c`}>
+        <label className="block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-c`}>
           Concepto
-          <input id={`${uid}-c`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej.: Dron, 2 jornadas" />
+          <input id={`${uid}-c`} className="flp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej.: Dron, 2 jornadas" />
         </label>
-        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-p`}>
+        <label className="block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-p`}>
           Partida
-          <select id={`${uid}-p`} className="fp-input mt-1 w-full px-2 text-[16px] sm:text-sm" value={partida} onChange={(e) => setPartida(e.target.value)}>
+          <select id={`${uid}-p`} className="flp-input mt-1 w-full px-2 text-[16px] sm:text-sm" value={partida} onChange={(e) => setPartida(e.target.value)}>
             {mundo.capitulos.map((cap) => (
               <optgroup key={cap.id} label={`${cap.id} ${cap.nombre}`}>
                 {cap.partidas.map((cod) => (
@@ -956,26 +962,26 @@ function FormularioCoste({ onCerrar }) {
             ))}
           </select>
         </label>
-        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-v`}>
+        <label className="block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-v`}>
           Proveedor con el que has hablado
-          <input id={`${uid}-v`} className="fp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Opcional" />
+          <input id={`${uid}-v`} className="flp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Opcional" />
         </label>
-        <label className="block text-xs font-bold text-muted" htmlFor={`${uid}-i`}>
+        <label className="block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-i`}>
           Importe sin IVA (€)
-          <input id={`${uid}-i`} className="fp-input tnum mt-1 w-full px-3 text-[16px] sm:text-sm" inputMode="decimal" value={importe} onChange={(e) => setImporte(e.target.value)} placeholder="3.200" />
+          <input id={`${uid}-i`} className="flp-input tnum mt-1 w-full px-3 text-[16px] sm:text-sm" inputMode="decimal" value={importe} onChange={(e) => setImporte(e.target.value)} placeholder="3.200" />
         </label>
       </div>
-      <label className="mt-3 flex min-h-[44px] items-center gap-2 text-sm text-ink">
-        <input type="checkbox" className="h-5 w-5 accent-[#311b2e]" checked={sustituye} onChange={(e) => setSustituye(e.target.checked)} />
+      <label className="mt-3 flex min-h-[44px] items-center gap-2 text-sm text-flp-ink">
+        <input type="checkbox" className="h-5 w-5 accent-flp-carbon" checked={sustituye} onChange={(e) => setSustituye(e.target.checked)} />
         Sale de lo estimado por detallar en su capítulo
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="submit" variant="primary" disabled={!valido || ocupado}>
+        <FilmpilotButton type="submit" variant="primary" disabled={!valido || ocupado}>
           Añadir a la propuesta
-        </Button>
-        <Button type="button" variant="ghost" onClick={onCerrar}>
+        </FilmpilotButton>
+        <FilmpilotButton type="button" variant="ghost" onClick={onCerrar}>
           Cancelar
-        </Button>
+        </FilmpilotButton>
       </div>
     </form>
   )
@@ -1010,7 +1016,7 @@ function BloquePropuesta({ b }) {
       <div className="ag-propuesta-total">
         <span>Total</span>
         <strong className="tnum">{formatear(tot.total, 'eur')}</strong>
-        <span className="text-muted">
+        <span className="text-flp-muted">
           detallado {formatear(tot.detallado, 'eur')} · estimado {formatear(tot.estimado, 'eur')}
         </span>
       </div>
@@ -1019,7 +1025,7 @@ function BloquePropuesta({ b }) {
           <li key={cap.id}>
             <div className="ag-propuesta-cap">
               <span>
-                <span className="tnum text-muted">{cap.id}</span> {cap.nombre}
+                <span className="tnum text-flp-muted">{cap.id}</span> {cap.nombre}
               </span>
               <strong className="tnum">{formatear(cap.total, 'eur')}</strong>
             </div>
@@ -1027,14 +1033,14 @@ function BloquePropuesta({ b }) {
               {cap.lineas.map((l) => (
                 <li key={l.id}>
                   <div className="min-w-0">
-                    <span className="font-semibold text-ink">{l.concepto}</span>
-                    {l.detalle && <span className="text-muted"> · {l.detalle}</span>}
-                    <span className="block text-xs text-muted">
-                      {l.proveedor} · <span className={l.origen === 'Confirmado por teléfono' ? 'font-semibold text-positive' : ''}>{l.origen}</span>
+                    <span className="font-semibold text-flp-ink">{l.concepto}</span>
+                    {l.detalle && <span className="text-flp-muted"> · {l.detalle}</span>}
+                    <span className="block text-xs text-flp-muted">
+                      {l.proveedor} · <span className={l.origen === 'Confirmado por teléfono' ? 'font-semibold text-flp-success' : ''}>{l.origen}</span>
                       {l.anterior && <> · antes {l.anterior.proveedor}, <s className="tnum">{formatear(l.anterior.importe, 'eur')}</s></>}
                     </span>
                   </div>
-                  <span className="tnum font-bold text-ink">{formatear(l.importe, 'eur')}</span>
+                  <span className="tnum font-semibold text-flp-ink">{formatear(l.importe, 'eur')}</span>
                 </li>
               ))}
               {cap.porDetallar > 0 && (
@@ -1049,7 +1055,7 @@ function BloquePropuesta({ b }) {
         <li>
           <button type="button" className="ag-propuesta-cap is-boton" onClick={() => setVerEstimados((x) => !x)} aria-expanded={verEstimados}>
             <span>
-              {soloEstimados.length} capítulos aún sin detallar <span className="text-muted">· estimados por el reparto ICAA</span>
+              {soloEstimados.length} capítulos aún sin detallar <span className="text-flp-muted">· estimados por el reparto ICAA</span>
             </span>
             <strong className="tnum">{formatear(estimadoResto, 'eur')}</strong>
             <IconChevronDown size={16} className={verEstimados ? 'rotate-180' : ''} aria-hidden="true" />
@@ -1106,10 +1112,10 @@ function BloqueLlamada({ b }) {
     return (
       <section className="ag-llamada" aria-label={`Llamada a ${a.proveedor}`}>
         <header className="ag-llamada-cab">
-          <AgentTile id="proveedores" size={32} />
+          <AgentAvatar id="proveedores" size={32} />
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-extrabold text-ink">Llamada a {a.proveedor}</h4>
-            <p className="text-xs text-muted">
+            <h4 className="text-sm font-semibold text-flp-ink">Llamada a {a.proveedor}</h4>
+            <p className="text-xs text-flp-muted">
               {r.cumple ? `Confirma ${formatear(r.precioFinal, 'eur')} y cumple los requisitos` : `No cumple: ${r.motivo}`} · {a.llamada.duracion}
             </p>
           </div>
@@ -1130,10 +1136,10 @@ function BloqueLlamada({ b }) {
   return (
     <section className="ag-llamada" aria-label={`Llamada a ${a.proveedor}`}>
       <header className="ag-llamada-cab">
-        <AgentTile id="proveedores" size={32} trabajando={!terminada} />
+        <AgentAvatar id="proveedores" size={32} trabajando={!terminada} />
         <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-extrabold text-ink">Llamada a {a.proveedor}</h4>
-          <p className="text-xs text-muted">
+          <h4 className="text-sm font-semibold text-flp-ink">Llamada a {a.proveedor}</h4>
+          <p className="text-xs text-flp-muted">
             {linea.concepto} · alternativa a {linea.anterior?.proveedor ?? linea.proveedor} · simulada: no se llama a nadie
           </p>
         </div>
@@ -1173,13 +1179,13 @@ function BloqueLlamada({ b }) {
           </ul>
           {terminada && (
             <div className={`ag-llamada-resultado ${r.cumple ? 'is-ok' : 'is-ko'}`}>
-              <span className="text-xs font-bold text-muted">Precio final confirmado</span>
+              <span className="text-xs font-semibold text-flp-muted">Precio final confirmado</span>
               <strong className="tnum">{formatear(r.precioFinal, 'eur')}</strong>
-              <span className="text-xs text-muted">
+              <span className="text-xs text-flp-muted">
                 Tarifa {formatear(a.referencia, 'eur')}
                 {r.extras.map((e) => ` + ${e.concepto.toLowerCase()} ${formatear(e.importe, 'eur')}`).join('')}
               </span>
-              <span className="mt-1 text-sm font-semibold text-ink">{r.cumple ? 'Cumple todos los requisitos' : `No cumple: ${r.motivo}`}</span>
+              <span className="mt-1 text-sm font-semibold text-flp-ink">{r.cumple ? 'Cumple todos los requisitos' : `No cumple: ${r.motivo}`}</span>
             </div>
           )}
         </div>
@@ -1225,26 +1231,26 @@ export function RadarRiesgos({ compacto = false }) {
         <li key={r.id} className={`ag-radar-item is-${r.severidad}`}>
           <div className="flex flex-wrap items-center gap-2">
             <ChipSeveridad severidad={r.severidad} />
-            <span className="text-xs font-bold text-muted">{r.tipo}</span>
+            <span className="text-xs font-semibold text-flp-muted">{r.tipo}</span>
             {ESTADO_RIESGO[r.estado] && (
-              <span className="text-xs font-semibold text-ink">
+              <span className="text-xs font-semibold text-flp-ink">
                 · {ESTADO_RIESGO[r.estado]}
                 {r.estado === 'reservado' && r.reservaAprobada ? ` ${formatear(r.reservaAprobada, 'eur')}` : ''}
                 {r.reservaCorta ? ` · se queda corta (${formatear(r.reserva, 'eur')})` : ''}
               </span>
             )}
           </div>
-          <strong className="mt-1 block text-sm text-ink">
+          <strong className="mt-1 block text-sm text-flp-ink">
             <Tx value={r.titulo} />
           </strong>
-          <span className="block text-xs text-muted">
+          <span className="block text-xs text-flp-muted">
             {r.jornadas.length > 1 ? `Jornadas ${r.jornadas.join(' y ')}` : `Jornada ${r.jornadas[0]}`} · {fechaLarga(r.fecha)} · {r.dias === 1 ? 'mañana' : `en ${formatear(r.dias, 'dias')}`}
             {r.probabilidad != null && ` · lluvia ${formatear(r.probabilidad, 'pct0')}`}
             {r.exposicion != null && r.exposicion > 0 && ` · exposición máxima ${formatear(r.exposicion, 'eur')}`}
             {r.exposicion == null && ' · impacto por estimar'}
           </span>
           {!compacto && (
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-sm text-flp-muted">
               <Tx value={r.respuesta} />
             </p>
           )}
@@ -1260,7 +1266,7 @@ export function RadarRiesgos({ compacto = false }) {
 function BloqueRiesgos() {
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-muted">Riesgos de producción · en vivo</span>}>Radar de riesgos</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Riesgos de producción · en vivo</span>}>Radar de riesgos</Titulo>
       <RadarRiesgos />
     </div>
   )
@@ -1274,10 +1280,10 @@ function BloquePlan() {
   const semanas = [...new Set(mundo.rodaje.jornadas.map((j) => j.semana))]
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-muted">Plan de ejemplo</span>}>Próximas jornadas</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Plan de ejemplo</span>}>Próximas jornadas</Titulo>
       {semanas.map((sem) => (
         <section key={sem} className="mt-3 first:mt-0" aria-label={sem}>
-          <h5 className="mb-1.5 text-xs font-bold text-muted">{sem}</h5>
+          <h5 className="mb-1.5 text-xs font-semibold text-flp-muted">{sem}</h5>
           <ol className="ag-plan">
             {mundo.rodaje.jornadas
               .filter((j) => j.semana === sem)
@@ -1291,7 +1297,7 @@ function BloquePlan() {
                     </span>
                     <span className="min-w-0">
                       <span className="ag-plan-loc">{j.localizacion}</span>
-                      <span className="block text-xs text-muted">
+                      <span className="block text-xs text-flp-muted">
                         {j.tipo === 'EXT' ? 'Exterior' : 'Interior'} · {j.franja.toLowerCase()}
                       </span>
                     </span>

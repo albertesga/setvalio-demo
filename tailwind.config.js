@@ -46,11 +46,29 @@ export default {
         'negative-soft': '#FBEAEC',
         line: 'rgb(49 27 46 / 0.18)',
         'line-strong': '#9A8492',
+        // Filmpilot (portada y agentes). Identidad en hex para admitir opacidad;
+        // los semánticos leen las variables de src/brand/filmpilot.css y cambian en .flp-dark.
+        flp: {
+          carbon: '#141414',
+          signal: '#FFE24A',
+          chalk: '#F5F4EF',
+          silver: '#B7BAB7',
+          ink: 'var(--flp-text)',
+          bg: 'var(--flp-bg)',
+          surface: 'var(--flp-surface)',
+          muted: 'var(--flp-muted)',
+          line: 'var(--flp-border)',
+          control: 'var(--flp-control-border)',
+          error: 'var(--flp-error)',
+          success: 'var(--flp-success)',
+        },
       },
       fontFamily: {
         sans: ['Manrope', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
         display: ['Manrope', 'system-ui', 'sans-serif'],
         editorial: ['Newsreader', 'Georgia', 'serif'],
+        'flp-sans': ['Instrument Sans', 'Arial', 'sans-serif'],
+        'flp-mono': ['Geist Mono', 'Courier New', 'monospace'],
       },
       borderRadius: {
         sm: '6px',
@@ -58,6 +76,9 @@ export default {
         lg: '8px',
         xl: '10px',
         '2xl': '10px',
+        'flp-sm': '6px',
+        'flp-md': '16px',
+        'flp-lg': '24px',
       },
       fontSize: {
         // Única medida custom en uso. La escala semántica (display/h1/h2/h3/h4/

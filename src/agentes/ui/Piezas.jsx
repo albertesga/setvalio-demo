@@ -1,8 +1,10 @@
 // Piezas pequeñas de la interfaz de agentes: identidad, autonomía, estado y texto.
+// Marca Filmpilot: cada agente lleva el glifo de su familia y su nombre al lado;
+// el Orquestador, el símbolo. El estado usa el vocabulario de la marca.
 
-import { useEffect, useRef } from 'react'
-import { SetvalioMark } from '../../components/Brand.jsx'
-import { IconCheck, IconClock, IconAlert, IconClose } from '../../components/icons.jsx'
+import { useEffect, useId, useRef, useState } from 'react'
+import { AgentGlyph, FilmpilotSymbol } from '../../brand/Filmpilot.jsx'
+import { IconCheck, IconClock, IconAlert, IconClose, IconChevronDown } from '../../components/icons.jsx'
 import { AGENTES, AUTONOMIA } from '../agentes.js'
 import { segmentos } from '../texto.js'
 
@@ -14,11 +16,11 @@ export function Tx({ value, className = '' }) {
     <span className={className}>
       {segs.map((s, i) =>
         s.esNumero ? (
-          <strong key={i} className="tnum font-bold text-ink">
+          <strong key={i} className="tnum font-semibold text-flp-ink">
             {s.texto}
           </strong>
         ) : s.esValor ? (
-          <span key={i} className="font-semibold text-ink">
+          <span key={i} className="font-medium text-flp-ink">
             {s.texto}
           </span>
         ) : (
@@ -29,22 +31,42 @@ export function Tx({ value, className = '' }) {
   )
 }
 
-/** Baldosa del agente: código de dos letras en ciruela. El Orquestador lleva el símbolo. */
-export function AgentTile({ id, size = 32, trabajando = false, esperando = false, className = '' }) {
+/** «Facturas, Conciliación y 3 más»: nombres en lugar de una pila de avatares. */
+export function nombresCortos(nombres, max = 2) {
+  if (nombres.length <= max + 1) return nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres.join('')
+  return `${nombres.slice(0, max).join(', ')} y ${nombres.length - max} más`
+}
+
+/**
+ * Avatar del agente: glifo de su familia en carbón. Fondo señal cuando tiene
+ * algo «Por revisar»; el Orquestador, símbolo tiza sobre carbón.
+ */
+export function AgentAvatar({ id, size = 32, trabajando = false, revisar = false, className = '' }) {
   const a = AGENTES[id]
   if (!a) return null
   const dim = { width: size, height: size }
   if (id === 'orquestador') {
     return (
-      <span className={`ag-tile ag-tile--orq ${trabajando ? 'is-working' : ''} ${className}`} style={dim} aria-hidden="true">
-        <SetvalioMark size={Math.round(size * 0.62)} light />
+      <span className={`ag-avatar ag-avatar--orq ${trabajando ? 'is-working' : ''} ${className}`} style={dim} aria-hidden="true">
+        <FilmpilotSymbol size={Math.round(size * 0.62)} />
       </span>
     )
   }
   return (
-    <span className={`ag-tile ${trabajando ? 'is-working' : ''} ${className}`} style={dim} aria-hidden="true">
-      <span className="ag-tile-code">{a.codigo}</span>
-      {esperando && <span className="ag-tile-wait"><IconClock size={10} strokeWidth={2.6} /></span>}
+    <span className={`ag-avatar ${trabajando ? 'is-working' : ''} ${revisar ? 'is-review' : ''} ${className}`} style={dim} aria-hidden="true">
+      <AgentGlyph family={a.familia} size={Math.round(size * 0.8)} />
+    </span>
+  )
+}
+
+/** Avatar y nombre juntos: el glifo es de la familia, el nombre identifica al agente. */
+export function AgentLabel({ id, size = 24, trabajando = false, className = '' }) {
+  const a = AGENTES[id]
+  if (!a) return null
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
+      <AgentAvatar id={id} size={size} trabajando={trabajando} />
+      <span className="truncate text-sm font-medium text-flp-ink">{a.nombre}</span>
     </span>
   )
 }
@@ -69,33 +91,60 @@ export function AutonomyBadge({ nivel, compacto = false }) {
   )
 }
 
+// Vocabulario de la marca: En espera · Trabajando · Por revisar · Completado.
 const ESTADOS = {
-  en_cola: { etiqueta: 'En cola', tono: 'neutral' },
-  en_curso: { etiqueta: 'En curso', tono: 'info' },
-  hecho: { etiqueta: 'Hecho', tono: 'positive', Icon: IconCheck },
-  detenido: { etiqueta: 'Detenido', tono: 'neutral', Icon: IconClose },
-  pendiente: { etiqueta: 'Pendiente de decisión', tono: 'warning', Icon: IconClock },
-  bloqueante: { etiqueta: 'Bloqueante', tono: 'negative', Icon: IconAlert },
+  en_cola: { etiqueta: 'En espera', marca: 'idle' },
+  en_curso: { etiqueta: 'Trabajando', marca: 'working' },
+  hecho: { etiqueta: 'Completado', marca: 'done', Icon: IconCheck },
+  detenido: { etiqueta: 'Detenido', marca: 'stopped', Icon: IconClose },
+  pendiente: { etiqueta: 'Por revisar', marca: 'review', Icon: IconClock },
+  bloqueante: { etiqueta: 'Bloqueante', marca: 'error', Icon: IconAlert },
 }
 
 /** Estado con icono y texto: nunca solo color. */
 export function StatusChip({ estado, etiqueta, className = '' }) {
-  const e = ESTADOS[estado] ?? { etiqueta: etiqueta ?? estado, tono: 'neutral' }
+  const e = ESTADOS[estado] ?? { etiqueta: etiqueta ?? estado, marca: 'idle' }
   const Icon = e.Icon
   return (
-    <span className={`ag-chip ag-chip--${e.tono} ${className}`}>
-      {estado === 'en_curso' ? <span className="ag-spinner" aria-hidden="true" /> : Icon ? <Icon size={12} strokeWidth={2.6} aria-hidden="true" /> : <span className="ag-chip-dot" aria-hidden="true" />}
+    <span className={`ag-chip flp-state flp-state--${e.marca} ${className}`}>
+      {estado === 'en_curso' ? <span className="ag-spinner" aria-hidden="true" /> : Icon ? <Icon size={12} strokeWidth={2.4} aria-hidden="true" /> : <span className="flp-state-dot" aria-hidden="true" />}
       {etiqueta ?? e.etiqueta}
     </span>
   )
 }
 
+// Tonos de las etiquetas: «warning» es lo que espera una revisión (señal).
+const TONOS = { neutral: '', info: '', positive: 'flp-state--done', negative: 'flp-state--error', warning: 'flp-state--review' }
+
 export function Tono({ tono = 'neutral', children, className = '' }) {
-  return <span className={`ag-chip ag-chip--${tono} ${className}`}>{children}</span>
+  return <span className={`ag-chip flp-state ${TONOS[tono] ?? ''} ${className}`}>{children}</span>
+}
+
+/** Bloque plegable accesible: un botón con aria-expanded y su contenido. */
+export function Desplegable({ titulo, resumen, nivel = 2, abiertoInicial = false, className = '', children }) {
+  const [abierto, setAbierto] = useState(abiertoInicial)
+  const id = `pl-${useId().replace(/:/g, '')}`
+  const H = `h${nivel}`
+  return (
+    <section className={`ag-desplegable ${className}`}>
+      <H className="m-0">
+        <button type="button" className="ag-desplegable-boton" aria-expanded={abierto} aria-controls={id} onClick={() => setAbierto((v) => !v)}>
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block text-sm font-semibold text-flp-ink">{titulo}</span>
+            {resumen && <span className="block text-xs text-flp-muted">{resumen}</span>}
+          </span>
+          <IconChevronDown size={18} className={`flex-none transition-transform ${abierto ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </button>
+      </H>
+      <div id={id} className={`ag-plegable ${abierto ? 'is-open' : ''}`} inert={abierto ? undefined : ''} aria-hidden={!abierto || undefined}>
+        <div className="ag-plegable-dentro">{children}</div>
+      </div>
+    </section>
+  )
 }
 
 /** Panel lateral o inferior con trampa de foco y Escape. */
-export function Hoja({ abierta, onCerrar, titulo, lado = 'abajo', children, id }) {
+export function Hoja({ abierta, onCerrar, titulo, subtitulo, lado = 'abajo', children, id }) {
   const ref = useRef(null)
   const cerrarRef = useRef(null)
   // El efecto depende solo de «abierta»: si dependiera de onCerrar, cada render movería el foco.
@@ -108,7 +157,7 @@ export function Hoja({ abierta, onCerrar, titulo, lado = 'abajo', children, id }
     const onKey = (e) => {
       if (e.key === 'Escape') onCerrarRef.current()
       if (e.key !== 'Tab') return
-      const f = ref.current?.querySelectorAll('button:not([disabled]), select, textarea, input, a[href], [tabindex]:not([tabindex="-1"])')
+      const f = ref.current?.querySelectorAll('button:not([disabled]), select, textarea, input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')
       if (!f?.length) return
       const first = f[0]
       const last = f[f.length - 1]
@@ -133,8 +182,11 @@ export function Hoja({ abierta, onCerrar, titulo, lado = 'abajo', children, id }
       <div ref={ref} id={id} className="ag-hoja-panel" role="dialog" aria-modal="true" aria-label={titulo}>
         <div className="ag-hoja-cabecera">
           {lado === 'abajo' && <span className="ag-hoja-asa" aria-hidden="true" />}
-          <h2 className="text-base font-extrabold text-ink">{titulo}</h2>
-          <button ref={cerrarRef} type="button" onClick={onCerrar} className="ag-icon-button" aria-label="Cerrar">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-flp-ink">{titulo}</h2>
+            {subtitulo && <p className="text-xs text-flp-muted">{subtitulo}</p>}
+          </div>
+          <button ref={cerrarRef} type="button" onClick={onCerrar} className="ag-icon-button flex-none" aria-label="Cerrar">
             <IconClose size={18} />
           </button>
         </div>

@@ -1,126 +1,34 @@
-// Prototipo conversacional: los agentes de SetValio trabajan sobre «La última función».
+// Prototipo conversacional: los agentes de Filmpilot trabajan sobre «La última función».
 // Motor simulado y guionizado (src/agentes/): sin modelo de lenguaje y con datos de ejemplo.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../agentes/agentes.css'
-import { BrandLockup, SetvalioMark } from '../components/Brand.jsx'
-import { IconBell, IconMenu, IconMore, IconArrowLeft, IconPlay } from '../components/icons.jsx'
-import { useAgentes, RITMOS } from '../agentes/useAgentes.js'
+import { useAgentes } from '../agentes/useAgentes.js'
 import { personaDe, estadoTour } from '../agentes/sesion.js'
-import { PERSONAS } from '../agentes/mundo.js'
 import { CASOS } from '../agentes/casos.js'
-import * as c from '../agentes/calculos.js'
 import { AgentesCtx } from '../agentes/ui/contexto.js'
-import { Hoja } from '../agentes/ui/Piezas.jsx'
+import { Hoja, Desplegable } from '../agentes/ui/Piezas.jsx'
 import { Mensaje } from '../agentes/ui/Mensajes.jsx'
 import { decisionesAbiertas } from '../agentes/ui/Bloques.jsx'
 import { Inicio, Sugerencias, Redactor, BarraRecorrido } from '../agentes/ui/Conversacion.jsx'
-import { AgentRail, CasosTracker, DetalleAgente, PanelActividad, PanelDecisiones, PanelRiesgos, estadoAgentes } from '../agentes/ui/Paneles.jsx'
+import { Cabecera, OpcionesDemo } from '../agentes/ui/Cabecera.jsx'
+import { AgentesPorFamilia, CasosTracker, DetalleAgente, PanelActividad, PanelDecisiones, PanelRiesgos, estadoAgentes, casosVistos } from '../agentes/ui/Paneles.jsx'
 import { riesgosAltos } from '../agentes/rodaje.js'
 
-function useTema() {
+// La pantalla ocupa el alto visible y desplaza sus columnas por dentro: el documento no se mueve.
+// (El color del navegador lo fija App.jsx según la ruta.)
+function useBloqueoScroll() {
   useEffect(() => {
-    const meta = document.querySelector('meta[name="theme-color"]')
-    const original = meta?.getAttribute('content')
-    meta?.setAttribute('content', '#F4F1E8')
-    // La pantalla ocupa el alto visible y desplaza sus columnas por dentro: el documento no se mueve.
     const html = document.documentElement
     const previos = [html.style.overflow, document.body.style.overflow]
     html.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
     window.scrollTo(0, 0)
     return () => {
-      if (original != null) meta?.setAttribute('content', original)
       html.style.overflow = previos[0]
       document.body.style.overflow = previos[1]
     }
   }, [])
-}
-
-function PildoraDemo() {
-  const [abierta, setAbierta] = useState(false)
-  const ref = useRef(null)
-  useEffect(() => {
-    if (!abierta) return
-    const fuera = (e) => {
-      if (!ref.current?.contains(e.target)) setAbierta(false)
-    }
-    const esc = (e) => e.key === 'Escape' && setAbierta(false)
-    document.addEventListener('mousedown', fuera)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', fuera)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [abierta])
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" className="ag-demo-pill" aria-expanded={abierta} aria-controls="ag-demo-info" onClick={() => setAbierta((v) => !v)}>
-        Demo · agentes simulados
-      </button>
-      {abierta && (
-        <div id="ag-demo-info" className="ag-popover" role="dialog" aria-label="Sobre esta demo">
-          <p>
-            Esta pantalla es una demostración. Los agentes siguen guiones preparados sobre datos de ejemplo de «La última función» (Candilejas Films). No hay un modelo de lenguaje detrás, no se conecta a bancos y no se envía ningún correo.
-          </p>
-          <p className="mt-2">Las cifras salen de los datos de la demo y de sus reglas de cálculo. Lo marcado como «Exploratorio» o «Fase posterior» no forma parte del alcance decidido.</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MenuMas({ ritmo, setRitmo, onReiniciar, onNavigate }) {
-  const [abierto, setAbierto] = useState(false)
-  const ref = useRef(null)
-  const botonRef = useRef(null)
-  useEffect(() => {
-    if (!abierto) return
-    const fuera = (e) => {
-      if (!ref.current?.contains(e.target)) setAbierto(false)
-    }
-    const esc = (e) => {
-      if (e.key !== 'Escape') return
-      setAbierto(false)
-      botonRef.current?.focus()
-    }
-    document.addEventListener('mousedown', fuera)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', fuera)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [abierto])
-  return (
-    <div ref={ref} className="relative">
-      <button ref={botonRef} type="button" className="ag-icon-button" aria-label="Más opciones" aria-expanded={abierto} aria-controls="ag-mas-opciones" onClick={() => setAbierto((v) => !v)}>
-        <IconMore size={20} />
-      </button>
-      {abierto && (
-        <div id="ag-mas-opciones" className="ag-popover ag-popover--menu">
-          <label className="block px-3 pb-1 pt-2 text-xs font-bold text-muted" htmlFor="ag-ritmo">
-            Ritmo de los agentes
-          </label>
-          <select id="ag-ritmo" className="fp-input mx-3 mb-2 w-[calc(100%-1.5rem)] px-2 text-sm" value={ritmo} onChange={(e) => setRitmo(e.target.value)}>
-            {Object.entries(RITMOS).map(([k, r]) => (
-              <option key={k} value={k}>
-                {r.etiqueta}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="ag-menu-item" onClick={() => { setAbierto(false); onNavigate('panel') }}>
-            Abrir la demo clásica
-          </button>
-          <button type="button" className="ag-menu-item" onClick={() => { setAbierto(false); onNavigate('landing') }}>
-            Volver a la portada
-          </button>
-          <button type="button" className="ag-menu-item text-negative" onClick={() => { setAbierto(false); onReiniciar() }}>
-            Reiniciar la demo
-          </button>
-        </div>
-      )}
-    </div>
-  )
 }
 
 function Anunciador({ s }) {
@@ -147,14 +55,14 @@ function Anunciador({ s }) {
 }
 
 export default function Agentes({ onNavigate, contexto, pushToast }) {
-  useTema()
+  useBloqueoScroll()
   const [ritmo, setRitmo] = useState('normal')
   const { s, despachar } = useAgentes({ ritmo })
   const persona = personaDe(s)
   const ocupado = !!s.activo
   const tour = estadoTour(s)
-  const [hoja, setHoja] = useState(null) // 'actividad' | 'menu'
-  const [pestana, setPestana] = useState('actividad')
+  const [hoja, setHoja] = useState(null) // 'actividad' | 'demo'
+  const [pestana, setPestana] = useState('revisar')
   const [agenteAbierto, setAgenteAbierto] = useState(null)
   const scrollRef = useRef(null)
   const finRef = useRef(null)
@@ -258,8 +166,9 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     const base = [...ultimoAgentes.turno.sugerencias]
     const textos = new Set(base.map((x) => x.texto))
     const sinVer = CASOS.find((x) => !s.casosVistos.includes(x.id) && !textos.has(x.prompt))
-    if (sinVer && base.length < 4) base.push({ etiqueta: sinVer.prompt, texto: sinVer.prompt })
-    return base.slice(0, 4)
+    // Tres como mucho: el pie no debe comerse la conversación.
+    if (sinVer && base.length < 3) base.push({ etiqueta: sinVer.prompt, texto: sinVer.prompt })
+    return base.slice(0, 3)
   }, [ultimoAgentes, s.casosVistos])
 
   const ctx = { mundo: s.mundo, persona, despachar, enviar, enviarEntrada, decidir, onNavigate, avisar, ocupado, deshacible: s.ultimaMutacion?.mensajeId }
@@ -271,10 +180,10 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
 
   const panelDerecho = (pref) => (
     <>
-      <div className="ag-tabs" role="tablist" aria-label="Panel de agentes">
+      <div className="ag-tabs" role="tablist" aria-label="Por revisar, actividad y riesgos">
         {[
+          ['revisar', 'Por revisar', pendientes],
           ['actividad', 'Actividad', s.novedades],
-          ['decisiones', 'Decisiones', pendientes],
           ['riesgos', 'Riesgos', altos],
           ['casos', 'Casos', null],
         ].map(([id, etiqueta, n]) => (
@@ -306,81 +215,37 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             }}
           >
             {etiqueta}
-            {n ? <span className="ag-tab-n tnum">{n}</span> : null}
+            {n ? <span className={`ag-tab-n tnum ${id === 'revisar' ? 'is-revisar' : ''}`}>{n}</span> : null}
           </button>
         ))}
       </div>
       <div id={`${pref}-tabpanel-${pestana}`} role="tabpanel" aria-labelledby={`${pref}-tab-${pestana}`} className="ag-panel-scroll">
         {pestana === 'actividad' && <PanelActividad s={s} />}
-        {pestana === 'decisiones' && <PanelDecisiones s={s} />}
+        {pestana === 'revisar' && <PanelDecisiones s={s} />}
         {pestana === 'riesgos' && <PanelRiesgos s={s} />}
         {pestana === 'casos' && <CasosTracker vistos={s.casosVistos} />}
       </div>
     </>
   )
 
+  const vistos = casosVistos(s.casosVistos)
+
   return (
     <AgentesCtx.Provider value={ctx}>
-      <div className="ag-app">
+      <div className="ag-app flp-theme">
         <a href="#ag-entrada" className="ag-skip">
           Ir al campo de mensaje
         </a>
-        <header className="ag-header">
-          <button type="button" className="ag-header-marca" onClick={() => onNavigate('landing')} aria-label="SetValio, volver a la portada">
-            <span className="hidden sm:inline-flex">
-              <BrandLockup compact decorative />
-            </span>
-            <span className="sm:hidden">
-              <SetvalioMark size={30} />
-            </span>
-          </button>
-          <span className="ag-header-sep hidden md:block" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-extrabold text-ink">
-              Agentes <span className="font-semibold text-muted">· {s.mundo.proyecto.titulo}</span>
-            </p>
-            <p className="truncate text-xs text-muted">
-              Rodaje, día {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje}
-              <span className="ag-solo-compacto"> · demo simulada</span>
-            </p>
-          </div>
-          <div className="ag-header-acciones">
-            <PildoraDemo />
-            {!s.tour && (
-              <button type="button" className="ag-boton-fila" onClick={() => despachar({ tipo: 'tour/iniciar' })} disabled={ocupado}>
-                <IconPlay size={14} aria-hidden="true" /> Recorrido guiado
-              </button>
-            )}
-            <label className="sr-only" htmlFor="ag-persona">
-              Ver como
-            </label>
-            <select id="ag-persona" className="ag-select" value={s.persona} onChange={(e) => despachar({ tipo: 'persona', persona: e.target.value })}>
-              {Object.values(PERSONAS).map((p) => (
-                <option key={p.id} value={p.id}>
-                  Ver como: {p.nombre} · {p.rol}
-                </option>
-              ))}
-            </select>
-            <MenuMas ritmo={ritmo} setRitmo={setRitmo} onReiniciar={() => despachar({ tipo: 'reiniciar' })} onNavigate={onNavigate} />
-          </div>
-          <div className="ag-header-movil">
-            <button type="button" className="ag-icon-button relative" aria-label={`Actividad, decisiones y riesgos${s.novedades ? `, ${s.novedades} novedades` : pendientes ? `, ${pendientes} decisiones pendientes` : ''}`} onClick={() => abrirHoja('actividad')}>
-              <IconBell size={20} />
-              {(s.novedades > 0 || pendientes > 0) && <span className="ag-badge tnum">{s.novedades || pendientes}</span>}
-            </button>
-            <button type="button" className="ag-icon-button" aria-label="Menú: agentes, casos y opciones" onClick={() => abrirHoja('menu')}>
-              <IconMenu size={20} />
-            </button>
-          </div>
-        </header>
+        <Cabecera s={s} persona={persona} pendientes={pendientes} onPortada={() => onNavigate('landing')} onActividad={() => abrirHoja('actividad')} onDemo={() => setHoja('demo')} />
 
         <div className="ag-cuerpo">
-          <aside className="ag-col-izq" aria-label="Agentes y casos de uso">
+          <aside className="ag-col-izq" aria-label="Agentes">
             <div className="ag-panel-scroll">
-              <h2 className="mb-2 text-xs font-bold text-muted">Agentes</h2>
-              <AgentRail estados={estados} onAbrir={setAgenteAbierto} />
-              <div className="mt-6 border-t border-line pt-4">
-                <CasosTracker vistos={s.casosVistos} />
+              <AgentesPorFamilia estados={estados} onAbrir={setAgenteAbierto} />
+              <div className="mt-5 border-t border-flp-line pt-1">
+                <Desplegable titulo="Casos de uso" resumen={`${vistos} de ${CASOS.length} vistos`}>
+                  <CasosTracker vistos={s.casosVistos} cabecera={false} />
+                </Desplegable>
               </div>
             </div>
           </aside>
@@ -390,9 +255,9 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             <div ref={scrollRef} className="ag-scroll" onScroll={onScroll} onWheel={soltar} onTouchMove={() => (anclado.current = false)} onKeyDown={soltar}>
               <div className="ag-hilo">
                 {s.mensajes.length === 0 ? (
-                  <Inicio persona={persona} onAbrirAgente={setAgenteAbierto} onRecorrido={() => despachar({ tipo: 'tour/iniciar' })} />
+                  <Inicio persona={persona} estados={estados} onAbrirAgente={setAgenteAbierto} onRecorrido={() => despachar({ tipo: 'tour/iniciar' })} />
                 ) : (
-                  <section aria-label="Mensajes" className="space-y-5">
+                  <section aria-label="Mensajes" className="space-y-6">
                     {s.mensajes.map((m, i) => (
                       <Mensaje key={m.id} msg={m} ultimo={i === s.mensajes.length - 1} />
                     ))}
@@ -402,7 +267,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
               </div>
             </div>
             <div className="ag-pie">
-            {nuevos && !cerca && (
+              {nuevos && !cerca && (
                 <button
                   type="button"
                   className="ag-nuevos"
@@ -431,87 +296,27 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             </div>
           </main>
 
-          <aside className="ag-col-der" aria-label="Actividad, decisiones y riesgos">
+          <aside className="ag-col-der" aria-label="Por revisar, actividad y riesgos">
             {panelDerecho('lateral')}
           </aside>
         </div>
 
-        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Actividad, decisiones y riesgos" id="ag-hoja-actividad">
+        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Por revisar, actividad y riesgos" id="ag-hoja-actividad">
           {hoja === 'actividad' && panelDerecho('hoja')}
         </Hoja>
 
-        <Hoja abierta={hoja === 'menu'} onCerrar={cerrarHoja} titulo="Agentes y opciones" id="ag-hoja-menu">
-          <div className="space-y-5">
-            <PildoraDemo />
-            {!s.tour && (
-              <button
-                type="button"
-                className="ag-boton-fila w-full justify-center"
-                disabled={ocupado}
-                onClick={() => {
-                  setHoja(null)
-                  despachar({ tipo: 'tour/iniciar' })
-                }}
-              >
-                <IconPlay size={14} aria-hidden="true" /> Recorrido guiado
-              </button>
-            )}
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted" htmlFor="ag-persona-m">
-                Ver como
-              </label>
-              <select id="ag-persona-m" className="ag-select w-full" value={s.persona} onChange={(e) => despachar({ tipo: 'persona', persona: e.target.value })}>
-                {Object.values(PERSONAS).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} · {p.rol}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted" htmlFor="ag-ritmo-m">
-                Ritmo de los agentes
-              </label>
-              <select id="ag-ritmo-m" className="ag-select w-full" value={ritmo} onChange={(e) => setRitmo(e.target.value)}>
-                {Object.entries(RITMOS).map(([k, r]) => (
-                  <option key={k} value={k}>
-                    {r.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <h3 className="mb-2 text-xs font-bold text-muted">Agentes</h3>
-              <AgentRail
-                estados={estados}
-                onAbrir={(id) => {
-                  setHoja(null)
-                  setAgenteAbierto(id)
-                }}
-              />
-            </div>
-            <div className="border-t border-line pt-4">
-              <CasosTracker vistos={s.casosVistos} />
-            </div>
-            <div className="flex flex-col gap-1 border-t border-line pt-4">
-              <button type="button" className="ag-menu-item" onClick={() => onNavigate('panel')}>
-                Abrir la demo clásica
-              </button>
-              <button type="button" className="ag-menu-item" onClick={() => onNavigate('landing')}>
-                <IconArrowLeft size={16} aria-hidden="true" /> Volver a la portada
-              </button>
-              <button
-                type="button"
-                className="ag-menu-item text-negative"
-                onClick={() => {
-                  setHoja(null)
-                  despachar({ tipo: 'reiniciar' })
-                }}
-              >
-                Reiniciar la demo
-              </button>
-            </div>
-          </div>
+        <Hoja abierta={hoja === 'demo'} onCerrar={cerrarHoja} titulo="Opciones de la demo" subtitulo={`Ves la demo como ${persona.nombre} · ${persona.rol}`} id="ag-hoja-demo">
+          <OpcionesDemo
+            s={s}
+            despachar={despachar}
+            ritmo={ritmo}
+            setRitmo={setRitmo}
+            ocupado={ocupado}
+            estados={estados}
+            onNavigate={onNavigate}
+            onCerrar={cerrarHoja}
+            onAbrirAgente={setAgenteAbierto}
+          />
         </Hoja>
 
         <DetalleAgente id={agenteAbierto} onCerrar={cerrarAgente} />

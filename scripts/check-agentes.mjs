@@ -19,7 +19,7 @@ import { reducir } from '../src/agentes/acciones.js'
 import { detectarIntencion } from '../src/agentes/intenciones.js'
 import { responder } from '../src/agentes/orquestador.js'
 import { ESCENARIOS } from '../src/agentes/escenarios/index.js'
-import { AGENTES, AUTONOMIA } from '../src/agentes/agentes.js'
+import { AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, ORDEN_AGENTES, agentesDeFamilia } from '../src/agentes/agentes.js'
 import { CASOS, RECORRIDO, CASO_DE_INTENCION } from '../src/agentes/casos.js'
 import { crearSesion, reducirSesion, estadoTour } from '../src/agentes/sesion.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
@@ -781,6 +781,21 @@ test('ningún guion de riesgos pasa números escritos a mano como valor', () => 
     const malos = src.match(/\bv\(\s*\d[\d_]*\s*[,)]/g)
     assert.ok(!malos, `${u.pathname.split('/').pop()}: ${malos}`)
   }
+})
+test('cada agente pertenece a una familia de la marca y el Orquestador a ninguna', () => {
+  assert.deepEqual(Object.keys(FAMILIAS).sort(), [...ORDEN_FAMILIAS].sort())
+  for (const id of ORDEN_AGENTES) {
+    const f = AGENTES[id].familia
+    if (id === 'orquestador') assert.equal(f, null, 'el Orquestador lleva el símbolo, no un glifo')
+    else assert.ok(FAMILIAS[f], `${id}: familia desconocida ${f}`)
+  }
+  assert.equal(ORDEN_FAMILIAS.flatMap(agentesDeFamilia).length, ORDEN_AGENTES.length - 1, 'todo agente sale en el carril, salvo el Orquestador')
+  for (const f of ORDEN_FAMILIAS) assert.ok(agentesDeFamilia(f).length > 0, `${f}: familia vacía`)
+})
+test('el texto de los agentes no menciona la marca anterior', () => {
+  const dir = new URL('../src/agentes/', import.meta.url)
+  const ficheros = readdirSync(dir, { recursive: true }).filter((f) => /\.(js|jsx)$/.test(f))
+  for (const f of ficheros) assert.ok(!/SetValio/i.test(readFileSync(new URL(f, dir), 'utf8')), `${f} menciona SetValio`)
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

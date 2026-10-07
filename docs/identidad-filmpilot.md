@@ -1,0 +1,63 @@
+# Identidad de Filmpilot
+
+La identidad aprobada es el **Filmpilot Brand Kit v1**. Se aplica a la portada y al prototipo de agentes (`?vista=agentes`). Las pantallas clásicas de la demo siguen con SetValio ([identidad-setvalio.md](identidad-setvalio.md)) hasta que se migren.
+
+## Nombre y voz
+
+- Nombre en texto: **Filmpilot**. El logotipo usa **filmpilot** en minúsculas y va trazado en el SVG: nunca se escribe con texto vivo.
+- Claim (H1 de la portada, en HTML real): **Libertad para crear. / Claridad para producir.**
+- Apoyo: «Un equipo de agentes. Una producción bajo control.» Descriptor: «Inteligencia en producción». Cierre: «Menos seguimiento. Más producción.»
+- Voz directa, profesional y humana. No prometer automatismos que la demo no tenga: los agentes son simulados y no se envía nada.
+
+## Dónde está cada cosa
+
+| Qué | Dónde |
+| --- | --- |
+| Assets del kit (logos, glifos, órbitas, iconos, fuentes, foto, OG) | `public/brand/filmpilot/` |
+| Tokens y clases de marca | `src/brand/filmpilot.css` |
+| Componentes (logo, símbolo, glifo, estado, botón, foto, órbita) | `src/brand/Filmpilot.jsx` |
+| Geometría del símbolo y de los glifos (en línea, `currentColor`) | `src/brand/glifos.js` |
+| Familias de agentes | `FAMILIAS` en `src/agentes/agentes.js` |
+
+**Prefijo `flp-`, no `fp-`.** El kit trae clases `.fp-*` y variables `--fp-*`, pero esos nombres ya los usa el design system clásico (`src/index.css`, el `Button` de `ui.jsx`). Por eso no se cargan `brand.css` ni `tokens.css` del kit: sus valores están copiados en `src/brand/filmpilot.css` con prefijo `flp-`, y las clases solo actúan dentro de `.flp-theme`. En Tailwind hay claves nuevas (`flp-*` en colores, `font-flp-sans`, `font-flp-mono`, `rounded-flp-sm|md|lg`); no se ha cambiado ningún token existente.
+
+Orden de las hojas (`src/main.jsx`): marca, Tailwind y después las de cada pantalla. Así una utilidad de Tailwind puede ajustar una clase de marca, y `Landing.css` o `agentes.css` pueden ajustar ambas.
+
+## Color
+
+| Token | HEX | Uso |
+| --- | --- | --- |
+| Carbón | `#141414` | Texto, logo, paneles oscuros |
+| Señal | `#FFE24A` | Acción principal, lo que está «Por revisar», bloque orbital |
+| Tiza | `#F5F4EF` | Fondo editorial y texto sobre carbón |
+| Plata | `#B7BAB7` | Secundarios y texto secundario sobre carbón |
+
+Semánticos de interfaz: gris `#595B59`, borde de control `#70726E`, divisor `#D3D4CD`, superficie `#FFFFFF`, error `#A42C26`, éxito `#24633D` (con su versión oscura en `.flp-dark`).
+
+**Regla del amarillo:** solo en la acción principal de cada sección, en lo que espera una revisión y en composiciones de marca. Siempre con texto carbón encima. Nunca texto amarillo ni plata sobre tiza. Reparto orientativo de la portada: 60–70 % tiza, 20–30 % carbón, 5–15 % señal.
+
+## Tipografía
+
+- **Instrument Sans**: titulares en 400 con tracking negativo (≈ −0,05 em), texto en 400–500, controles en 500. Máximo 600 en la interfaz.
+- **Geist Mono**: etiquetas cortas (`.flp-kicker`), estados y cifras. Nunca párrafos.
+- Las dos son locales y variables (`public/brand/filmpilot/fonts/`, OFL). Solo se precarga Instrument Sans.
+
+## Agentes: familias y estados
+
+| Familia | Glifo | Agentes |
+| --- | --- | --- |
+| Presupuesto | `agent-budget` | Presupuesto, Proveedores, Control de costes, Riesgos de producción |
+| Financiación | `agent-finance` | Conciliación, Excepciones, Previsión |
+| Documentación | `agent-documents` | Facturas, Informes, Cumplimiento |
+
+El Orquestador lleva el símbolo de Filmpilot (tiza sobre carbón). Un glifo nunca va solo: siempre acompaña al nombre del agente. `npm run check:agentes` comprueba que cada agente tenga familia.
+
+Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por revisar** (carbón sobre señal) · **Completado**, más **Detenido** y **Bloqueante** donde hacen falta. El movimiento es breve: el glifo de un agente que trabaja respira dos veces y para; todo respeta `prefers-reduced-motion`.
+
+## Fotografía
+
+`images/production-team-*` es una **imagen generada de concepto**: no representa al equipo, a clientes ni a un rodaje real. El `alt` y la portada lo dicen. El interés está en la mitad derecha; el texto va a la izquierda sobre una capa de contraste.
+
+## Metadatos
+
+`index.html` usa el favicon, el `site.webmanifest` y la imagen social del kit (`social/og-filmpilot.png`) con URL absoluta bajo `https://albertesga.github.io/setvalio-demo/`. El `theme-color` lo fija `App.jsx` por ruta: tiza en portada y agentes, ciruela en las pantallas clásicas.

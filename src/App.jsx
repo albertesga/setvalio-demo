@@ -138,6 +138,12 @@ export default function App() {
   const tema = temaDe(grupo)
   const subtabs = SUBNAV[grupo]
 
+  // Portada y agentes llevan la marca Filmpilot (tiza); las pantallas clásicas, SetValio (ciruela).
+  const conMarcaNueva = route === 'landing' || route === 'agentes'
+  useEffect(() => {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', conMarcaNueva ? '#F5F4EF' : '#311B2E')
+  }, [conMarcaNueva])
+
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 3600)
@@ -179,7 +185,7 @@ export default function App() {
       {route === 'landing' ? (
         <Landing onNavigate={navegar} />
       ) : route === 'agentes' ? (
-        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted" role="status">Cargando agentes…</div>}>
+        <Suspense fallback={<div className="flp-theme flex min-h-screen items-center justify-center text-sm text-flp-muted" role="status">Cargando agentes…</div>}>
           <Agentes onNavigate={navegar} contexto={routeContext.agentes} pushToast={pushToast} />
         </Suspense>
       ) : (
@@ -250,10 +256,17 @@ export default function App() {
       {/* Toast */}
       {toast && (
         <div role="status" aria-live="polite" className="fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 lg:left-auto lg:right-6 lg:translate-x-0">
-          <div className="fp-fade-up flex items-center gap-2.5 rounded-xl border border-line bg-ink px-4 py-3 text-sm text-white shadow-modal">
-            <IconCheckCircle size={18} className="text-primary-soft" />
-            {toast.text}
-          </div>
+          {conMarcaNueva ? (
+            <div className="flp-theme fp-fade-up flex items-center gap-2.5 rounded-flp-md bg-flp-carbon px-4 py-3 text-sm text-flp-chalk shadow-modal">
+              <IconCheckCircle size={18} className="text-flp-signal" />
+              {toast.text}
+            </div>
+          ) : (
+            <div className="fp-fade-up flex items-center gap-2.5 rounded-xl border border-line bg-ink px-4 py-3 text-sm text-white shadow-modal">
+              <IconCheckCircle size={18} className="text-primary-soft" />
+              {toast.text}
+            </div>
+          )}
         </div>
       )}
     </div>

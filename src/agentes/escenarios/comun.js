@@ -148,7 +148,7 @@ export function bloqueDossier(m) {
     tipo: 'checklist',
     titulo: 'Bloqueantes del dossier fiscal',
     items: c.dossier(m).map((d) => ({ id: d.id, documento: d.documento, responsable: d.responsable, deadline: d.deadline, dias: d.dias, estado: d.estado, evidencia: d.pendientes ? `${d.pendientes} ${d.evidencia.toLowerCase()}` : d.evidencia, razon: d.razon })),
-    nota: 'SetValio prepara la documentación. El fiscalista revisa y firma.',
+    nota: 'Filmpilot prepara la documentación. El fiscalista revisa y firma.',
   }
 }
 

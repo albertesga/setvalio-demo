@@ -1,0 +1,204 @@
+/* Filmpilot · capa de marca (Brand Kit v1) con prefijo flp-.
+   El kit trae clases .fp-* y variables --fp-*, pero esos nombres ya los usa el
+   design system clásico (src/index.css y el Button de ui.jsx), que sigue con
+   SetValio. Por eso no se cargan brand.css ni tokens.css del kit: sus valores
+   viven aquí, con otro prefijo y solo dentro de .flp-theme. Las fuentes las
+   declara public/brand/filmpilot/styles/fonts.css (enlazado en index.html).
+
+   Reglas del kit que hay que respetar:
+   - Señal (#FFE24A) solo para la acción principal, lo que está «Por revisar»
+     y composiciones de marca; siempre con texto carbón encima.
+   - Nunca texto amarillo ni plata sobre tiza.
+   - Titulares en Instrument Sans 400 con tracking negativo; Geist Mono para
+     etiquetas cortas, estados y cifras, nunca para párrafos. */
+
+:root {
+  --flp-carbon: #141414;
+  --flp-signal: #ffe24a;
+  --flp-signal-hover: #f3d433;
+  --flp-chalk: #f5f4ef;
+  --flp-silver: #b7bab7;
+
+  --flp-text: #141414;
+  --flp-bg: #f5f4ef;
+  --flp-surface: #ffffff;
+  --flp-muted: #595b59;
+  --flp-border: #d3d4cd;
+  --flp-control-border: #70726e;
+  --flp-error: #a42c26;
+  --flp-success: #24633d;
+
+  --flp-font-sans: 'Instrument Sans', Arial, sans-serif;
+  --flp-font-mono: 'Geist Mono', 'Courier New', monospace;
+
+  --flp-radius-sm: 6px;
+  --flp-radius-md: 16px;
+  --flp-radius-lg: 24px;
+  --flp-radius-pill: 999px;
+
+  --flp-max: 80rem;
+  --flp-gutter: clamp(1.25rem, 4vw, 4rem);
+  --flp-duration: 180ms;
+  --flp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --flp-shadow: 0 18px 60px rgb(20 20 20 / 0.08);
+}
+
+/* ── Ámbito ──────────────────────────────────────────────────────────────── */
+.flp-theme {
+  color: var(--flp-text);
+  background: var(--flp-bg);
+  font-family: var(--flp-font-sans);
+  font-weight: 400;
+  font-stretch: 100%;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+/* index.css fuerza Manrope en h1-h3: dentro de la marca heredan la fuente. */
+.flp-theme :is(h1, h2, h3, h4, h5, h6) { font-family: inherit; }
+.flp-theme ::selection { background: var(--flp-signal); color: var(--flp-carbon); }
+.flp-theme :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--flp-text);
+  outline-offset: 2px;
+}
+
+.flp-dark {
+  --flp-text: #f5f4ef;
+  --flp-bg: #141414;
+  --flp-surface: #202020;
+  --flp-muted: #b7bab7;
+  --flp-border: #3d3d3a;
+  --flp-control-border: #92958f;
+  --flp-error: #ffada6;
+  --flp-success: #a8ddb6;
+  color: var(--flp-text);
+  background: var(--flp-bg);
+  color-scheme: dark;
+}
+
+/* ── Tipografía ──────────────────────────────────────────────────────────── */
+.flp-kicker {
+  font-family: var(--flp-font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.flp-display {
+  margin: 0;
+  font-size: clamp(2.75rem, 5.4vw, 5.25rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.052em;
+  text-wrap: balance;
+}
+.flp-title {
+  margin: 0;
+  font-size: clamp(2rem, 3.7vw, 3.75rem);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.flp-subtitle {
+  margin: 0;
+  font-size: clamp(1.375rem, 2.1vw, 1.75rem);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+.flp-body { font-size: clamp(1rem, 1.5vw, 1.125rem); line-height: 1.55; }
+.flp-mono { font-family: var(--flp-font-mono); font-size: 0.75rem; letter-spacing: 0.01em; }
+.flp-number { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.flp-muted { color: var(--flp-muted); }
+.flp-link { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.22em; }
+.flp-logo { display: block; height: auto; }
+
+/* ── Botón: píldora. Primario = señal; secundario = contorno; fantasma = texto. ── */
+.flp-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--flp-radius-pill);
+  font: 500 0.9375rem/1.2 var(--flp-font-sans);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--flp-duration) var(--flp-ease),
+    border-color var(--flp-duration) var(--flp-ease),
+    color var(--flp-duration) var(--flp-ease),
+    transform var(--flp-duration) var(--flp-ease);
+}
+.flp-button--sm { padding: 0.45rem 0.95rem; font-size: 0.875rem; }
+.flp-button--lg { min-height: 48px; padding: 0.8rem 1.4rem; font-size: 1rem; }
+.flp-button--primary { background: var(--flp-signal); color: var(--flp-carbon); }
+.flp-button--primary:hover:not(:disabled) { background: var(--flp-signal-hover); }
+.flp-button--carbon { background: var(--flp-carbon); color: var(--flp-chalk); }
+.flp-button--carbon:hover:not(:disabled) { background: #2a2a2a; }
+.flp-button--secondary { border-color: var(--flp-control-border); background: transparent; color: var(--flp-text); }
+.flp-button--secondary:hover:not(:disabled) { border-color: var(--flp-text); background: var(--flp-surface); }
+.flp-dark .flp-button--secondary:hover:not(:disabled) { background: rgb(245 244 239 / 0.08); }
+.flp-button--ghost { padding-inline: 0.75rem; background: transparent; color: var(--flp-text); }
+.flp-button--ghost:hover:not(:disabled) { background: rgb(20 20 20 / 0.05); }
+.flp-dark .flp-button--ghost:hover:not(:disabled) { background: rgb(245 244 239 / 0.08); }
+.flp-button:active:not(:disabled) { transform: translateY(1px); }
+.flp-button:disabled { cursor: not-allowed; opacity: 0.45; }
+.flp-button svg { flex: none; }
+
+/* ── Campo ───────────────────────────────────────────────────────────────── */
+.flp-input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--flp-control-border);
+  border-radius: var(--flp-radius-sm);
+  background: var(--flp-surface);
+  color: var(--flp-text);
+  font: inherit;
+  font-size: 16px;
+}
+.flp-input:focus-visible { outline: 2px solid var(--flp-text); outline-offset: 1px; }
+.flp-input[aria-invalid='true'] { border-color: var(--flp-error); }
+
+/* ── Estado: siempre con texto. «Por revisar» es carbón sobre señal. ───────── */
+.flp-state {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--flp-control-border);
+  border-radius: var(--flp-radius-pill);
+  background: transparent;
+  color: var(--flp-text);
+  font-family: var(--flp-font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.flp-state--idle { border-color: var(--flp-border); color: var(--flp-muted); }
+.flp-state--working { border-color: var(--flp-text); }
+.flp-state--review { border-color: var(--flp-signal); background: var(--flp-signal); color: var(--flp-carbon); }
+.flp-state--done { border-color: currentColor; color: var(--flp-success); }
+.flp-state--error { border-color: currentColor; color: var(--flp-error); }
+.flp-state--stopped { border-style: dashed; color: var(--flp-muted); }
+.flp-state-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
+
+/* ── Imagen y movimiento ─────────────────────────────────────────────────── */
+.flp-photo { display: block; width: 100%; height: auto; object-fit: cover; }
+@keyframes flp-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+/* Respira dos veces y se para: nada de bucles largos. */
+.flp-breathe { animation: flp-breathe 2s ease-in-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .flp-breathe { animation: none; }
+  .flp-button { transition: none; }
+}

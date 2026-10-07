@@ -1,6 +1,10 @@
-# SetValio
+# Filmpilot
 
-Prototipo de control financiero para productoras de cine y televisión. Conecta el
+Prototipo de control financiero para productoras de cine y televisión, con un
+equipo de agentes que prepara, cuadra y vigila. La portada y el prototipo de
+agentes llevan la marca **Filmpilot**; las pantallas clásicas de la demo
+conservan todavía la de SetValio (ver [Marca](#marca)).
+ Conecta el
 presupuesto del proyecto con incentivos, ayudas, financiación, compras, gasto real
 y documentación fiscal. Todos los datos son de demostración y viven en memoria;
 no hay backend ni persistencia.
@@ -32,8 +36,16 @@ Cada cambio en `main` se publica automáticamente con el flujo de `.github/workf
 
 ## Agentes (prototipo conversacional)
 
-Desde la portada, **Probar el asistente** abre una conversación con los agentes de
-SetValio sobre La última función (también con `?vista=agentes`). Un Orquestador
+Desde la portada, **Probar los agentes** abre una conversación con los agentes de
+Filmpilot sobre La última función (también con `?vista=agentes`). La pantalla de
+inicio tiene tres accesos (el informe semanal, «¿Cómo vamos?» y el recorrido
+guiado) y el resto de casos plegado; todo lo que no es conversación (ver como
+otro rol, ritmo, reinicio, demo clásica) está detrás del botón **Demo** de la
+cabecera. Los agentes se agrupan en tres familias, cada una con su glifo:
+**Presupuesto** (Presupuesto, Proveedores, Control de costes y Riesgos),
+**Financiación** (Conciliación, Excepciones y Previsión) y **Documentación**
+(Facturas, Informes y Cumplimiento). Los estados usan el vocabulario de la marca:
+En espera, Trabajando, Por revisar y Completado. Un Orquestador
 reparte cada petición entre Facturas, Conciliación, Excepciones, Previsión,
 Control de costes, Informes y Cumplimiento. Cada paso muestra si el agente
 **ejecuta**, **propone** o **pide aprobación**; las decisiones las toma una persona
@@ -68,9 +80,17 @@ y ninguna cifra está escrita a mano en los guiones. El motor vive en `src/agent
 `npm run check:agentes` lo comprueba en Node: cifras frente a `src/lib`, frases de
 ejemplo, transiciones, recorrido y deshacer.
 
-La ruta **Design system** documenta en vivo los tokens y componentes compartidos.
-La dirección de marca, usos del logotipo y normas de voz están en
-[docs/identidad-setvalio.md](docs/identidad-setvalio.md).
+La ruta **Design system** documenta en vivo los tokens y componentes compartidos
+de las pantallas clásicas.
+
+## Marca
+
+- **Filmpilot** (Brand Kit v1): portada y prototipo de agentes. Assets en
+  `public/brand/filmpilot/`, tokens y clases con prefijo `flp-` en
+  `src/brand/filmpilot.css` y componentes en `src/brand/Filmpilot.jsx`. Reglas
+  de uso en [docs/identidad-filmpilot.md](docs/identidad-filmpilot.md).
+- **SetValio**: pantallas clásicas de la demo (panel, presupuesto, costes…),
+  pendientes de migrar. Ver [docs/identidad-setvalio.md](docs/identidad-setvalio.md).
 
 ## Datos y límites
 
@@ -82,5 +102,6 @@ La dirección de marca, usos del logotipo y normas de voz están en
 - Las acciones de exportación y subida son demostrativas, no entregables reales.
 
 Las cifras de ejemplo no corresponden a una producción real. Antes de usar
-SetValio comercialmente, comprueba la disponibilidad legal del nombre y del
-dominio.
+Filmpilot comercialmente, comprueba la disponibilidad legal del nombre y del
+dominio. La fotografía de la portada es una imagen conceptual generada: no
+representa a un cliente ni un rodaje real.
