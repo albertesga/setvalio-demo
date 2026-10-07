@@ -54,8 +54,25 @@ function Anunciador({ s }) {
   )
 }
 
+// ¿Está a la vista la columna izquierda (≥ 1280 px)? Entonces la pestaña «Agentes» sobra.
+function useAnchoXL() {
+  const consulta = '(min-width: 1280px)'
+  const [xl, setXl] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(consulta).matches)
+  useEffect(() => {
+    const mq = window.matchMedia?.(consulta)
+    if (!mq) return
+    const cambio = () => setXl(mq.matches)
+    mq.addEventListener('change', cambio)
+    return () => mq.removeEventListener('change', cambio)
+  }, [])
+  return xl
+}
+
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
+
 export default function Agentes({ onNavigate, contexto, pushToast }) {
   useBloqueoScroll()
+  const xl = useAnchoXL()
   const [ritmo, setRitmo] = useState('normal')
   const { s, despachar } = useAgentes({ ritmo })
   const persona = personaDe(s)
@@ -66,6 +83,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const [agenteAbierto, setAgenteAbierto] = useState(null)
   const scrollRef = useRef(null)
   const finRef = useRef(null)
+  const barraRef = useRef(null)
   const inputRef = useRef(null)
   const [cerca, setCerca] = useState(true)
   const [nuevos, setNuevos] = useState(false)
@@ -91,6 +109,15 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const cerrarHoja = useCallback(() => setHoja(null), [])
   const cerrarAgente = useCallback(() => setAgenteAbierto(null), [])
   const escribir = useCallback(() => despachar({ tipo: 'actividad' }), [despachar])
+  // Leer, desplazarse o pulsar también es actividad: las novedades que llegan solas
+  // esperan a que la persona deje la pantalla quieta, no la interrumpen mientras lee.
+  const ultimaActividad = useRef(0)
+  const marcarActividad = useCallback(() => {
+    const ahora = Date.now()
+    if (ahora - ultimaActividad.current < 1000) return
+    ultimaActividad.current = ahora
+    despachar({ tipo: 'actividad' })
+  }, [despachar])
 
   // Recorrido pedido desde la portada.
   const tourPedido = useRef(false)
@@ -100,6 +127,12 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
       despachar({ tipo: 'tour/iniciar' })
     }
   }, [contexto, s.tour, despachar])
+
+  // Al empezar el recorrido, el foco va a su barra: ahí están el paso, la nota y «Siguiente».
+  const enRecorrido = !!s.tour
+  useEffect(() => {
+    if (enRecorrido) requestAnimationFrame(() => barraRef.current?.focus())
+  }, [enRecorrido])
 
   // Desplazamiento. Mientras los agentes trabajan, sigue el final; cuando llega la
   // respuesta, la deja empezando arriba para leerla desde el principio. Si la
@@ -171,31 +204,45 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     return base.slice(0, 3)
   }, [ultimoAgentes, s.casosVistos])
 
-  const ctx = { mundo: s.mundo, persona, despachar, enviar, enviarEntrada, decidir, onNavigate, avisar, ocupado, deshacible: s.ultimaMutacion?.mensajeId }
+  // El aviso completo de «Exploratorio» o «Sin validar» sale la primera vez; después, solo la etiqueta.
+  const primerAviso = useMemo(() => {
+    const out = {}
+    for (const m of s.mensajes) {
+      if (m.rol !== 'agentes') continue
+      for (const b of m.turno.bloques) if (b.tipo === 'aviso' && !(b.tono in out)) out[b.tono] = m.id
+    }
+    return out
+  }, [s.mensajes])
+
+  const ctx = { mundo: s.mundo, persona, despachar, enviar, enviarEntrada, decidir, onNavigate, avisar, ocupado, deshacible: s.ultimaMutacion?.mensajeId, eventosPausados: s.eventosPausados, primerAviso }
 
   const abrirHoja = (que) => {
     setHoja(que)
     if (que === 'actividad') despachar({ tipo: 'leerNovedades' })
   }
 
-  const panelDerecho = (pref) => (
+  const PESTANAS = [
+    { id: 'revisar', etiqueta: 'Por revisar', n: pendientes, sr: plural(pendientes, 'por revisar', 'por revisar'), estilo: 'is-revisar' },
+    { id: 'actividad', etiqueta: 'Actividad', punto: s.novedades > 0, sr: s.novedades ? plural(s.novedades, 'novedad sin leer', 'novedades sin leer') : '' },
+    { id: 'riesgos', etiqueta: 'Riesgos', n: altos, sr: plural(altos, 'riesgo alto', 'riesgos altos'), estilo: 'is-riesgo' },
+    { id: 'agentes', etiqueta: 'Agentes' },
+  ]
+  const panelDerecho = (pref) => {
+    // En la columna lateral (≥ 1280 px) la pestaña «Agentes» se oculta: el carril ya está a la vista.
+    const activa = pref === 'lateral' && xl && pestana === 'agentes' ? 'revisar' : pestana
+    return (
     <>
-      <div className="ag-tabs" role="tablist" aria-label="Por revisar, actividad y riesgos">
-        {[
-          ['revisar', 'Por revisar', pendientes],
-          ['actividad', 'Actividad', s.novedades],
-          ['riesgos', 'Riesgos', altos],
-          ['casos', 'Casos', null],
-        ].map(([id, etiqueta, n]) => (
+      <div className="ag-tabs" role="tablist" aria-label="Por revisar, actividad, riesgos y agentes">
+        {PESTANAS.map(({ id, etiqueta, n, punto, sr, estilo }) => (
           <button
             key={id}
             type="button"
             role="tab"
             id={`${pref}-tab-${id}`}
-            aria-selected={pestana === id}
-            aria-controls={`${pref}-tabpanel-${id}`}
-            tabIndex={pestana === id ? 0 : -1}
-            className={`ag-tab ${id === 'casos' && pref === 'lateral' ? 'ag-tab--casos' : ''}`}
+            aria-selected={activa === id}
+            aria-controls={activa === id ? `${pref}-tabpanel-${id}` : undefined}
+            tabIndex={activa === id ? 0 : -1}
+            className={`ag-tab ${id === 'agentes' && pref === 'lateral' ? 'ag-tab--agentes' : ''}`}
             onClick={() => {
               setPestana(id)
               if (id === 'actividad') despachar({ tipo: 'leerNovedades' })
@@ -215,32 +262,58 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             }}
           >
             {etiqueta}
-            {n ? <span className={`ag-tab-n tnum ${id === 'revisar' ? 'is-revisar' : ''}`}>{n}</span> : null}
+            {n ? (
+              <span className={`ag-tab-n tnum ${estilo ?? ''}`} aria-hidden="true">
+                {n}
+              </span>
+            ) : null}
+            {punto ? <span className="ag-tab-punto" aria-hidden="true" /> : null}
+            {sr && (n || punto) ? <span className="sr-only">, {sr}</span> : null}
           </button>
         ))}
       </div>
-      <div id={`${pref}-tabpanel-${pestana}`} role="tabpanel" aria-labelledby={`${pref}-tab-${pestana}`} className="ag-panel-scroll">
-        {pestana === 'actividad' && <PanelActividad s={s} />}
-        {pestana === 'revisar' && <PanelDecisiones s={s} />}
-        {pestana === 'riesgos' && <PanelRiesgos s={s} />}
-        {pestana === 'casos' && <CasosTracker vistos={s.casosVistos} />}
+      <div id={`${pref}-tabpanel-${activa}`} role="tabpanel" aria-labelledby={`${pref}-tab-${activa}`} className="ag-panel-scroll">
+        {activa === 'actividad' && <PanelActividad s={s} />}
+        {activa === 'revisar' && <PanelDecisiones s={s} />}
+        {activa === 'riesgos' && <PanelRiesgos s={s} />}
+        {activa === 'agentes' && (
+          <>
+            <AgentesPorFamilia
+              estados={estados}
+              onAbrir={(id) => {
+                setHoja(null)
+                setAgenteAbierto(id)
+              }}
+            />
+            <div className="mt-5 border-t border-flp-line">
+              <Desplegable titulo="Casos de uso" resumen={`${vistos} de ${CASOS.length} vistos`} nivel={3}>
+                <CasosTracker vistos={s.casosVistos} cabecera={false} />
+              </Desplegable>
+            </div>
+          </>
+        )}
       </div>
     </>
-  )
+    )
+  }
 
   const vistos = casosVistos(s.casosVistos)
+  const ultimaNovedadId = [...s.mensajes].reverse().find((m) => m.rol === 'novedad')?.id
 
   return (
     <AgentesCtx.Provider value={ctx}>
-      <div className="ag-app flp-theme">
+      <div className="ag-app flp-theme" onPointerDownCapture={marcarActividad} onWheelCapture={marcarActividad} onKeyDownCapture={marcarActividad} onTouchStartCapture={marcarActividad}>
         <a href="#ag-entrada" className="ag-skip">
           Ir al campo de mensaje
         </a>
         <Cabecera s={s} persona={persona} pendientes={pendientes} onPortada={() => onNavigate('landing')} onActividad={() => abrirHoja('actividad')} onDemo={() => setHoja('demo')} />
 
         <div className="ag-cuerpo">
-          <aside className="ag-col-izq" aria-label="Agentes">
+          <aside className="ag-col-izq" aria-labelledby="ag-titulo-agentes">
             <div className="ag-panel-scroll">
+              <h2 id="ag-titulo-agentes" className="sr-only">
+                Agentes
+              </h2>
               <AgentesPorFamilia estados={estados} onAbrir={setAgenteAbierto} />
               <div className="mt-5 border-t border-flp-line pt-1">
                 <Desplegable titulo="Casos de uso" resumen={`${vistos} de ${CASOS.length} vistos`}>
@@ -251,18 +324,31 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
           </aside>
 
           <main className="ag-centro" aria-label="Conversación con los agentes">
-            <BarraRecorrido tour={tour} onSiguiente={() => despachar({ tipo: 'tour/siguiente' })} onSalir={() => despachar({ tipo: 'tour/salir' })} />
+            <BarraRecorrido
+              ref={barraRef}
+              tour={tour}
+              onSiguiente={() => {
+                // Sigue al paso nuevo: la respuesta anterior ya está leída.
+                anclado.current = true
+                despachar({ tipo: 'tour/siguiente' })
+              }}
+              onSalir={() => despachar({ tipo: 'tour/salir' })}
+            />
             <div ref={scrollRef} className="ag-scroll" onScroll={onScroll} onWheel={soltar} onTouchMove={() => (anclado.current = false)} onKeyDown={soltar}>
               <div className="ag-hilo">
                 {s.mensajes.length === 0 ? (
                   <Inicio persona={persona} estados={estados} onAbrirAgente={setAgenteAbierto} onRecorrido={() => despachar({ tipo: 'tour/iniciar' })} />
                 ) : (
-                  <section aria-label="Mensajes" className="space-y-6">
+                  <section aria-labelledby="ag-titulo-conversacion" className="space-y-6">
+                    <h2 id="ag-titulo-conversacion" className="sr-only">
+                      Conversación
+                    </h2>
                     {s.mensajes.map((m, i) => (
-                      <Mensaje key={m.id} msg={m} ultimo={i === s.mensajes.length - 1} />
+                      <Mensaje key={m.id} msg={m} ultimo={i === s.mensajes.length - 1} ultimaNovedad={m.id === ultimaNovedadId} />
                     ))}
                   </section>
                 )}
+                {!tour && !ocupado && <Sugerencias items={sugerencias} onElegir={enviar} />}
                 <div ref={finRef} />
               </div>
             </div>
@@ -277,7 +363,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                     setNuevos(false)
                   }}
                 >
-                  Nuevos mensajes ↓
+                  Nuevos mensajes <span aria-hidden="true">↓</span>
                 </button>
               )}
               {ocupado && trabajando.length > 0 && (
@@ -290,33 +376,22 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                   {trabajando.length === 1 ? '1 agente trabajando' : `${trabajando.length} agentes trabajando`}
                 </p>
               )}
-              {!tour && <Sugerencias items={sugerencias} onElegir={enviar} deshabilitado={ocupado} />}
               <Redactor ocupado={ocupado} inputRef={inputRef} onEnviar={enviar} onEscribir={escribir} />
               <p className="ag-pie-nota">Agentes simulados con datos de ejemplo. No se envía nada ni se mueve dinero.</p>
             </div>
           </main>
 
-          <aside className="ag-col-der" aria-label="Por revisar, actividad y riesgos">
+          <aside className="ag-col-der" aria-label="Por revisar, actividad, riesgos y agentes">
             {panelDerecho('lateral')}
           </aside>
         </div>
 
-        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Por revisar, actividad y riesgos" id="ag-hoja-actividad">
+        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Por revisar, actividad, riesgos y agentes" id="ag-hoja-actividad">
           {hoja === 'actividad' && panelDerecho('hoja')}
         </Hoja>
 
-        <Hoja abierta={hoja === 'demo'} onCerrar={cerrarHoja} titulo="Opciones de la demo" subtitulo={`Ves la demo como ${persona.nombre} · ${persona.rol}`} id="ag-hoja-demo">
-          <OpcionesDemo
-            s={s}
-            despachar={despachar}
-            ritmo={ritmo}
-            setRitmo={setRitmo}
-            ocupado={ocupado}
-            estados={estados}
-            onNavigate={onNavigate}
-            onCerrar={cerrarHoja}
-            onAbrirAgente={setAgenteAbierto}
-          />
+        <Hoja abierta={hoja === 'demo'} onCerrar={cerrarHoja} titulo="Opciones de la demo" subtitulo={`Ahora: ${persona.nombre} · ${persona.rol}`} id="ag-hoja-demo">
+          <OpcionesDemo s={s} despachar={despachar} ritmo={ritmo} setRitmo={setRitmo} ocupado={ocupado} onNavigate={onNavigate} onCerrar={cerrarHoja} avisar={avisar} />
         </Hoja>
 
         <DetalleAgente id={agenteAbierto} onCerrar={cerrarAgente} />

@@ -4,7 +4,7 @@ import { useId, useRef } from 'react'
 import { AgentGlyph, StateChip } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconPlay, IconPause } from '../../components/icons.jsx'
 import { AGENTES, ORDEN_AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, agentesDeFamilia } from '../agentes.js'
-import { CASOS } from '../casos.js'
+import { CASOS, ETIQUETA_CAPACIDAD } from '../casos.js'
 import { EVENTOS } from '../sesion.js'
 import * as c from '../calculos.js'
 import { fechaCorta } from '../texto.js'
@@ -40,18 +40,19 @@ function FilaAgente({ id, e, onAbrir }) {
       <button type="button" className={`ag-agente ${trabajando ? 'is-working' : ''}`} onClick={() => onAbrir(id)}>
         <AgentAvatar id={id} size={32} trabajando={trabajando} revisar={revisar} />
         <span className="min-w-0 flex-1 text-left">
-          <span className="block text-sm font-medium text-flp-ink">{a.nombre}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-sm font-medium text-flp-ink">{a.nombre}</span>
+            {a.exploratorio && <span className="ag-etiqueta-capacidad">Exploratorio</span>}
+          </span>
           {trabajando ? (
             <span className="block truncate text-xs text-flp-muted">
               <span className="font-medium text-flp-ink">Trabajando · </span>
               <Tx value={e.detalle} />
             </span>
           ) : revisar ? (
-            <StateChip state="review" className="mt-0.5">
-              {e.espera} por revisar
-            </StateChip>
+            <span className="block text-xs font-medium text-flp-ink">{e.espera} por revisar</span>
           ) : (
-            <span className="block text-xs text-flp-muted">{a.exploratorio ? 'En espera · exploratorio' : 'En espera'}</span>
+            <span className="block text-xs text-flp-muted">En espera</span>
           )}
         </span>
       </button>
@@ -60,20 +61,24 @@ function FilaAgente({ id, e, onAbrir }) {
 }
 
 /** Carril de agentes: el Orquestador arriba y las tres familias de la marca debajo. */
-export function AgentesPorFamilia({ estados, onAbrir }) {
+export function AgentesPorFamilia({ estados, onAbrir, nivel = 3 }) {
   const uid = useId().replace(/:/g, '')
+  const H = `h${nivel}`
   return (
     <div className="ag-familias">
-      <ul>
-        <FilaAgente id="orquestador" e={estados.orquestador} onAbrir={onAbrir} />
-      </ul>
+      <div>
+        <ul>
+          <FilaAgente id="orquestador" e={estados.orquestador} onAbrir={onAbrir} />
+        </ul>
+        <p className="ag-familia-desc">{AGENTES.orquestador.rol}</p>
+      </div>
       {ORDEN_FAMILIAS.map((f) => (
         <section key={f} className="ag-familia" aria-labelledby={`${uid}-${f}`}>
           <div className="ag-familia-cab">
             <AgentGlyph family={f} size={20} />
-            <h3 id={`${uid}-${f}`} className="flp-kicker">
+            <H id={`${uid}-${f}`} className="flp-kicker">
               {FAMILIAS[f].nombre}
-            </h3>
+            </H>
           </div>
           <p className="ag-familia-desc">{FAMILIAS[f].descriptor}</p>
           <ul>
@@ -88,13 +93,15 @@ export function AgentesPorFamilia({ estados, onAbrir }) {
 }
 
 export function DetalleAgente({ id, onCerrar }) {
-  const { enviar } = useCtx()
+  const { enviar, mundo } = useCtx()
   // Conserva el último agente mientras la hoja se cierra, para que no se vacíe a medio camino.
   const ultimo = useRef(null)
   if (id) ultimo.current = id
   const aid = ultimo.current
   const a = aid ? AGENTES[aid] : null
   const casos = a ? CASOS.filter((x) => x.agentes.includes(aid)).slice(0, 3) : []
+  const suyas = (e) => AGENTE_DE_EXCEPCION[e.tipo] === aid
+  const nSuyas = a ? decisionesAbiertas(mundo).filter(suyas).length : 0
   return (
     <Hoja abierta={!!id} onCerrar={onCerrar} titulo={a?.nombre ?? 'Agente'} subtitulo={a ? (a.familia ? `Familia ${FAMILIAS[a.familia].nombre}` : 'Reparte el trabajo entre los demás') : undefined} id="ag-hoja-agente">
       {a && (
@@ -107,6 +114,12 @@ export function DetalleAgente({ id, onCerrar }) {
               {a.exploratorio && <span className="ag-etiqueta-capacidad mt-2">Exploratorio</span>}
             </div>
           </div>
+          {nSuyas > 0 && (
+            <div>
+              <h3 className="flp-kicker mb-2 text-flp-muted">Por revisar ({nSuyas})</h3>
+              <ListaDecisiones filtro={suyas} onElegir={onCerrar} />
+            </div>
+          )}
           <div>
             <h3 className="flp-kicker mb-2 text-flp-muted">Cómo actúa</h3>
             <ul className="space-y-2">
@@ -143,8 +156,6 @@ export function DetalleAgente({ id, onCerrar }) {
     </Hoja>
   )
 }
-
-const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Por validar' }
 
 export function casosVistos(vistos) {
   return CASOS.filter((x) => vistos.includes(x.id)).length
@@ -212,10 +223,10 @@ function ItemActividad({ it }) {
             <Tx value={it.salida} />
           </p>
         )}
-        {(it.autonomia || it.evento) && (
+        {(it.evento || (it.autonomia && it.autonomia !== 'ejecuta')) && (
           <div className="mt-1 flex flex-wrap gap-1.5">
             {it.evento && <Tono tono="info">Novedad</Tono>}
-            {it.autonomia && it.autonomia !== 'ejecuta' ? <AutonomyBadge nivel={it.autonomia} /> : it.autonomia === 'ejecuta' ? <AutonomyBadge nivel="ejecuta" /> : null}
+            {it.autonomia && it.autonomia !== 'ejecuta' && <AutonomyBadge nivel={it.autonomia} />}
           </div>
         )}
       </div>
@@ -234,22 +245,22 @@ export function PanelActividad({ s }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className={`ag-directo ${enDirecto ? 'is-on' : ''}`}>
           <span aria-hidden="true" />
-          {s.tour ? 'Pausado durante el recorrido' : enDirecto ? 'En directo' : 'Entradas en pausa'}
+          {s.tour ? 'Novedades en pausa durante el recorrido' : enDirecto ? 'Novedades en directo' : 'Novedades en pausa'}
         </span>
         <div className="flex gap-1.5">
           <button type="button" className="ag-boton-fila" aria-pressed={s.eventosPausados} onClick={() => despachar({ tipo: 'pausarEventos', valor: !s.eventosPausados })}>
             {s.eventosPausados ? <IconPlay size={14} aria-hidden="true" /> : <IconPause size={14} aria-hidden="true" />}
-            {s.eventosPausados ? 'Reanudar' : 'Pausar'}
+            {s.eventosPausados ? 'Reanudar novedades' : 'Pausar novedades'}
           </button>
         </div>
       </div>
       {quedan > 0 && (
         <div className="mb-4 rounded-flp-sm border border-dashed border-flp-control bg-flp-surface px-3 py-2.5 text-xs text-flp-muted">
           {s.mensajes.some((m) => m.rol === 'agentes')
-            ? `Quedan ${quedan} ${quedan === 1 ? 'novedad' : 'novedades'} de ejemplo por llegar mientras conversas.`
+            ? `Quedan ${quedan} ${quedan === 1 ? 'novedad' : 'novedades'} de ejemplo. Llegan solas cuando dejas de usar la pantalla unos segundos.`
             : 'Cuando empieces a conversar irán llegando avisos de riesgos, facturas y solicitudes de ejemplo.'}
           <button type="button" className="ag-link ml-1" disabled={ocupado} onClick={() => despachar({ tipo: 'simularEvento' })}>
-            Traer la siguiente ahora
+            Traer la siguiente novedad
           </button>
         </div>
       )}
@@ -263,7 +274,7 @@ export function PanelActividad({ s }) {
           </ul>
         </>
       )}
-      <h3 className="flp-kicker mb-1 text-flp-muted">Antes de entrar</h3>
+      <h3 className="flp-kicker mb-1 text-flp-muted">Antes de esta sesión</h3>
       <ul>
         {previas.map((it) => (
           <ItemActividad key={it.id} it={it} />
@@ -283,21 +294,32 @@ export function PanelDecisiones({ s }) {
     'documento/aplazar': 'deja en revisión',
     'documento/revision': 'envía al fiscalista',
     'partida/ajustarCef': 'ajusta la previsión de',
-    'informe/aprobar': 'aprueba el informe',
-    'borrador/marcarListo': 'revisa el borrador',
-    'borrador/descartar': 'descarta el borrador',
+    'informe/aprobar': 'aprueba el informe de',
+    'borrador/marcarListo': 'revisa el borrador para',
+    'borrador/descartar': 'descarta el borrador para',
     'propuesta/autorizarLlamadas': 'autoriza las llamadas',
     'propuesta/noLlamar': 'decide no llamar',
-    'propuesta/elegir': 'elige proveedor para',
-    'propuesta/anadirLinea': 'añade a la propuesta',
+    'propuesta/elegir': 'elige proveedor de',
+    'propuesta/anadirLinea': 'añade a la propuesta:',
     'riesgo/mitigar': 'cambia el plan por',
     'riesgo/reservar': 'aprueba una reserva por',
     'riesgo/aceptar': 'asume',
   }
   const NOMBRE_RIESGO = { 'RG-1': 'la lluvia de la jornada 18', 'RG-5': 'las horas extra de noche' }
+  const { ocupado } = useCtx()
+  // Nombres legibles: las referencias internas (R1, L1…) no le dicen nada a nadie.
+  const nombre = (ref) => {
+    if (ref.tipo === 'riesgo') return NOMBRE_RIESGO[ref.id] ?? 'un riesgo'
+    if (ref.tipo === 'llamadas') return 'las llamadas a proveedores de Itsasoa'
+    if (ref.tipo === 'informe') return s.mundo.informes[ref.id]?.periodo?.etiqueta ?? ref.id
+    if (ref.tipo === 'eleccion' || ref.tipo === 'linea') return (s.mundo.propuesta?.lineas ?? []).find((l) => l.id === ref.id)?.concepto?.toLowerCase() ?? 'una línea de la propuesta'
+    if (ref.tipo === 'borrador') return s.mundo.borradores[ref.id]?.para ?? 'un borrador'
+    return ref.id
+  }
   return (
     <div>
-      <h3 className="flp-kicker mb-2 text-flp-muted">Esperan una decisión</h3>
+      <p className="mb-3 text-sm text-flp-muted">Lo que espera tu decisión o la de tu equipo. Pulsa «Revisar» para ir a la tarjeta.</p>
+      {ocupado && <p className="mb-3 text-xs font-medium text-flp-ink">Los agentes están trabajando: podrás revisar en cuanto terminen.</p>}
       <ListaDecisiones compacta />
       {decididas.length > 0 && (
         <>
@@ -305,7 +327,7 @@ export function PanelDecisiones({ s }) {
           <ul className="space-y-2">
             {decididas.map((h) => (
               <li key={h.version} className="text-sm text-flp-muted">
-                <strong className="text-flp-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-semibold text-flp-ink">{h.ref.tipo === 'riesgo' ? NOMBRE_RIESGO[h.ref.id] ?? 'un riesgo' : h.ref.id}</span>
+                <strong className="font-medium text-flp-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-medium text-flp-ink">{nombre(h.ref)}</span>
               </li>
             ))}
           </ul>

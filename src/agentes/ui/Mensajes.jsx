@@ -1,11 +1,12 @@
 // Mensajes de la conversación y línea de trabajo de los agentes.
 
 import { useState } from 'react'
-import { IconChevronDown, IconBell, IconStop } from '../../components/icons.jsx'
+import { IconChevronDown, IconBell, IconStop, IconArrowDown } from '../../components/icons.jsx'
+import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { AGENTES } from '../agentes.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, StatusChip, nombresCortos } from './Piezas.jsx'
-import { Bloque } from './Bloques.jsx'
+import { Bloque, aprobacionPendiente } from './Bloques.jsx'
 
 function nombresAgentes(ids) {
   return ids.filter((a) => a !== 'orquestador').map((a) => AGENTES[a].nombre)
@@ -58,7 +59,8 @@ function Traza({ msg }) {
           <strong className="font-medium text-flp-ink">Cómo lo han hecho</strong>
           <span className="block truncate text-xs text-flp-muted">
             {agentes.length ? `${nombresCortos(agentes)} · ` : ''}
-            {t.pasos.length} pasos{msg.estado === 'detenido' ? ' · detenido' : ''}
+            {t.pasos.length} {t.pasos.length === 1 ? 'paso' : 'pasos'}
+            {msg.estado === 'detenido' ? ' · detenido' : ''}
           </span>
         </span>
         <IconChevronDown size={18} className={`transition-transform ${abierta ? 'rotate-180' : ''}`} aria-hidden="true" />
@@ -107,11 +109,21 @@ function Traza({ msg }) {
 }
 
 function MensajeAgentes({ msg, ultimo }) {
-  const { despachar, deshacible, ocupado } = useCtx()
+  const { despachar, deshacible, ocupado, mundo } = useCtx()
   const t = msg.turno
   const enCurso = msg.estado === 'en_curso'
   const bloques = t.bloques.slice(0, msg.bloquesVisibles)
   const tituloId = `${msg.id}-titulo`
+  const enfocarTitulo = () => requestAnimationFrame(() => document.getElementById(tituloId)?.focus())
+  // Al terminar: cuántas decisiones de esta respuesta siguen esperando a una persona.
+  const porDecidir = !enCurso && msg.estado === 'hecho' ? t.bloques.filter((b) => aprobacionPendiente(mundo, b)).length : 0
+  const irADecision = () => {
+    const tarjeta = document.querySelector(`#msg-${msg.id} .ag-aprobacion:not(.is-decidida)`)
+    if (!tarjeta) return
+    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    tarjeta.scrollIntoView({ block: 'start', behavior: reducido ? 'auto' : 'smooth' })
+    tarjeta.querySelector('h4')?.focus({ preventScroll: true })
+  }
   return (
     <article id={`msg-${msg.id}`} className={`ag-msg-agentes ${msg.deshecho ? 'is-deshecho' : ''}`} aria-labelledby={tituloId} aria-busy={enCurso || undefined}>
       <header className="flex items-center gap-2.5">
@@ -121,9 +133,19 @@ function MensajeAgentes({ msg, ultimo }) {
             {t.titulo}
           </h3>
           <p className="text-xs text-flp-muted">
-            <span className="tnum">{msg.hora}</span> · {msg.origen === 'evento' ? 'Novedad recibida' : msg.origen === 'accion' ? 'Los agentes aplican la decisión' : 'Orquestador'}
+            <span className="tnum">{msg.hora}</span> · {msg.origen === 'evento' ? 'Novedad que llega sola' : msg.origen === 'accion' ? 'Los agentes aplican tu decisión' : 'Orquestador'}
             {msg.deshecho && <strong className="font-semibold text-flp-ink"> · Deshecho</strong>}
           </p>
+          {ultimo && msg.estado === 'hecho' && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <StatusChip estado="hecho" />
+              {porDecidir > 0 && (
+                <button type="button" className="ag-link ag-link--salto" onClick={irADecision}>
+                  {porDecidir === 1 ? '1 decisión para ti' : `${porDecidir} decisiones para ti`} <IconArrowDown size={14} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {enCurso && (
           <div className="flex flex-none gap-2">
@@ -132,12 +154,19 @@ function MensajeAgentes({ msg, ultimo }) {
               className="ag-boton-fila"
               onClick={() => {
                 despachar({ tipo: 'saltar' })
-                requestAnimationFrame(() => document.getElementById(tituloId)?.focus())
+                enfocarTitulo()
               }}
             >
-              Ver resultado
+              Saltar al resultado
             </button>
-            <button type="button" className="ag-boton-fila" onClick={() => despachar({ tipo: 'detener' })}>
+            <button
+              type="button"
+              className="ag-boton-fila"
+              onClick={() => {
+                despachar({ tipo: 'detener' })
+                enfocarTitulo()
+              }}
+            >
               <IconStop size={14} aria-hidden="true" /> Detener
             </button>
           </div>
@@ -160,18 +189,26 @@ function MensajeAgentes({ msg, ultimo }) {
         <div className="ag-bloques">
           {bloques.map((b) => (
             <div key={b.clave} className="ag-bloque-entrada">
-              <Bloque b={b} />
+              <Bloque b={b} mensajeId={msg.id} />
             </div>
           ))}
         </div>
       )}
 
       {!enCurso && deshacible === msg.id && !msg.deshecho && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-flp-muted">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-flp-muted">
           <span>¿No era esto?</span>
-          <button type="button" className="ag-link" disabled={ocupado} onClick={() => despachar({ tipo: 'deshacer', mensajeId: msg.id })}>
-            Deshacer
-          </button>
+          <FilmpilotButton
+            size="sm"
+            variant="secondary"
+            disabled={ocupado}
+            onClick={() => {
+              despachar({ tipo: 'deshacer', mensajeId: msg.id })
+              enfocarTitulo()
+            }}
+          >
+            Deshacer esta decisión
+          </FilmpilotButton>
         </div>
       )}
     </article>
@@ -202,16 +239,24 @@ function MensajeDecision({ msg }) {
   )
 }
 
-function MensajeNovedad({ msg }) {
+function MensajeNovedad({ msg, ultimaNovedad }) {
+  const { despachar, eventosPausados } = useCtx()
   return (
     <div className="ag-msg-novedad" role="note">
       <span className="ag-msg-novedad-icono" aria-hidden="true">
         <IconBell size={15} />
       </span>
-      <span>
-        <strong>Novedad</strong> · {msg.titulo}
+      <span className="min-w-0 flex-1">
+        <strong className="font-medium">Novedad</strong> · {msg.titulo}
+        <span className="block text-xs text-flp-muted">
+          <span className="tnum">{msg.hora}</span> · Llega sola, sin que la pidas: así avisan los agentes.
+        </span>
       </span>
-      <span className="tnum text-xs text-flp-muted">{msg.hora}</span>
+      {ultimaNovedad && (
+        <button type="button" className="ag-link" onClick={() => despachar({ tipo: 'pausarEventos', valor: !eventosPausados })}>
+          {eventosPausados ? 'Reanudar novedades' : 'Pausar novedades'}
+        </button>
+      )}
     </div>
   )
 }
@@ -232,14 +277,14 @@ function MensajeNota({ msg }) {
   return <p className="ag-msg-nota">{msg.texto}</p>
 }
 
-export function Mensaje({ msg, ultimo }) {
+export function Mensaje({ msg, ultimo, ultimaNovedad }) {
   switch (msg.rol) {
     case 'usuario':
       return <MensajeUsuario msg={msg} />
     case 'decision':
       return <MensajeDecision msg={msg} />
     case 'novedad':
-      return <MensajeNovedad msg={msg} />
+      return <MensajeNovedad msg={msg} ultimaNovedad={ultimaNovedad} />
     case 'guia':
       return <MensajeGuia msg={msg} />
     case 'nota':

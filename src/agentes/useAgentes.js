@@ -5,7 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { obtener, suscribir, despachar } from './store.js'
 
 export const RITMOS = {
-  pausado: { etiqueta: 'Pausado', factor: 0.6 },
+  pausado: { etiqueta: 'Lento', factor: 0.6 },
   normal: { etiqueta: 'Normal', factor: 1 },
   rapido: { etiqueta: 'Rápido', factor: 2.5 },
 }

@@ -34,13 +34,13 @@
   .ag-header .ag-campana { display: none; }
 }
 @media (min-width: 1280px) {
-  .ag-tabs .ag-tab--casos { display: none; }
+  .ag-tabs .ag-tab--agentes { display: none; }
 }
 .ag-header-marca { display: inline-flex; min-height: 44px; flex: none; align-items: center; border-radius: 6px; color: var(--flp-carbon); }
 .ag-header-sep { width: 1px; height: 28px; flex: none; background: var(--flp-border); }
 /* Un solo botón para todo lo que no es conversación. */
 .ag-demo-boton {
-  display: inline-flex; min-height: 44px; max-width: 340px; flex: none; align-items: center; gap: 8px; padding: 0 12px 0 6px;
+  display: inline-flex; min-height: 44px; max-width: 320px; flex: none; align-items: center; gap: 10px; padding: 4px 14px 4px 6px;
   border: 1px solid var(--flp-control-border); border-radius: 999px; background: var(--flp-surface);
   color: var(--flp-carbon); font-size: 14px; white-space: nowrap;
   transition: border-color var(--flp-duration) var(--flp-ease);
@@ -60,6 +60,9 @@
   background: var(--flp-signal); color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px; line-height: 18px; text-align: center;
   box-shadow: 0 0 0 1px var(--flp-carbon);
 }
+/* Novedades sin leer: un punto carbón aparte, sin número, para no cambiar el significado de la insignia. */
+.ag-campana-punto { position: absolute; bottom: 9px; right: 9px; width: 8px; height: 8px; border: 2px solid var(--flp-chalk); border-radius: 50%; background: var(--flp-carbon); }
+.ag-confirmar { padding: 12px 14px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-sm); background: var(--flp-surface); }
 
 /* Opciones de la demo: radios en filas y un control segmentado. */
 .ag-opciones { display: grid; gap: 6px; }
@@ -70,7 +73,7 @@
 .ag-opcion-radio:has(input:checked) { border-color: var(--flp-carbon); box-shadow: inset 0 0 0 1px var(--flp-carbon); }
 .ag-opcion-radio input { width: 18px; height: 18px; flex: none; accent-color: var(--flp-carbon); }
 .ag-segmentado { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; padding: 3px; border: 1px solid var(--flp-control-border); border-radius: 999px; background: var(--flp-surface); }
-.ag-segmentado label { position: relative; display: flex; min-height: 40px; align-items: center; justify-content: center; cursor: pointer; }
+.ag-segmentado label { position: relative; display: flex; min-height: 44px; align-items: center; justify-content: center; cursor: pointer; }
 .ag-segmentado input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .ag-segmentado span { width: 100%; padding: 8px 6px; border-radius: 999px; color: var(--flp-muted); font-size: 14px; text-align: center; }
 .ag-segmentado input:checked + span { background: var(--flp-carbon); color: var(--flp-chalk); }
@@ -130,15 +133,14 @@
 }
 .ag-redactor-boton:hover:not(:disabled) { background: var(--flp-signal-hover); }
 .ag-redactor-boton:disabled { background: var(--flp-chalk); color: var(--flp-control-border); cursor: not-allowed; }
-.ag-sugerencias { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 8px; padding-bottom: 2px; scrollbar-width: none; }
-.ag-sugerencias::-webkit-scrollbar { display: none; }
-@media (min-width: 768px) { .ag-sugerencias { flex-wrap: wrap; overflow: visible; } }
+/* Sugerencias al final de la última respuesta («Para seguir»), dentro del hilo. */
+.ag-sugerencias-hilo { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--flp-border); }
+.ag-sugerencias { display: flex; flex-wrap: wrap; gap: 8px; }
 .ag-sugerencia {
-  display: inline-flex; min-height: 44px; flex: none; align-items: center; padding: 8px 16px;
-  border: 1px solid var(--flp-control-border); border-radius: 999px; background: var(--flp-surface);
-  color: var(--flp-carbon); font-size: 14px; line-height: 1.3; text-align: left; white-space: nowrap;
+  display: inline-flex; min-height: 44px; max-width: 100%; align-items: center; padding: 8px 16px;
+  border: 1px solid var(--flp-control-border); border-radius: 22px; background: var(--flp-surface);
+  color: var(--flp-carbon); font-size: 14px; line-height: 1.3; text-align: left;
 }
-@media (min-width: 768px) { .ag-sugerencia { white-space: normal; } }
 .ag-sugerencia:hover:not(:disabled) { border-color: var(--flp-carbon); }
 .ag-sugerencia:disabled { opacity: .5; cursor: not-allowed; }
 .ag-trabajando-linea { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
@@ -190,6 +192,8 @@
 
 /* Etiquetas y estados (sobre .flp-state). */
 .ag-chip { max-width: 100%; }
+/* Atención sin amarillo: «Riesgo medio», «Cerca del umbral», «No cumple»… El amarillo queda para lo «Por revisar». */
+.ag-chip--atencion { border-color: var(--flp-text); font-weight: 500; }
 .ag-chip svg { flex: none; }
 .ag-spinner { width: 11px; height: 11px; flex: none; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: ag-spin .8s linear infinite; }
 @keyframes ag-spin { to { transform: rotate(360deg); } }
@@ -444,6 +448,8 @@ button.ag-acceso:disabled { opacity: .6; cursor: not-allowed; }
   color: var(--flp-muted); font-size: 14px; font-weight: 500; white-space: nowrap;
 }
 .ag-tab[aria-selected='true'] { border-bottom-color: var(--flp-carbon); color: var(--flp-carbon); }
+.ag-tab-n.is-riesgo { background: transparent; color: var(--flp-error); box-shadow: inset 0 0 0 1px var(--flp-error); }
+.ag-tab-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--flp-carbon); }
 .ag-tab-n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--flp-carbon); color: var(--flp-chalk); font-family: var(--flp-font-mono); font-size: 12px; line-height: 20px; text-align: center; }
 .ag-tab-n.is-revisar { background: var(--flp-signal); color: var(--flp-carbon); box-shadow: inset 0 0 0 1px var(--flp-carbon); }
 .ag-directo { display: inline-flex; align-items: center; gap: 6px; color: var(--flp-muted); font-size: 12px; font-weight: 500; }
@@ -460,6 +466,10 @@ button.ag-acceso:disabled { opacity: .6; cursor: not-allowed; }
 .ag-caso-check.is-visto { border-color: var(--flp-carbon); background: var(--flp-carbon); color: var(--flp-chalk); }
 
 /* Recorrido */
+.ag-tourbar-nota { display: -webkit-box; margin-top: 2px; overflow: hidden; color: var(--flp-muted); font-size: 13px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.ag-tourbar:focus-visible { outline: 2px solid var(--flp-signal); outline-offset: -4px; }
+.flp-button.is-bloqueado { cursor: not-allowed; opacity: .45; }
+.ag-link--salto { min-height: 32px; gap: 4px; font-size: 13px; }
 .ag-tourbar {
   display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px;
   background: var(--flp-carbon); color: var(--flp-chalk);

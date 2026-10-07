@@ -426,7 +426,7 @@ export function BloqueAprobacion({ b }) {
         <AutonomyBadge nivel={b.nivel} />
         {b.rol && <Tono tono="neutral">Decide: {b.rol}</Tono>}
       </div>
-      <h4 className="mt-3 text-base font-semibold leading-snug text-flp-ink">
+      <h4 tabIndex={-1} className="mt-3 text-base font-semibold leading-snug text-flp-ink focus:outline-none">
         <Tx value={b.titulo} />
       </h4>
       {b.subtitulo && <p className="mt-0.5 text-xs text-flp-muted">{b.subtitulo}</p>}
@@ -1341,7 +1341,12 @@ const REGISTRO = {
   plan: BloquePlan,
 }
 
-export function Bloque({ b }) {
+export function Bloque({ b, mensajeId }) {
   const C = REGISTRO[b.tipo]
-  return C ? <C b={b} /> : null
+  return C ? <C b={b} mensajeId={mensajeId} /> : null
+}
+
+/** Una tarjeta de aprobación sigue esperando decisión. */
+export function aprobacionPendiente(mundo, b) {
+  return b.tipo === 'aprobacion' && !ESTADO_DECISION[c.estadoDecision(mundo, b.ref).estado]
 }

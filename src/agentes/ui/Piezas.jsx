@@ -16,7 +16,7 @@ export function Tx({ value, className = '' }) {
     <span className={className}>
       {segs.map((s, i) =>
         s.esNumero ? (
-          <strong key={i} className="tnum font-semibold text-flp-ink">
+          <strong key={i} className="tnum whitespace-nowrap font-semibold text-flp-ink">
             {s.texto}
           </strong>
         ) : s.esValor ? (
@@ -72,6 +72,7 @@ export function AgentLabel({ id, size = 24, trabajando = false, className = '' }
 }
 
 const NIVEL_SEGMENTOS = { ejecuta: 1, propone: 2, aprueba: 3 }
+const ETIQUETA_CORTA = { ejecuta: 'Ejecuta', propone: 'Propone', aprueba: 'Aprobación' }
 
 /** Cómo actúa el agente (no es un estado): Ejecuta · Propone · Pide aprobación. */
 export function AutonomyBadge({ nivel, compacto = false }) {
@@ -85,8 +86,7 @@ export function AutonomyBadge({ nivel, compacto = false }) {
           <i key={i} className={i <= n ? 'is-on' : ''} />
         ))}
       </span>
-      {!compacto && <span>{a.etiqueta}</span>}
-      {compacto && <span className="sr-only">{a.etiqueta}</span>}
+      <span>{compacto ? ETIQUETA_CORTA[nivel] : a.etiqueta}</span>
     </span>
   )
 }
@@ -113,8 +113,9 @@ export function StatusChip({ estado, etiqueta, className = '' }) {
   )
 }
 
-// Tonos de las etiquetas: «warning» es lo que espera una revisión (señal).
-const TONOS = { neutral: '', info: '', positive: 'flp-state--done', negative: 'flp-state--error', warning: 'flp-state--review' }
+// Tonos de las etiquetas. Solo «revisar» lleva la señal amarilla (lo que espera
+// una decisión); «atencion» y «warning» avisan sin amarillo: borde y texto carbón.
+const TONOS = { neutral: '', info: '', positive: 'flp-state--done', negative: 'flp-state--error', revisar: 'flp-state--review', atencion: 'ag-chip--atencion', warning: 'ag-chip--atencion' }
 
 export function Tono({ tono = 'neutral', children, className = '' }) {
   return <span className={`ag-chip flp-state ${TONOS[tono] ?? ''} ${className}`}>{children}</span>
@@ -147,6 +148,7 @@ export function Desplegable({ titulo, resumen, nivel = 2, abiertoInicial = false
 export function Hoja({ abierta, onCerrar, titulo, subtitulo, lado = 'abajo', children, id }) {
   const ref = useRef(null)
   const cerrarRef = useRef(null)
+  const inicioY = useRef(null)
   // El efecto depende solo de «abierta»: si dependiera de onCerrar, cada render movería el foco.
   const onCerrarRef = useRef(onCerrar)
   onCerrarRef.current = onCerrar
@@ -180,7 +182,16 @@ export function Hoja({ abierta, onCerrar, titulo, subtitulo, lado = 'abajo', chi
     <div className={`ag-hoja ag-hoja--${lado} ${abierta ? 'is-open' : ''}`} aria-hidden={!abierta} inert={abierta ? undefined : ''}>
       <div className="ag-hoja-fondo" onClick={onCerrar} />
       <div ref={ref} id={id} className="ag-hoja-panel" role="dialog" aria-modal="true" aria-label={titulo}>
-        <div className="ag-hoja-cabecera">
+        <div
+          className="ag-hoja-cabecera"
+          onTouchStart={(e) => (inicioY.current = e.touches[0]?.clientY ?? null)}
+          onTouchEnd={(e) => {
+            // El asa invita a deslizar: bajarla más de 60 px cierra la hoja.
+            const fin = e.changedTouches[0]?.clientY
+            if (inicioY.current != null && fin - inicioY.current > 60) onCerrarRef.current()
+            inicioY.current = null
+          }}
+        >
           {lado === 'abajo' && <span className="ag-hoja-asa" aria-hidden="true" />}
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-flp-ink">{titulo}</h2>
