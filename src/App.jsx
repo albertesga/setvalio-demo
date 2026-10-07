@@ -65,19 +65,19 @@ function rutaInicial() {
   return new URLSearchParams(window.location.search).get('vista') === 'agentes' ? 'agentes' : 'landing'
 }
 
-function sincronizarVista(route) {
-  if (typeof window === 'undefined') return
+// Cada cambio de pantalla deja una entrada en el historial: «Atrás» vuelve a la
+// pantalla anterior (por ejemplo, de la demo clásica a la portada) en vez de salir.
+function urlDe(route) {
   const url = new URL(window.location.href)
-  const actual = url.searchParams.get('vista')
-  if (route === 'agentes' && actual !== 'agentes') url.searchParams.set('vista', 'agentes')
-  else if (route !== 'agentes' && actual) url.searchParams.delete('vista')
-  else return
-  window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+  if (route === 'agentes') url.searchParams.set('vista', 'agentes')
+  else url.searchParams.delete('vista')
+  return url.pathname + url.search
 }
 
 export default function App() {
   const [route, setRoute] = useState(rutaInicial)
-  const [desdeAgentes, setDesdeAgentes] = useState(false)
+  // Desde dónde se entró a la demo clásica, para ofrecer la vuelta: 'agentes' o 'landing'.
+  const [origen, setOrigen] = useState(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [gastosPendientes, setGastosPendientes] = useState(12)
   const [toast, setToast] = useState(null)
@@ -95,10 +95,11 @@ export default function App() {
       if (!prev[id]) return prev
       return { ...prev, [id]: null }
     })
-    if (route === 'agentes' && id !== 'agentes' && id !== 'landing') setDesdeAgentes(true)
-    if (id === 'agentes' || id === 'landing') setDesdeAgentes(false)
+    const clasica = id !== 'agentes' && id !== 'landing'
+    if (clasica && (route === 'agentes' || route === 'landing')) setOrigen(route)
+    if (!clasica) setOrigen(null)
+    if (id !== route && typeof window !== 'undefined') window.history.pushState({ route: id }, '', urlDe(id))
     setRoute(id)
-    sincronizarVista(id)
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
   }
 
@@ -143,6 +144,19 @@ export default function App() {
   useEffect(() => {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', conMarcaNueva ? '#F5F4EF' : '#311B2E')
   }, [conMarcaNueva])
+
+  // «Atrás» y «Adelante» del navegador cambian de pantalla.
+  useEffect(() => {
+    window.history.replaceState({ ...(window.history.state ?? {}), route: rutaInicial() }, '', window.location.href)
+    const alVolver = (e) => {
+      // Las anclas de la portada (#agentes…) no guardan pantalla: se deduce de la URL.
+      const destino = e.state?.route ?? rutaInicial()
+      setRoute(destino)
+      if (destino === 'agentes' || destino === 'landing') setOrigen(null)
+    }
+    window.addEventListener('popstate', alVolver)
+    return () => window.removeEventListener('popstate', alVolver)
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -242,14 +256,14 @@ export default function App() {
         </div>
       )}
 
-      {desdeAgentes && route !== 'agentes' && route !== 'landing' && (
+      {origen && route !== 'agentes' && route !== 'landing' && (
         <button
           type="button"
-          onClick={() => navegar('agentes')}
+          onClick={() => navegar(origen)}
           className="fixed bottom-5 left-4 z-[55] inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-ink px-4 text-sm font-semibold text-surface shadow-modal hover:bg-primary-hover lg:left-6"
         >
           <IconArrowLeft size={16} aria-hidden="true" />
-          Volver a la conversación
+          {origen === 'agentes' ? 'Volver a la conversación' : 'Volver a Filmpilot'}
         </button>
       )}
 
@@ -258,7 +272,7 @@ export default function App() {
         <div role="status" aria-live="polite" className="fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 lg:left-auto lg:right-6 lg:translate-x-0">
           {conMarcaNueva ? (
             <div className="flp-theme fp-fade-up flex items-center gap-2.5 rounded-flp-md bg-flp-carbon px-4 py-3 text-sm text-flp-chalk shadow-modal">
-              <IconCheckCircle size={18} className="text-flp-signal" />
+              <IconCheckCircle size={18} className="text-flp-chalk" />
               {toast.text}
             </div>
           ) : (

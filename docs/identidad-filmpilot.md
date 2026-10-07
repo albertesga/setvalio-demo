@@ -36,6 +36,8 @@ Semánticos de interfaz: gris `#595B59`, borde de control `#70726E`, divisor `#D
 
 **Regla del amarillo:** solo en la acción principal de cada sección, en lo que espera una revisión y en composiciones de marca. Siempre con texto carbón encima. Nunca texto amarillo ni plata sobre tiza. Reparto orientativo de la portada: 60–70 % tiza, 20–30 % carbón, 5–15 % señal.
 
+**Atención no es «Por revisar».** Riesgo medio, cerca del umbral, no cumple, confianza baja o un informe desactualizado usan el tono de atención (`Tono tono="atencion"`: borde y texto carbón), no la señal. En el prototipo, cada agente con algo pendiente lleva un punto señal en su avatar y el recuento en texto; la cifra amarilla vive en la pestaña «Por revisar» (y en la campana, en móvil).
+
 ## Tipografía
 
 - **Instrument Sans**: titulares en 400 con tracking negativo (≈ −0,05 em), texto en 400–500, controles en 500. Máximo 600 en la interfaz.
