@@ -2,6 +2,7 @@
 // agentes: directamente, al recorrido guiado o con una pregunta de ejemplo.
 // Cada sección vive en src/screens/portada/; aquí solo se montan.
 
+import { useLayoutEffect } from 'react'
 import './Landing.css'
 import './portada/subrayados.css'
 import { Cabecera } from './portada/Cabecera.jsx'
@@ -25,6 +26,13 @@ const CASO_RIESGO = {
 }
 
 export default function Landing({ onNavigate }) {
+  // Al cargar con un ancla (#agentes, #faq…) el navegador no baja: la sección aún no existía
+  // al leer la URL. Se baja aquí, sin animar (el scroll suave cruzaría toda la página), antes
+  // de pintar; las tomas ya se arman respecto a ese destino (useToma).
+  useLayoutEffect(() => {
+    const id = window.location.hash.slice(1)
+    if (id) document.getElementById(decodeURIComponent(id))?.scrollIntoView({ behavior: 'instant' })
+  }, [])
   const clearSectionHash = () => {
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
   }

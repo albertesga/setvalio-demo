@@ -1,7 +1,8 @@
 /* Titular por palabras (Titular.jsx). La ventana recorta cada palabra sin cortar
    descendentes; el estado de partida solo existe con movimiento y la toma armada. */
 
-.titular-ventana { display: inline-block; overflow: hidden; overflow: clip; padding-bottom: 0.12em; margin-bottom: -0.12em; vertical-align: top; }
+/* El relleno a la derecha evita que el tracking negativo del titular recorte la última letra. */
+.titular-ventana { display: inline-block; overflow: hidden; overflow: clip; padding-bottom: 0.12em; margin-bottom: -0.12em; padding-inline-end: 0.06em; margin-inline-end: -0.06em; vertical-align: top; }
 .titular-ventana > span { display: inline-block; }
 
 @media screen and (prefers-reduced-motion: no-preference) {
@@ -10,4 +11,9 @@
     transform: none;
     transition: transform 560ms var(--flp-ease) calc(var(--i) * 40ms + var(--pausa, 0ms));
   }
+}
+
+/* Movimiento reducido en plena toma: la transición en curso se cancela y las palabras quedan en su sitio. */
+@media (prefers-reduced-motion: reduce) {
+  .titular-ventana > span { transition: none !important; }
 }

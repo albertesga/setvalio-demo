@@ -4,6 +4,7 @@
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { IconClaqueta } from '../../components/icons.jsx'
 import { usePrefiereMovimiento } from './movimiento.js'
+import './BotonRepetir.css'
 
 export function BotonRepetir({ onClick, corriendo = false, className = '', children = 'Volver a verlo' }) {
   const movimiento = usePrefiereMovimiento()

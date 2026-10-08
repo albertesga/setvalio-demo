@@ -1,0 +1,9 @@
+/* «Volver a verlo» (BotonRepetir.jsx): mientras corre la toma no se puede pulsar ni lo
+   parece, y al imprimir no sale (en papel no hay nada que repetir). */
+
+.flp-button.portada-repetir[aria-disabled='true'] { cursor: default; }
+.flp-button.flp-button--ghost.portada-repetir[aria-disabled='true']:hover { background: transparent; }
+
+@media print {
+  .flp-button.portada-repetir { display: none; }
+}

@@ -68,10 +68,15 @@
   .flp-cine-etiqueta { display: none; }
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media print, (prefers-reduced-motion: reduce) {
   .flp-cine-escena,
   .flp-cine-simbolo,
   .flp-cine-gesto { transform: none !important; }
+}
+/* Al imprimir, el reposo sea cual sea el punto del scroll (el JS deja lo último en línea). */
+@media print {
+  .flp-cine-orbitas { transform: none !important; }
+  .flp-cine-sombra { opacity: 0 !important; }
 }
 
 /* ── Entrada de cámara (una vez al cargar) ────────────────────────────────────

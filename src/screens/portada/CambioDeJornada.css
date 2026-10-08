@@ -88,3 +88,8 @@
   .cambio-tarjeta[data-fase='lista'] .cambio-sello { opacity: 0; transform: scale(1.08); }
   .cambio-tarjeta[data-fase='rodando'] .cambio-sello { transition: opacity 200ms var(--flp-ease) var(--cambio-sello), transform 200ms var(--flp-ease) var(--cambio-sello); }
 }
+
+/* Movimiento reducido en plena toma: las transiciones en curso se cancelan y todo queda a la vista. */
+@media (prefers-reduced-motion: reduce) {
+  .cambio-tarjeta :is(.cambio-lluvia-barra, .cambio-lluvia-texto, .cambio-cifra, .cambio-sello) { transition: none !important; }
+}

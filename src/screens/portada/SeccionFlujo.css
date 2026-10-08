@@ -96,3 +96,9 @@
 @media (max-width: 900px) {
   .flujo-rail { left: 21px; }
 }
+
+/* Al imprimir, las etapas sin raíl: su geometría se mide en JS contra la pantalla y no
+   puede seguir la maquetación del papel. */
+@media print {
+  .flujo-rail { display: none; }
+}

@@ -131,6 +131,7 @@ export function CinematicSymbol({ className = '' }) {
     let entradaDesde = null // cuándo arrancó la entrada; null si no hay ninguna en curso
     let enEspera = false // armada bajo el pliegue: abierta y sin cerrarse hasta que se vea
     let quieta = false // movimiento reducido pedido en caliente: en reposo y sin seguir a nadie
+    let imprimiendo = false // entre beforeprint y afterprint: en reposo, sin frames
     let tcEscrito = null // el TC solo se reescribe cuando cambia de fotograma
     const largos = trazosOrbita.current.map((t) => t?.getTotalLength?.() ?? 0)
 
@@ -203,7 +204,7 @@ export function CinematicSymbol({ className = '' }) {
       if (!quieto && visible) raf = requestAnimationFrame(paso)
     }
     const pedir = () => {
-      if (raf === null && visible && !quieta) raf = requestAnimationFrame(paso)
+      if (raf === null && visible && !quieta && !imprimiendo) raf = requestAnimationFrame(paso)
     }
 
     const arrancar = () => {
@@ -253,6 +254,23 @@ export function CinematicSymbol({ className = '' }) {
       pintar()
     }
 
+    // Al imprimir, el reposo (sin inclinación ni sombra, puntos en su sitio y TC a cero);
+    // después vuelve a seguir al scroll. Una entrada armada bajo el pliegue sigue armada.
+    const alImprimir = () => {
+      imprimiendo = true
+      if (raf !== null) cancelAnimationFrame(raf)
+      raf = null
+      entradaDesde = null
+      Object.assign(objetivo, { x: 0, y: 0, p: 0 })
+      Object.assign(actual, { x: 0, y: 0, p: 0, a: 0 })
+      pintar()
+    }
+    const trasImprimir = () => {
+      imprimiendo = false
+      if (enEspera) actual.a = 1
+      alScroll()
+    }
+
     // Entrada: solo si el bloque no se ha pasado ya al montar (si la página carga con
     // scroll, no hay). A la vista arranca ya; bajo el pliegue espera a verse. Con un ancla
     // en la URL (#faq…) tampoco: el navegador baja hasta ella justo después de montar,
@@ -289,6 +307,8 @@ export function CinematicSymbol({ className = '' }) {
       document.documentElement.addEventListener('pointerleave', alSalir)
     }
     reducido?.addEventListener?.('change', alCambiarPreferencia)
+    window.addEventListener('beforeprint', alImprimir)
+    window.addEventListener('afterprint', trasImprimir)
     alScroll()
     // El primer fotograma ya sale con el diafragma de la entrada abierto.
     pintar()
@@ -300,6 +320,8 @@ export function CinematicSymbol({ className = '' }) {
       window.removeEventListener('pointermove', alCursor)
       document.documentElement.removeEventListener('pointerleave', alSalir)
       reducido?.removeEventListener?.('change', alCambiarPreferencia)
+      window.removeEventListener('beforeprint', alImprimir)
+      window.removeEventListener('afterprint', trasImprimir)
     }
   }, [])
 

@@ -11,6 +11,7 @@
 // @media (prefers-reduced-motion: no-preference).
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 
 export const limitar = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 /** La misma curva suave que el hero (smoothstep). */
@@ -43,8 +44,10 @@ export function useEnVista(ref, { umbral = 0.4, margen = '0px 0px -10% 0px', una
       setVisto(true)
       return
     }
+    // Con el hilo ocupado llegan varias entradas juntas: la última es el estado actual.
     const io = new IntersectionObserver(
-      ([e]) => {
+      (entradas) => {
+        const e = entradas[entradas.length - 1]
         if (e.isIntersecting) {
           setVisto(true)
           if (una) io.disconnect()
@@ -77,14 +80,27 @@ export function useToma(ref, { umbral = 0.45, duracion = 1000, margen = '0px', e
   const movimiento = usePrefiereMovimiento()
   const [fase, setFase] = useState('final')
   const [vuelta, setVuelta] = useState(0)
+  // Sube en cada repetir(): rearma la espera aunque la fase ya fuera 'lista'.
+  const [intento, setIntento] = useState(0)
   const repitiendo = useRef(false)
 
-  // Armar antes de pintar: sin parpadeo del estado final al de partida.
+  // Armar antes de pintar: sin parpadeo del estado final al de partida. Si la página carga
+  // con un ancla, se mide respecto a su destino: lo que se verá al llegar no se esconde.
   useLayoutEffect(() => {
     const el = ref.current
     if (!el || !movimiento || typeof IntersectionObserver === 'undefined') return
-    if (el.getBoundingClientRect().top > window.innerHeight) setFase((f) => (f === 'final' ? 'lista' : f))
+    const id = window.location.hash.slice(1)
+    const destino = id ? document.getElementById(decodeURIComponent(id)) : null
+    const base = destino ? destino.getBoundingClientRect().top : 0
+    if (el.getBoundingClientRect().top - base > window.innerHeight) setFase((f) => (f === 'final' ? 'lista' : f))
   }, [ref, movimiento])
+
+  // Al imprimir, lo que aún no se ha visto sale en su estado final (y se queda así).
+  useEffect(() => {
+    const alImprimir = () => flushSync(() => setFase((f) => (f === 'lista' || f === 'rodando' ? 'final' : f)))
+    window.addEventListener('beforeprint', alImprimir)
+    return () => window.removeEventListener('beforeprint', alImprimir)
+  }, [])
 
   // Si la persona pide movimiento reducido en caliente, todo a su estado final.
   useEffect(() => {
@@ -111,19 +127,23 @@ export function useToma(ref, { umbral = 0.45, duracion = 1000, margen = '0px', e
     const el = ref.current
     if (!el) return
     let t = null
+    // Si el bloque no cabe en pantalla (zoom alto, móvil apaisado) nunca llegaría a `umbral`:
+    // se pide lo que cabe.
+    const efectivo = Math.min(umbral, (0.9 * window.innerHeight) / Math.max(1, el.offsetHeight))
     const io = new IntersectionObserver(
-      ([e]) => {
+      (entradas) => {
+        const e = entradas[entradas.length - 1]
         clearTimeout(t)
-        if (e.isIntersecting) t = setTimeout(arrancar, espera)
+        if (e.isIntersecting && e.intersectionRatio >= efectivo) t = setTimeout(arrancar, espera)
       },
-      { threshold: umbral, rootMargin: margen },
+      { threshold: efectivo, rootMargin: margen },
     )
     io.observe(el)
     return () => {
       clearTimeout(t)
       io.disconnect()
     }
-  }, [fase, ref, umbral, margen, espera])
+  }, [fase, intento, ref, umbral, margen, espera])
 
   // Rodando → hecha. En un efecto propio para que StrictMode lo limpie y lo rearme.
   useEffect(() => {
@@ -135,6 +155,7 @@ export function useToma(ref, { umbral = 0.45, duracion = 1000, margen = '0px', e
   const repetir = useCallback(() => {
     if (!movimiento) return
     repitiendo.current = true
+    setIntento((i) => i + 1)
     setFase('lista')
   }, [movimiento])
 
@@ -219,8 +240,8 @@ export function useProgresoScroll(ref, pintar, { activo = true, pagina = false }
       else {
         // Un 10 % de margen para no empezar tarde ni cortar el último frame.
         io = new IntersectionObserver(
-          ([e]) => {
-            r.activo = e.isIntersecting
+          (entradas) => {
+            r.activo = entradas[entradas.length - 1].isIntersecting
             pedirFrame()
           },
           { rootMargin: '10% 0px 10% 0px' },

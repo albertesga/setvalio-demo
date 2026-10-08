@@ -44,6 +44,8 @@
 @media screen and (prefers-reduced-motion: no-preference) {
   .foto-encuadre { will-change: transform; }
   .foto-exposicion { will-change: opacity; }
+  /* Las bandas escalan en cada frame: con capa propia no repintan la banda entera. */
+  .landing-photo-banda { will-change: transform; }
 }
 
 /* Sin movimiento las bandas no se pintan, y sus rótulos irían sobre la foto sin contraste

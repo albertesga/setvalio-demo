@@ -206,6 +206,13 @@ export function CambioDeJornada({ planRef, toma, plan, cifras, lluvia }) {
     }
   }, [orden, planRef])
 
+  // Movimiento reducido en caliente: los arcos en curso terminan en su sitio, sin un frame más.
+  useLayoutEffect(() => {
+    if (movimiento) return
+    for (const a of animaciones.current) a.finish()
+    animaciones.current = []
+  }, [movimiento])
+
   // Al desmontar no queda ninguna animación viva.
   useEffect(() => {
     const vivas = animaciones
