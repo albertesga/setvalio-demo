@@ -14,8 +14,8 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
   const [menuOpen, setMenuOpen] = useState(false)
   // Se observan todas las secciones, no solo las de la nav: en el inicio, la foto o el
   // cierre no queda marcado ningún enlace (tampoco el de antes). Solo cambia de estado al
-  // pasar de una sección a otra. Con la franja por defecto: el cabezal de la pista cambia
-  // de clip en su centro (LECTURA en PistaMontaje.jsx); si cambia una, cambia la otra.
+  // pasar de una sección a otra. El cabezal de la pista cambia de clip en el centro de la
+  // misma franja (FRANJA_LECTURA en movimiento.js).
   const activa = useSeccionActiva(SECCIONES)
   const menuButtonRef = useRef(null)
   const headerRef = useRef(null)

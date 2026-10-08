@@ -8,9 +8,3 @@
   .agentes-plano { transform: none !important; will-change: auto !important; }
 }
 
-/* Titular (A2): su estado de partida no va bajo @media screen, así que si se imprime antes
-   de llegar a Agentes las palabras se quedan fuera de su ventana y el h2 sale en blanco.
-   Red local hasta que Titular.css lo guarde con screen. */
-@media print {
-  .agentes-seccion .titular-ventana > span { transform: none !important; }
-}

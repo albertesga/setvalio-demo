@@ -6,15 +6,14 @@
 // Con movimiento reducido la pista se queda con sus clips y sin cabezal.
 
 import { memo, useLayoutEffect, useRef, useState } from 'react'
-import { limitar, usePrefiereMovimiento, useProgresoScroll } from './movimiento.js'
+import { FRANJA_LECTURA, limitar, usePrefiereMovimiento, useProgresoScroll } from './movimiento.js'
 import './PistaMontaje.css'
 
 // Corte entre clips, en px: el mismo que el gap de .pista-montaje.
 const CORTE = 2
 // Punto de lectura, en fracción de la pantalla: el centro de la franja en la que
-// useSeccionActiva marca la sección ('-45% 0px -50% 0px', la que usa Cabecera.jsx).
-// Así el cabezal cambia de clip cuando cambia el enlace marcado.
-const LECTURA = 0.475
+// useSeccionActiva marca la sección. Así el cabezal cambia de clip cuando cambia el enlace marcado.
+const LECTURA = (FRANJA_LECTURA.arriba + (1 - FRANJA_LECTURA.abajo)) / 2
 
 // Posición en el documento sin transformaciones: si una sección se anima con transform,
 // la pista no se entera.

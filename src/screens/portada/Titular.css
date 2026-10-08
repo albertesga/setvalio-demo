@@ -4,7 +4,7 @@
 .titular-ventana { display: inline-block; overflow: hidden; overflow: clip; padding-bottom: 0.12em; margin-bottom: -0.12em; vertical-align: top; }
 .titular-ventana > span { display: inline-block; }
 
-@media (prefers-reduced-motion: no-preference) {
+@media screen and (prefers-reduced-motion: no-preference) {
   .titular[data-fase='lista'] .titular-ventana > span { transform: translateY(110%); }
   .titular[data-fase='rodando'] .titular-ventana > span {
     transform: none;

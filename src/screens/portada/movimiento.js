@@ -209,7 +209,8 @@ export function useProgresoScroll(ref, pintar, { activo = true, pagina = false }
     if (!movimiento || !activo) return
     const el = ref?.current ?? null
     if (!pagina && !el) return
-    const r = { el, pintar: pintarRef, activo: pagina, pagina }
+    // Activo desde el principio: el primer frame pinta aunque el IO aún no haya contestado.
+    const r = { el, pintar: pintarRef, activo: true, pagina }
     registros.add(r)
     escuchar()
     let io = null
@@ -239,7 +240,12 @@ export function useProgresoScroll(ref, pintar, { activo = true, pagina = false }
 // ── Sección activa ───────────────────────────────────────────────────────────
 
 /** Id de la sección que cruza la franja central de la pantalla. Solo cambia de estado al cambiar de sección. */
-export function useSeccionActiva(ids, rootMargin = '-45% 0px -50% 0px') {
+// Franja de lectura: la sección activa es la que cruza la pantalla entre el 45 % y el 50 %.
+// La pista de montaje pone su punto de lectura en el centro de esa franja.
+export const FRANJA_LECTURA = { arriba: 0.45, abajo: 0.5 }
+const MARGEN_LECTURA = `-${FRANJA_LECTURA.arriba * 100}% 0px -${FRANJA_LECTURA.abajo * 100}% 0px`
+
+export function useSeccionActiva(ids, rootMargin = MARGEN_LECTURA) {
   const [activa, setActiva] = useState(null)
   const clave = ids.join(',')
   useEffect(() => {

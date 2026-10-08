@@ -50,8 +50,10 @@ export function CifraCinta({ texto, vuelta = 0, retardo = 0, className = '' }) {
         {caracteres.map((ch, k) => {
           if (ch < '0' || ch > '9') return <span key={k}>{ch}</span>
           i -= 1
+          // El dígito en flujo (invisible) da el ancho y la línea base; la tira va encima.
           return (
             <span key={k} className="cinta-col">
+              <span className="cinta-hueco">{ch}</span>
               <span className="cinta-tira" style={{ '--d': Number(ch), '--i': i }}>
                 {FILAS.map((f, n) => (
                   <span key={n}>{f}</span>

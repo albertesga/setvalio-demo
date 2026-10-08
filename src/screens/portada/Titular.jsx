@@ -8,7 +8,7 @@ import './Titular.css'
 
 export function Titular({ as: Tag = 'h2', id, className = '', pausaAntes = null, children }) {
   const ref = useRef(null)
-  const { fase } = useToma(ref, { umbral: 0.6, duracion: 1400 })
+  const { fase } = useToma(ref, { umbral: 0.6, duracion: 1200 })
   const texto = String(children)
   const palabras = texto.split(' ')
   return (
