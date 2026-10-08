@@ -1,0 +1,15 @@
+/* Cifra de cinta (CifraCinta.jsx). Cada dígito es una ventana de 1em con una tira
+   0–9 0–9; en reposo enseña su dígito y al girar sube una vuelta entera. */
+
+.cinta { white-space: nowrap; }
+.cinta-visual { font-variant-numeric: tabular-nums; user-select: none; }
+.cinta-col { display: inline-block; height: 1em; overflow: hidden; overflow: clip; line-height: 1; vertical-align: text-bottom; }
+.cinta-tira { display: block; transform: translateY(calc(var(--d) * -1em)); }
+.cinta-tira > span { display: block; height: 1em; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .cinta[data-girando] .cinta-tira {
+    transform: translateY(calc((10 + var(--d)) * -1em));
+    transition: transform 700ms var(--flp-ease) calc(var(--retardo, 0ms) + var(--i) * 35ms);
+  }
+}

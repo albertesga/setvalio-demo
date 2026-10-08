@@ -1,0 +1,13 @@
+/* Titular por palabras (Titular.jsx). La ventana recorta cada palabra sin cortar
+   descendentes; el estado de partida solo existe con movimiento y la toma armada. */
+
+.titular-ventana { display: inline-block; overflow: hidden; overflow: clip; padding-bottom: 0.12em; margin-bottom: -0.12em; vertical-align: top; }
+.titular-ventana > span { display: inline-block; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .titular[data-fase='lista'] .titular-ventana > span { transform: translateY(110%); }
+  .titular[data-fase='rodando'] .titular-ventana > span {
+    transform: none;
+    transition: transform 560ms var(--flp-ease) calc(var(--i) * 40ms + var(--pausa, 0ms));
+  }
+}

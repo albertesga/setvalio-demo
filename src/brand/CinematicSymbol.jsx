@@ -37,7 +37,7 @@ const PUNTOS = [
 ]
 
 const FPS = 24
-function codigoDeTiempo(fotogramas) {
+export function codigoDeTiempo(fotogramas) {
   const ff = fotogramas % FPS
   const s = Math.floor(fotogramas / FPS)
   const dos = (n) => String(n).padStart(2, '0')
