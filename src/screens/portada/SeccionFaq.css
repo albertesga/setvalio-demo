@@ -1,0 +1,12 @@
+/* Preguntas frecuentes (SeccionFaq.jsx). Se carga después de Landing.css; prefijo faq-.
+   La respuesta que se abre se descubre de arriba abajo (clip-path y opacidad, sin tocar la
+   altura). La clase solo la pone el JS tras el primer clic y con movimiento. */
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .faq-descubre .landing-faq-item p:not([hidden]) { animation: faq-respuesta 260ms var(--flp-ease) both; }
+}
+
+@keyframes faq-respuesta {
+  from { clip-path: inset(0 0 100% 0); opacity: 0; }
+  to { clip-path: inset(0); opacity: 1; }
+}

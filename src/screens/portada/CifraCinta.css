@@ -1,0 +1,23 @@
+/* Cifra de cinta (CifraCinta.jsx). Cada dígito es una ventana del alto de una línea con
+   una tira 0–9 0–9 encima; en reposo enseña su dígito y al girar sube una vuelta entera.
+   La ventana lleva dentro el dígito real, invisible, así que comparte la línea base con
+   el resto de la cifra («€», «%», letras) y recorta con clip-path, no con overflow.
+   Las reglas van con .cinta delante: ninguna regla de la sección que la contiene
+   («dd span», «strong span»…) le cambia la caja, el tamaño o el color a sus piezas. */
+
+.cinta { --cinta-lh: 1.2; white-space: nowrap; }
+.cinta .cinta-visual,
+.cinta .cinta-visual span { margin: 0; padding: 0; color: inherit; font: inherit; letter-spacing: inherit; }
+.cinta .cinta-visual { display: inline; font-variant-numeric: tabular-nums; user-select: none; }
+.cinta .cinta-visual > span { display: inline; }
+.cinta .cinta-visual > .cinta-col { position: relative; display: inline-block; line-height: var(--cinta-lh); vertical-align: baseline; clip-path: inset(0); }
+.cinta .cinta-hueco { visibility: hidden; }
+.cinta .cinta-tira { position: absolute; top: 0; left: 0; display: block; transform: translateY(calc(var(--d) * var(--cinta-lh) * -1em)); }
+.cinta .cinta-tira > span { display: block; height: calc(var(--cinta-lh) * 1em); line-height: var(--cinta-lh); }
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .cinta[data-girando] .cinta-tira {
+    transform: translateY(calc((10 + var(--d)) * var(--cinta-lh) * -1em));
+    transition: transform 700ms var(--flp-ease) calc(var(--retardo, 0ms) + var(--i) * 35ms);
+  }
+}

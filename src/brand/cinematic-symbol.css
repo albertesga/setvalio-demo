@@ -68,8 +68,52 @@
   .flp-cine-etiqueta { display: none; }
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media print, (prefers-reduced-motion: reduce) {
   .flp-cine-escena,
   .flp-cine-simbolo,
   .flp-cine-gesto { transform: none !important; }
+}
+/* Al imprimir, el reposo sea cual sea el punto del scroll (el JS deja lo último en línea). */
+@media print {
+  .flp-cine-orbitas { transform: none !important; }
+  .flp-cine-sombra { opacity: 0 !important; }
+}
+
+/* ── Entrada de cámara (una vez al cargar) ────────────────────────────────────
+   Solo con movimiento y solo mientras el componente pone .is-entrando; con
+   .is-en-espera (armada bajo el pliegue) se queda en su primer fotograma hasta que el
+   bloque se ve. Iris 0–650 ms, esquinas 450–830 ms y datos del visor 800–1000 ms; el
+   diafragma lo cierra el componente (150–1100 ms). Su último fotograma es el reposo,
+   así que al quitar la clase no salta nada. Solo clip-path, transform y opacity. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* El bloque amarillo se abre desde el centro del símbolo; al 75 % ya cubre las esquinas. */
+  .flp-cine.is-entrando .flp-cine-fondo { animation: flp-cine-iris 650ms var(--flp-ease) both; }
+  /* Autofoco: cada esquina llega desde fuera, rebota un poco hacia dentro y se clava. */
+  .flp-cine.is-entrando .flp-cine-esquina {
+    transform-box: fill-box;
+    animation: flp-cine-encuadra 380ms var(--flp-ease) 450ms both;
+  }
+  .flp-cine.is-entrando .flp-cine-etiqueta { animation: flp-cine-aparece 200ms var(--flp-ease) 800ms both; }
+  /* Más específica que las de arriba: el atajo animation repone el play-state. */
+  .flp-cine.is-entrando.is-en-espera :is(.flp-cine-fondo, .flp-cine-esquina, .flp-cine-etiqueta) { animation-play-state: paused; }
+
+  /* Hacia dónde queda «fuera» para cada esquina (en unidades de la escena de 720). */
+  .flp-cine-esquina.is-no { --flp-cine-x: -1; --flp-cine-y: -1; }
+  .flp-cine-esquina.is-ne { --flp-cine-x: 1; --flp-cine-y: -1; }
+  .flp-cine-esquina.is-se { --flp-cine-x: 1; --flp-cine-y: 1; }
+  .flp-cine-esquina.is-so { --flp-cine-x: -1; --flp-cine-y: 1; }
+}
+
+@keyframes flp-cine-iris {
+  from { clip-path: circle(0% at 49.7% 50.9%); }
+  to { clip-path: circle(75% at 49.7% 50.9%); }
+}
+@keyframes flp-cine-encuadra {
+  0% { opacity: 0; transform: translate(calc(var(--flp-cine-x) * 14px), calc(var(--flp-cine-y) * 14px)); }
+  60% { opacity: 1; transform: translate(calc(var(--flp-cine-x) * -2px), calc(var(--flp-cine-y) * -2px)); }
+  100% { opacity: 1; transform: translate(0, 0); }
+}
+@keyframes flp-cine-aparece {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

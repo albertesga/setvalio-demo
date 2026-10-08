@@ -1,0 +1,104 @@
+/* «Cómo funciona» (SeccionFlujo.jsx): cabezal de montaje y encuadre de etapa.
+   Se carga después de Landing.css: a igual especificidad gana. Prefijo flujo-.
+
+   Estado final (sin movimiento, en print y antes de que JS arme la lista): el raíl
+   entero en carbón, sin cabezal, y los cinco números en carbón. El estado del cabezal
+   solo existe con la lista armada ([data-cabezal]) y dentro de
+   @media screen and (prefers-reduced-motion: no-preference). */
+
+/* ── Cabezal de montaje ───────────────────────────────────────────────────── */
+.flujo-lista { position: relative; isolation: isolate; }
+.flujo-lista .landing-flow-row { --fila-fondo: var(--flp-bg); position: relative; }
+.flujo-lista .landing-flow-row:hover { --fila-fondo: var(--flp-surface); }
+
+/* El número corta el raíl como una marca de edición: va por encima y con el fondo de
+   su fila (que cambia con el hover de la fila, al mismo ritmo). */
+.flujo-lista .landing-flow-number {
+  position: relative; z-index: 2; justify-self: center; padding: 6px 4px;
+  background: var(--fila-fondo); color: var(--flp-text);
+  transition: background-color var(--flp-duration) var(--flp-ease);
+}
+.flujo-numero { display: block; }
+
+/* El raíl va del centro del 01 al del 05 (JS fija top y height; esto es el respaldo),
+   centrado en la columna de números: 4 px de padding de la fila + media columna. */
+.flujo-rail { position: absolute; z-index: 1; top: 42px; bottom: 42px; left: 27px; width: 2px; pointer-events: none; }
+.flujo-rail::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 1px; margin-inline: auto; background: var(--flp-border); }
+.flujo-recorrido { position: absolute; inset: 0; background: var(--flp-carbon); transform-origin: top; }
+/* Triángulo de 8 px con la punta en el extremo del tramo recorrido. */
+.flujo-cabezal { position: absolute; top: -8px; left: -3px; display: none; width: 8px; height: 8px; background: var(--flp-carbon); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* --p (0–1) y --y (px) los escribe el planificador de scroll en .flujo-rail. */
+  .flujo-lista[data-cabezal] .flujo-recorrido { transform: scaleY(var(--p, 0)); }
+  .flujo-lista[data-cabezal] .flujo-cabezal { display: block; transform: translate3d(0, var(--y, 0px), 0); }
+  /* Gris hasta que el cabezal llega: carbón al 70 % (≈ 6,8:1 sobre tiza, AA). */
+  .flujo-lista[data-cabezal] .flujo-numero { opacity: 0.7; transition: opacity var(--flp-duration) var(--flp-ease); }
+  .flujo-lista[data-cabezal] .landing-flow-row[data-alcanzada] .flujo-numero { opacity: 1; }
+}
+
+/* ── Encuadre de etapa y su pregunta ──────────────────────────────────────── */
+/* Cuatro esquinas de visor (2 px de trazo, 12 px de brazo) que se cierran sobre la fila. */
+.flujo-encuadre { position: absolute; inset: 4px -2px; pointer-events: none; }
+.flujo-encuadre > span {
+  position: absolute; width: 12px; height: 12px; border: 0 solid var(--flp-carbon); opacity: 0;
+  transition: opacity 120ms var(--flp-ease), transform 120ms var(--flp-ease);
+}
+.flujo-encuadre > :nth-child(1) { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; }
+.flujo-encuadre > :nth-child(2) { top: 0; right: 0; border-top-width: 2px; border-right-width: 2px; }
+.flujo-encuadre > :nth-child(3) { bottom: 0; left: 0; border-bottom-width: 2px; border-left-width: 2px; }
+.flujo-encuadre > :nth-child(4) { right: 0; bottom: 0; border-right-width: 2px; border-bottom-width: 2px; }
+
+/* El detalle y la pregunta comparten celda: la fila mide lo que la más alta de las dos
+   y el hover no mueve la maquetación. */
+.flujo-detalle { display: grid; align-items: center; }
+.flujo-detalle > * { grid-area: 1 / 1; }
+.flujo-detalle-texto, .flujo-pregunta { transition: opacity 120ms var(--flp-ease), transform 120ms var(--flp-ease); }
+/* La pregunta, con la forma de la burbuja de la sección de agentes. Solo con cursor y en
+   escritorio: en táctil el toque abre los agentes con ella, como siempre. */
+.flujo-pregunta {
+  display: none; justify-self: start; max-width: 100%; padding: 8px 12px;
+  border: 1px solid var(--flp-border); border-radius: 12px 12px 4px 12px; background: var(--flp-surface);
+  color: var(--flp-text); font-size: 15px; line-height: 1.35;
+}
+
+/* Encuadre con el teclado (siempre) y con el cursor (solo donde hay hover). */
+.landing-flow-row:focus-visible .flujo-encuadre > span { opacity: 1; transform: none; transition-duration: var(--flp-duration); }
+@media (hover: hover) {
+  .landing-flow-row:hover .flujo-encuadre > span { opacity: 1; transform: none; transition-duration: var(--flp-duration); }
+}
+
+@media (min-width: 901px) and (hover: hover) {
+  .flujo-pregunta { display: block; opacity: 0; }
+  .landing-flow-row:is(:hover, :focus-visible) .flujo-detalle-texto { opacity: 0; transition-duration: var(--flp-duration); }
+  .landing-flow-row:is(:hover, :focus-visible) .flujo-pregunta { opacity: 1; transform: none; transition-duration: var(--flp-duration); }
+}
+
+/* Los desplazamientos solo con movimiento: con movimiento reducido es un cambio de estado. */
+@media (prefers-reduced-motion: no-preference) {
+  .flujo-encuadre > :nth-child(1) { transform: translate(-6px, -6px); }
+  .flujo-encuadre > :nth-child(2) { transform: translate(6px, -6px); }
+  .flujo-encuadre > :nth-child(3) { transform: translate(-6px, 6px); }
+  .flujo-encuadre > :nth-child(4) { transform: translate(6px, 6px); }
+  .flujo-lista .landing-flow-arrow { transition: transform 120ms var(--flp-ease); }
+  .flujo-lista .landing-flow-row:focus-visible .landing-flow-arrow { transform: translateX(4px); transition-duration: var(--flp-duration); }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .flujo-lista .landing-flow-row:hover .landing-flow-arrow { transform: translateX(4px); transition-duration: var(--flp-duration); }
+}
+@media (min-width: 901px) and (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .flujo-pregunta { transform: translateY(6px); }
+  .landing-flow-row:is(:hover, :focus-visible) .flujo-detalle-texto { transform: translateY(-6px); }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+/* Columna de números de 36 px por debajo de 900 px: el raíl se centra en ella. */
+@media (max-width: 900px) {
+  .flujo-rail { left: 21px; }
+}
+
+/* Al imprimir, las etapas sin raíl: su geometría se mide en JS contra la pantalla y no
+   puede seguir la maquetación del papel. */
+@media print {
+  .flujo-rail { display: none; }
+}

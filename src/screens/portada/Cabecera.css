@@ -1,0 +1,22 @@
+/* Cabecera (Cabecera.jsx). Se carga después de Landing.css. */
+
+/* La pista de montaje hace de borde inferior. */
+.landing-header.cabecera-con-pista { border-bottom: 0; }
+
+/* Enlace de la sección en la que estás (solo escritorio: en móvil la nav va en el menú).
+   Pasa a carbón y se subraya con 1 px. Al irse, la línea se recoge hacia la derecha; al
+   llegar, se dibuja desde la izquierda. Es un estado: sin movimiento cambia al instante. */
+.landing-nav .cabecera-enlace { position: relative; }
+/* La línea es un borde y no un fondo: en alto contraste (forced-colors) el fondo se
+   pinta del color del lienzo y el enlace activo se quedaría sin marca. */
+.landing-nav .cabecera-enlace::after {
+  content: ''; position: absolute; right: 10px; bottom: calc(50% - 0.72em); left: 10px;
+  height: 0; border-top: 1px solid currentColor;
+  transform: scaleX(0); transform-origin: right;
+}
+.landing-nav .cabecera-enlace.is-activa { color: var(--flp-carbon); }
+.landing-nav .cabecera-enlace.is-activa::after { transform: scaleX(1); transform-origin: left; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-nav .cabecera-enlace::after { transition: transform var(--flp-duration) var(--flp-ease); }
+}

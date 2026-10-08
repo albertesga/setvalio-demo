@@ -60,6 +60,7 @@ Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por re
 
 `src/brand/CinematicSymbol.jsx` convierte `graphics/orbit-signal.svg` en una escena 3D (CSS, sin librerías). En reposo es la composición del kit, sin sombra, con un visor de cámara alrededor (esquinas, «A · CAM · 24 FPS», «2.39:1» y un código de tiempo). Solo se mueve con la persona, nunca en bucle:
 
+- **Entrada:** al cargar, la cámara A enfoca una sola vez (≈ 1,1 s): el bloque amarillo se abre como un iris, el diafragma se cierra en el logo, las esquinas del visor encuadran con un pequeño rebote y después aparecen sus datos. A la vez, el claim cambia de foco de la primera línea a la segunda. El código de tiempo no rebobina. No hay entrada si la página carga con el bloque ya pasado o con un ancla; en móvil espera a que se vea el bloque.
 - **Cursor:** inclina la escena como un movimiento de cámara. Los cinco gestos están a distinta profundidad y tienen grosor.
 - **Scroll:**
   - los gestos se abren como las láminas de un diafragma;
@@ -78,8 +79,30 @@ En la portada, la banda de la foto se mueve por capas con el scroll, sin bucles:
 - **Foto:** va más lenta que la página y con un leve acercamiento.
 - **Texto:** va algo más rápido y cada línea a su ritmo.
 - **Bandas de cine:** dos bandas carbón se cierran cuando la sección llega al centro.
+- **Cámara B:** es el contraplano del hero. Al cerrarse las bandas, las esquinas del visor se ajustan (de 1,06 a 1) y aparecen dentro de ellas «B · CAM · 24 FPS», «2.39:1», «La última función · Día 7 de 20» y un código de tiempo propio (por debajo de 640 px, solo el día y el TC). La foto sube de exposición al entrar y, pasado el centro, «Menos seguimiento.» se retira al 55 % (solo por encima de 640 px).
 
 Con `prefers-reduced-motion` todo queda quieto.
+
+## Movimiento en la portada
+
+La portada se rueda como una producción: una toma por sección. Las piezas viven en `src/screens/portada/` y comparten `movimiento.js`:
+
+- `useToma`: una secuencia que se reproduce una vez al entrar en pantalla. Solo se arma si el bloque está bajo el pliegue al cargar.
+- `useProgresoScroll`: un solo planificador de scroll y rAF para toda la página. Solo pide frames si hay algo que pintar.
+- `CifraCinta`: las cifras dan una vuelta de rodillo y se paran en su valor real. Nunca enseñan ceros ni valores intermedios quietos.
+
+| Sección | Efecto | Disparador |
+| --- | --- | --- |
+| Cabecera | Pista de montaje: un clip por sección, un cabezal que sigue al scroll y el enlace de la sección activa subrayado | Scroll |
+| Agentes | La sección llega recortada como un plano y se abre a sangre; el titular sube por palabras con una pausa antes de «Tú decides.»; el informe semanal se reproduce en directo (En espera → Trabajando → Completado → Por revisar), con «Volver a verlo» | Scroll y en pantalla |
+| Cómo funciona | Un cabezal de montaje baja por las cinco etapas, enciende cada número y gira su cifra; al pasar por una etapa, esquinas de visor y la pregunta que se enviará | Scroll y hover o foco |
+| Riesgos | La jornada 8 (exterior con lluvia) se cambia por la 9 delante de ti, con las cifras en juego y ahorradas; conmutador «Plan actual / Propuesta del agente» y «Volver a verlo» | En pantalla y clic |
+| Fiscalidad | El dossier se deja sobre la mesa en abanico y los tres «Bloqueante» se estampan como sellos | Scroll y en pantalla |
+| Preguntas | El titular sube por palabras y cada respuesta se descubre de arriba abajo | En pantalla y clic |
+| Cierre | Una claqueta que da el «clac» al pasar por «Probar los agentes» (en táctil, una vez al verla) | Hover o foco |
+| Enlaces de texto | El subrayado se recoge y se vuelve a dibujar | Hover o foco |
+
+Reglas: nada en bucle; solo se anima transform, opacity y clip-path; los estados de partida solo existen con movimiento y dentro de `@media screen and (prefers-reduced-motion: no-preference)`, así que con movimiento reducido o al imprimir se ve la portada completa y quieta. El amarillo no gana sitio: solo el CTA, «Por revisar» y el bloque del hero.
 
 ## Metadatos
 

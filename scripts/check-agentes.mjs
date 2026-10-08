@@ -25,7 +25,8 @@ import { crearSesion, reducirSesion, estadoTour, conversacionIniciada } from '..
 import { agendaDelDia, PREGUNTAS_PARTE } from '../src/agentes/escenarios/saludo.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
-import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
+import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, SENALES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
+import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER } from '../src/screens/portada/datos.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
 import { CASHFLOW } from '../src/lib/data.js'
 import { diasEntre } from '../src/agentes/texto.js'
@@ -812,6 +813,20 @@ test('ni la portada ni los agentes mencionan la marca anterior ni la demo clási
     assert.ok(!/SetValio/i.test(src), `${f} menciona SetValio`)
     assert.ok(!/demo cl[aá]sica/i.test(src), `${f} menciona la demo clásica`)
   }
+})
+test('la portada cuenta el día y el plan de rodaje del mundo de los agentes', () => {
+  const m = crearMundo()
+  assert.deepEqual([RODAJE.titulo, RODAJE.dia, RODAJE.jornadas], [m.proyecto.titulo, m.proyecto.diaActual, m.proyecto.diasRodaje])
+  for (const j of PLAN_RIESGO.jornadas) {
+    const o = JORNADAS.find((x) => x.n === j.n)
+    assert.ok(o, `jornada ${j.n}`)
+    assert.deepEqual([j.tipo, j.localizacion, j.nota], [o.tipo, o.localizacion, o.nota], `jornada ${j.n}`)
+  }
+  assert.deepEqual([PLAN_RIESGO.lluvia, PLAN_RIESGO.intercambio], [SENALES.lluvia.jornada, SENALES.lluvia.intercambio])
+  // Las cifras escritas en «Cómo funciona» son las que responden los agentes.
+  assert.equal(FLOW.find((f) => f.number === '03').value.replace('−', '-'), eur(c.tesoreria(m).minimo.saldo).replace(/\u00a0/g, ' ').replace('−', '-'))
+  assert.equal(FLOW.find((f) => f.number === '05').value, `${c.dossier(m).length} bloqueantes`)
+  assert.equal(DOSSIER.length, c.dossier(m).length)
 })
 test('la portada enseña las cifras del agente de riesgos', () => {
   const src = readFileSync(new URL('../src/screens/Landing.jsx', import.meta.url), 'utf8')

@@ -1,0 +1,49 @@
+/* Cambio de foco del claim (Hero.jsx). Cada línea es un bloque con el texto real y,
+   solo durante la entrada, una copia desenfocada encima: un text-shadow estático que se
+   pinta una vez. Solo se anima opacity y transform, nunca un filter. Sin movimiento, o
+   si la página carga con scroll o con un ancla, no hay copia ni atributo: el claim sale
+   nítido. */
+
+.foco-linea { position: relative; display: block; }
+/* En bloque, como la copia: las dos cortan las líneas igual (text-wrap: balance). */
+.foco-nitido { display: block; }
+.foco-blando { display: none; }
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* Respiro de objetivo: la línea llega un pelo grande y se asienta al enfocar. Crece
+     desde la izquierda para no despegarse del kicker. */
+  .landing-hero[data-entrada] .foco-linea {
+    transform-origin: 0 50%;
+    animation: foco-respira 500ms var(--flp-ease) var(--retardo, 0ms) both;
+    will-change: transform;
+  }
+  /* La nítida arranca en .15 y no en 0: el H1 sigue siendo el candidato a LCP. */
+  .landing-hero[data-entrada] .foco-nitido {
+    animation: foco-nitido 500ms var(--flp-ease) var(--retardo, 0ms) both;
+    will-change: opacity;
+  }
+  .landing-hero[data-entrada] .foco-blando {
+    position: absolute;
+    inset: 0;
+    display: block;
+    color: transparent;
+    text-shadow: 0 0 0.14em rgb(20 20 20 / 0.55);
+    pointer-events: none;
+    user-select: none;
+    animation: foco-blando 500ms var(--flp-ease) var(--retardo, 0ms) both;
+    will-change: opacity;
+  }
+}
+
+@keyframes foco-respira {
+  from { transform: scale(1.012); }
+  to { transform: none; }
+}
+@keyframes foco-nitido {
+  from { opacity: 0.15; }
+  to { opacity: 1; }
+}
+@keyframes foco-blando {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

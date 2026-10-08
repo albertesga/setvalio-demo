@@ -52,7 +52,8 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.flp-theme :is(h1, h2, h3, h4, h5, h6) { font-family: inherit; }
+/* :where para no ganar a clases como .flp-kicker en un encabezado. */
+.flp-theme :where(h1, h2, h3, h4, h5, h6) { font-family: inherit; }
 .flp-theme ::selection { background: var(--flp-signal); color: var(--flp-carbon); }
 .flp-theme :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--flp-text);

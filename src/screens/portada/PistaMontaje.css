@@ -1,0 +1,35 @@
+/* Pista de montaje (PistaMontaje.jsx). Hace de borde inferior de la cabecera: siete
+   clips en gris divisor con 2 px de corte y un cabezal carbón que sigue al scroll.
+   La caja mide lo que el cabezal (10 px) y los clips van pegados abajo. */
+
+.pista-montaje {
+  position: absolute; right: 0; bottom: 0; left: 0;
+  display: flex; height: 10px; align-items: flex-end; gap: 2px;
+  pointer-events: none;
+}
+/* flex-grow llega en línea: el alto de su sección. */
+.pista-clip { flex: 1 1 0; min-width: 0; height: 2px; background: var(--flp-border); }
+
+/* Cabezal: línea de 1 × 10 px bajo un triángulo de 6 px. Solo se mueve con transform,
+   escrito desde el scroll; no tiene transición. La traslación es entera y la línea va en
+   x = 2 px: nítida aunque la capa compuesta no se rasterice en subpíxel. El triángulo se
+   corre medio píxel para quedar centrado sobre ella. */
+.pista-cabezal { position: absolute; bottom: 0; left: 0; width: 6px; height: 10px; }
+.pista-cabezal::before { content: ''; position: absolute; bottom: 0; left: 2px; width: 1px; height: 10px; background: var(--flp-carbon); }
+.pista-cabezal::after { content: ''; position: absolute; top: 0; left: -0.5px; width: 6px; height: 5px; background: var(--flp-carbon); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+
+/* En alto contraste los fondos se pintan del color del lienzo y la cabecera se quedaría
+   sin borde: la pista pasa a colores del sistema. */
+@media (forced-colors: active) {
+  .pista-montaje { forced-color-adjust: none; }
+  .pista-clip { background: GrayText; }
+  .pista-cabezal::before, .pista-cabezal::after { background: CanvasText; }
+}
+
+/* Sin movimiento el componente no pinta el cabezal; esto es solo la red. */
+@media (prefers-reduced-motion: reduce) {
+  .pista-cabezal { display: none; }
+}
+@media print {
+  .pista-cabezal { display: none; }
+}

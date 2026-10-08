@@ -1,0 +1,80 @@
+/* Informe semanal en directo (InformeEnDirecto.jsx, A3). Se carga después de Landing.css;
+   prefijo informe-. Sin reglas de fase se ve el panel terminado: es lo que hay sin
+   movimiento, al imprimir, antes de armar la toma y en 'hecha'. Los estados de la toma
+   solo existen en pantalla, con movimiento y con data-fase puesto por useToma. */
+
+.informe { display: grid; gap: 12px; min-width: 0; }
+
+/* Celda del estado: En espera, Trabajando y el estado final, apilados en la misma celda.
+   Mide lo que el chip mayor, así que el cambio de estado no mueve la fila. Fuera de la
+   toma, los dos primeros no se pintan. */
+.informe-estado { display: grid; justify-items: end; }
+.informe-previos { display: grid; justify-items: end; visibility: hidden; }
+.informe .informe-estado .flp-state, .informe .informe-previos { grid-area: 1 / 1; }
+
+.informe .informe-repetir { justify-self: start; }
+
+@media (max-width: 640px) {
+  /* Como el chip en Landing.css: bajo el nombre, alineado a la izquierda. */
+  .informe .informe-estado { grid-column: 2; justify-self: start; justify-items: start; }
+  .informe .informe-previos { justify-items: start; }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* Estado de partida: la petición aún no está hecha y los cuatro agentes, en espera,
+     con el glifo apagado. La cifra del pie no se esconde: siempre es la real. */
+  .informe:is([data-fase='lista'], [data-fase='rodando']) .informe-previos { visibility: visible; }
+  .informe[data-fase='lista'] .informe-pide { opacity: 0; transform: translateX(16px); }
+  .informe[data-fase='lista'] .informe-glifo { opacity: 0.45; }
+  .informe[data-fase='lista'] .is-review .informe-glifo { color: var(--flp-chalk); }
+  .informe[data-fase='lista'] .informe-previos .flp-state--working,
+  .informe[data-fase='lista'] .informe-final { opacity: 0; }
+
+  /* La toma: cada fila trae --trabaja y --acaba (ms). Al repetir, useToma pasa dos
+     frames por 'lista', así que las animaciones vuelven a empezar sin remontar nada. */
+  .informe[data-fase='rodando'] .informe-pide { animation: informe-pide 240ms var(--flp-ease) both; }
+  .informe[data-fase='rodando'] .informe-previos .flp-state--idle { animation: informe-sale 160ms var(--flp-ease) calc(var(--trabaja) * 1ms) both; }
+  .informe[data-fase='rodando'] .informe-previos .flp-state--working {
+    animation:
+      informe-aparece 160ms var(--flp-ease) calc(var(--trabaja) * 1ms) both,
+      informe-sale 160ms var(--flp-ease) calc(var(--acaba) * 1ms) forwards;
+  }
+  .informe[data-fase='rodando'] .informe-final { animation: informe-aparece 160ms var(--flp-ease) calc(var(--acaba) * 1ms) both; }
+  /* «Por revisar» llega el último y se posa como un sello. */
+  .informe[data-fase='rodando'] .is-review .informe-final { animation: informe-sello 200ms var(--flp-ease) calc(var(--acaba) * 1ms) both; }
+
+  /* El glifo se enciende al empezar y respira dos veces mientras trabaja (el keyframe de
+     marca), repartidas entre trabaja y acaba. Después se para. */
+  .informe[data-fase='rodando'] .informe-glifo {
+    animation:
+      informe-enciende 200ms var(--flp-ease) calc(var(--trabaja) * 1ms) both,
+      flp-breathe calc((var(--acaba) - var(--trabaja)) * 0.5ms) ease-in-out calc(var(--trabaja) * 1ms) 2;
+  }
+  /* El de Excepciones pasa a señal de golpe al quedar por revisar: sin interpolar el color. */
+  .informe[data-fase='rodando'] .is-review .informe-glifo {
+    animation:
+      informe-enciende 200ms var(--flp-ease) calc(var(--trabaja) * 1ms) both,
+      flp-breathe calc((var(--acaba) - var(--trabaja)) * 0.5ms) ease-in-out calc(var(--trabaja) * 1ms) 2,
+      informe-senal 1ms step-end calc(var(--acaba) * 1ms) both;
+  }
+
+  /* «Volver a verlo» aparece al terminar la primera toma. Mientras tanto ocupa su sitio
+     (nada salta) y, si llega el foco de teclado, se ve. Repite la lista de transiciones
+     del botón para no perderlas. */
+  .informe .informe-repetir {
+    transition:
+      opacity 240ms var(--flp-ease),
+      background-color var(--flp-duration) var(--flp-ease),
+      border-color var(--flp-duration) var(--flp-ease),
+      color var(--flp-duration) var(--flp-ease),
+      transform var(--flp-duration) var(--flp-ease);
+  }
+  .informe:is([data-fase='lista'], [data-fase='rodando']):not([data-pedida]) .informe-repetir:not(:focus-visible) { opacity: 0; pointer-events: none; }
+}
+
+@keyframes informe-pide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes informe-aparece { from { opacity: 0; } to { opacity: 1; } }
+@keyframes informe-sale { from { opacity: 1; } to { opacity: 0; } }
+@keyframes informe-sello { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes informe-enciende { from { opacity: 0.45; } to { opacity: 1; } }
+@keyframes informe-senal { from { color: var(--flp-chalk); } to { color: var(--flp-signal); } }

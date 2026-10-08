@@ -1,0 +1,10 @@
+/* Sección de Agentes (SeccionAgentes.jsx). Se carga después de Landing.css; prefijo agentes-.
+   El plano que se abre (A1) se escribe en línea desde JS y solo mientras se abre: en reposo
+   no queda recorte ni capa. Al imprimir o con movimiento reducido, la sección va siempre
+   a sangre aunque quede algo escrito (el JS ya lo limpia al cambiar la preferencia). */
+
+@media print, (prefers-reduced-motion: reduce) {
+  .agentes-seccion { clip-path: none !important; }
+  .agentes-plano { transform: none !important; will-change: auto !important; }
+}
+
