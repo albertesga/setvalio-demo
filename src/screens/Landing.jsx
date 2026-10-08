@@ -3,6 +3,7 @@
 // Cada sección vive en src/screens/portada/; aquí solo se montan.
 
 import './Landing.css'
+import './portada/subrayados.css'
 import { Cabecera } from './portada/Cabecera.jsx'
 import { Hero } from './portada/Hero.jsx'
 import { SeccionAgentes } from './portada/SeccionAgentes.jsx'

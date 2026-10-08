@@ -1,0 +1,43 @@
+/* Subrayados que se redibujan (G1): enlaces de texto de la portada («Ver cómo lo analiza»,
+   «Preguntar qué bloquea el dossier», el pie y «Volver arriba»).
+   Con ratón: la línea se recoge hacia la derecha, se vuelve a dibujar desde la izquierda
+   con 2 px y el chevron avanza 3 px. En táctil se queda el subrayado de siempre.
+   Solo se anima transform. */
+
+.landing-subrayado { position: relative; display: inline-block; }
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-arrow-link,
+  .landing-footer-bottom a,
+  .landing-footer nav button:hover { text-decoration: none; }
+
+  .landing-subrayado::after {
+    content: ''; position: absolute; right: 0; bottom: -0.2em; left: 0; height: 1px;
+    background: currentColor; transform-origin: left; pointer-events: none;
+  }
+  /* En el pie la línea no está en reposo: entra al pasar por encima. */
+  .landing-footer nav button .landing-subrayado::after { transform: scaleX(0); }
+
+  :is(.landing-arrow-link, .landing-footer-bottom a):is(:hover, :focus-visible) .landing-subrayado::after { animation: subraya-redibuja 380ms var(--flp-ease) both; }
+  .landing-footer nav button:is(:hover, :focus-visible) .landing-subrayado::after { animation: subraya-entra 220ms var(--flp-ease) both; }
+
+  .landing-arrow-link svg { transition: transform var(--flp-duration) var(--flp-ease); }
+  .landing-arrow-link:is(:hover, :focus-visible) svg { transform: translateX(3px); }
+}
+
+@keyframes subraya-redibuja {
+  0% { transform: scaleX(1); transform-origin: right; }
+  42% { transform: scaleX(0); transform-origin: right; }
+  43% { transform: scaleX(0); transform-origin: left; }
+  100% { transform: scaleX(1) scaleY(2); transform-origin: left; }
+}
+@keyframes subraya-entra {
+  from { transform: scaleX(0) scaleY(2); }
+  to { transform: scaleX(1) scaleY(2); }
+}
+
+/* Movimiento reducido: la línea pasa a 2 px al instante y el chevron no se mueve. */
+@media (prefers-reduced-motion: reduce) {
+  :is(.landing-arrow-link, .landing-footer-bottom a, .landing-footer nav button):is(:hover, :focus-visible) .landing-subrayado::after { animation: none; transform: scaleY(2); }
+  .landing-arrow-link:is(:hover, :focus-visible) svg { transform: none; }
+}

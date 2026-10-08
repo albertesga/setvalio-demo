@@ -1,0 +1,80 @@
+/* Cierre (K1): claqueta de la toma junto a la invitación (Claqueta.jsx).
+   Carbón y tiza, sin amarillo: la señal de la sección sigue siendo solo el CTA.
+   El palo abierto es el estado de partida: solo existe con movimiento y la claqueta
+   armada por JS (data-armada). Sin eso, y en print, se ve cerrada y quieta.
+   Solo se anima transform. */
+
+/* ── Maquetación ──────────────────────────────────────────────────────────── */
+/* La columna de texto repite la rejilla de .landing-final-inner (Landing.css) heredando
+   su separación y su alineación: si cambian allí, cambian aquí. */
+.claqueta-texto { display: grid; min-width: 0; justify-self: stretch; gap: inherit; justify-items: inherit; }
+
+/* Por debajo de 901 px la claqueta va tras los botones, pequeña, para no empujar el CTA. */
+.claqueta {
+  --claqueta-ancho: 150px;
+  --claqueta-palo: calc(var(--claqueta-ancho) * 0.11);
+  width: var(--claqueta-ancho);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* A partir de 901 px (Landing.css pasa a una columna en 900): dos columnas, con la
+   claqueta a la derecha y las dos centradas en vertical. */
+@media (min-width: 901px) {
+  .claqueta-rejilla { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: clamp(3rem, 7vw, 7rem); }
+  .claqueta-rejilla > .claqueta { --claqueta-ancho: clamp(12.5rem, 21vw, 15rem); justify-self: end; }
+}
+
+/* ── Palos ────────────────────────────────────────────────────────────────── */
+/* El de arriba gira sobre la bisagra (abajo a la izquierda); el de abajo es fijo y lleva
+   las franjas al revés, así que al cerrar forman la espiga de una claqueta real.
+   El borde carbón dibuja el contorno: las franjas tiza se perderían sobre la página. */
+.claqueta-palo,
+.claqueta-base {
+  display: block;
+  height: var(--claqueta-palo);
+  border: 1px solid var(--flp-carbon);
+}
+.claqueta-palo {
+  background: repeating-linear-gradient(-45deg, var(--flp-carbon) 0 14px, var(--flp-chalk) 14px 28px);
+  transform-origin: 0 100%;
+}
+.claqueta-base { background: repeating-linear-gradient(45deg, var(--flp-carbon) 0 14px, var(--flp-chalk) 14px 28px); }
+
+/* ── Cuerpo: la pizarra con los campos ────────────────────────────────────── */
+.claqueta-cuerpo {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 0 0 var(--flp-radius-sm) var(--flp-radius-sm);
+  background: var(--flp-carbon); color: var(--flp-chalk);
+  font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.3; font-variant-numeric: tabular-nums;
+}
+.claqueta-campo { display: grid; min-width: 0; align-content: start; gap: 2px; padding: 8px 8px 10px; }
+.claqueta-campo:first-child { grid-column: 1 / -1; border-bottom: 1px solid rgb(245 244 239 / 0.3); }
+.claqueta-campo:last-child { border-left: 1px solid rgb(245 244 239 / 0.3); }
+/* Plata sobre carbón (≈ 9:1): la etiqueta se lee por debajo del valor, en tiza. */
+.claqueta-etiqueta { color: var(--flp-silver); letter-spacing: 0.08em; }
+.claqueta-valor { overflow-wrap: break-word; }
+
+@media (min-width: 901px) {
+  .claqueta-campo { padding: 10px 14px 12px; }
+  .claqueta-valor { font-size: 14px; }
+}
+
+/* ── Movimiento ───────────────────────────────────────────────────────────── */
+/* Abierto 16° y, al salir del botón, se reabre en 300 ms. El cierre usa su propia
+   transición (110 ms, ease-in): es un golpe, no un deslizamiento. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* Hueco para el palo abierto: su punta sube ≈ ancho × sen 16° y así no pisa los botones.
+     Solo con el palo abierto: cerrada y quieta no deja un hueco vacío ni se descentra. */
+  .claqueta[data-armada] { padding-top: calc(var(--claqueta-ancho) * 0.28); }
+  .claqueta[data-armada] .claqueta-palo { transform: rotate(-16deg); transition: transform 300ms var(--flp-ease); }
+  /* Táctil: se cierra una sola vez, 400 ms después de que la claqueta esté a la vista. */
+  .claqueta[data-armada].is-accion .claqueta-palo { transform: rotate(0deg); transition: transform 110ms ease-in 400ms; }
+  /* Teclado: al llegar a «Probar los agentes». Regla aparte: sin :has() el navegador
+     descarta solo esta regla y la claqueta se queda abierta, sin perder nada. */
+  .claqueta-rejilla:has(.claqueta-accion:focus-visible) .claqueta[data-armada] .claqueta-palo { transform: rotate(0deg); transition: transform 110ms ease-in; }
+}
+/* Cursor: solo donde hay hover de verdad (en táctil se quedaría pegado tras el toque). */
+@media screen and (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .claqueta-rejilla:has(.claqueta-accion:hover) .claqueta[data-armada] .claqueta-palo { transform: rotate(0deg); transition: transform 110ms ease-in; }
+}

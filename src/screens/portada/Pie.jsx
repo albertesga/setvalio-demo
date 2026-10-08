@@ -17,17 +17,17 @@ export function Pie({ abrirAgentes }) {
               Filmpilot
             </h2>
             <button type="button" onClick={() => abrirAgentes()}>
-              Probar los agentes
+              <span className="landing-subrayado">Probar los agentes</span>
             </button>
             <button type="button" onClick={() => abrirAgentes({ tour: true })}>
-              Recorrido guiado
+              <span className="landing-subrayado">Recorrido guiado</span>
             </button>
           </nav>
         </div>
         <div className="landing-footer-bottom">
           <span>Estimación orientativa: no sustituye el criterio de tu fiscalista.</span>
           <a href="#landing-title">
-            Volver arriba <span aria-hidden="true">↑</span>
+            <span className="landing-subrayado">Volver arriba</span> <span aria-hidden="true">↑</span>
           </a>
         </div>
       </Container>

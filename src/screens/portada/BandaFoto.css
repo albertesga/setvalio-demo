@@ -1,0 +1,65 @@
+/* Banda de la foto: la cámara B (BandaFoto.jsx). Se carga después de Landing.css.
+   Lo que se mueve lo escribe pintar() con el scroll. En reposo y sin movimiento: las
+   esquinas quietas a escala 1, sin rótulos ni capa de exposición. */
+
+/* Exposición: carbón entre la foto y la capa de contraste (el ::after de la banda). */
+.foto-exposicion { position: absolute; inset: 0; background: var(--flp-carbon); opacity: 0; pointer-events: none; }
+
+.foto-visor {
+  /* Como mucho 26 px: con la banda cerrada (9 % de 640 = 57,6 px) el brazo vertical, que
+     arranca a media banda, cabe dentro y no asoma sobre la foto. */
+  --foto-brazo: clamp(16px, 2.2vw, 26px);
+  --foto-hueco: 12px;
+  position: absolute; z-index: 1; inset: 0; pointer-events: none;
+}
+
+/* Encuadre al ancho del texto y a media altura de las bandas (miden el 9 %): con ellas
+   cerradas (la sección en el centro), los brazos van por dentro, en la línea de los rótulos. */
+.foto-encuadre { position: absolute; top: 4.5%; right: 0; bottom: 4.5%; left: 0; }
+.foto-esquina { position: absolute; width: var(--foto-brazo); height: var(--foto-brazo); overflow: visible; }
+.foto-esquina path { fill: none; stroke: var(--flp-chalk); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.foto-esquina.is-arriba { top: 0; }
+.foto-esquina.is-abajo { bottom: 0; }
+.foto-esquina.is-izquierda { left: 0; }
+.foto-esquina.is-derecha { right: 0; }
+
+/* Rótulos: cada fila mide lo que la banda y empieza donde acaba el brazo de la esquina. */
+.foto-datos { position: absolute; right: 0; left: 0; height: 9%; opacity: 0; }
+.foto-datos.is-arriba { top: 0; }
+.foto-datos.is-abajo { bottom: 0; }
+.foto-datos-fila {
+  display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 16px;
+  padding-inline: calc(var(--foto-brazo) + var(--foto-hueco));
+  color: var(--flp-chalk); font-family: var(--flp-font-mono); font-size: 12px; letter-spacing: 0.08em; line-height: 1;
+  text-transform: uppercase; white-space: nowrap;
+}
+/* El código de tiempo cambia en cada frame de scroll: que no mueva nada alrededor. */
+.foto-tc { contain: layout paint; font-variant-numeric: tabular-nums; }
+
+/* A 375 px la banda inferior no da para todo: quedan el día y el código de tiempo. */
+@media (max-width: 640px) {
+  .foto-datos-titulo { display: none; }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .foto-encuadre { will-change: transform; }
+  .foto-exposicion { will-change: opacity; }
+}
+
+/* Sin movimiento las bandas no se pintan, y sus rótulos irían sobre la foto sin contraste
+   garantizado: quedan las esquinas quietas, también si se cambia en caliente. Al imprimir,
+   lo mismo, sea cual sea el punto del scroll. */
+@media print, (prefers-reduced-motion: reduce) {
+  .foto-exposicion, .foto-datos { display: none; }
+  .foto-encuadre { transform: none !important; }
+  /* Landing.css las deja siempre: sin movimiento no hacen falta capas propias. */
+  .landing-photo-media, .landing-photo-capa { will-change: auto; }
+}
+
+/* Al imprimir, el mismo estado final que Landing.css da con movimiento reducido. Si no,
+   saldría el último frame pintado: tras pasar la sección, «Menos seguimiento.» al 55 %. */
+@media print {
+  .landing-photo-media { inset: 0; transform: none !important; }
+  .landing-photo-capa { transform: none !important; opacity: 1 !important; }
+  .landing-photo-banda { display: none; }
+}

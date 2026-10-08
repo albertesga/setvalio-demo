@@ -1,0 +1,90 @@
+/* Riesgos de producción: la jornada 8 se cambia por la 9 (CambioDeJornada.jsx).
+   Se carga después de Landing.css: a igual especificidad gana. Prefijo cambio-.
+
+   Estado final por defecto (sin movimiento, en print, en 'final' y en 'hecha'): la
+   lluvia sobre la 8, las cifras en su sitio, el sello quieto y el orden que diga el
+   conmutador. Los estados de partida solo existen con la toma armada por JS
+   ([data-fase='lista']) y dentro de @media screen and (prefers-reduced-motion:
+   no-preference). Los retardos salen de GUION_CSS, en la tarjeta. */
+
+.cambio { display: grid; gap: 20px; min-width: 0; }
+
+/* ── Plan: tres huecos fijos con su tira ──────────────────────────────────── */
+/* Las filas (rótulo, lluvia, tira) se comparten entre huecos con subgrid: si «Jornada 7 ·
+   hoy» ocupa dos líneas a 375 px, las tres tiras siguen alineadas y miden lo mismo. */
+.cambio-plan {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto 1fr;
+  gap: 6px 8px; isolation: isolate;
+}
+.cambio-hueco {
+  position: relative; display: grid; grid-row: span 3;
+  grid-template-rows: auto auto 1fr; grid-template-rows: subgrid;
+  /* El mismo hueco entre filas que el plan: con subgrid coincide y en la pauta de
+     respaldo evita que rótulo, lluvia y tira queden pegados. */
+  row-gap: 6px; min-width: 0; padding-top: 10px;
+}
+.cambio-hueco::before { content: ''; position: absolute; top: 0; right: 0; left: 0; height: 1px; background: var(--flp-border); }
+.cambio-hueco[data-hoy]::before { height: 3px; background: var(--flp-carbon); }
+.cambio-rotulo { color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.4; }
+.cambio-hueco[data-hoy] .cambio-rotulo { color: var(--flp-text); }
+
+/* La lluvia es del día, no de la tira: se queda en su hueco cuando las tiras cambian. */
+.cambio-lluvia { display: grid; align-content: start; gap: 4px; min-height: 26px; }
+.cambio-lluvia-barra { display: block; height: 4px; border-radius: 2px; background: var(--flp-error); transform-origin: left; }
+.cambio-lluvia-texto { color: var(--flp-error); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.3; white-space: nowrap; }
+
+/* La tira: el exterior va por encima mientras se cruzan. */
+.cambio-tira { position: relative; z-index: 1; display: grid; min-width: 0; }
+.cambio-tira[data-sube] { z-index: 2; }
+.cambio-tira-cuerpo {
+  position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 10px 8px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-bg);
+}
+.cambio-tipo { color: var(--flp-text); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.4; letter-spacing: 0.08em; }
+.cambio-sitio { color: var(--flp-text); font-size: 13px; line-height: 1.35; overflow-wrap: break-word; }
+.cambio-nota { color: var(--flp-muted); font-size: 12px; line-height: 1.35; overflow-wrap: break-word; }
+/* «Propuesta» y el contorno discontinuo: siempre en el DOM (sin saltos de altura) y a la
+   vista solo en las tiras que el agente ha cambiado de hueco. */
+.cambio-etiqueta { margin-top: auto; padding-top: 6px; color: var(--flp-text); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.3; opacity: 0; }
+.cambio-discontinuo { position: absolute; inset: -1px; border: 1px dashed var(--flp-carbon); border-radius: inherit; opacity: 0; pointer-events: none; }
+.cambio-tira[data-movida] :is(.cambio-etiqueta, .cambio-discontinuo) { opacity: 1; }
+/* La sombra de la tira levantada: solo la enciende la animación del arco. */
+.cambio-sombra { position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 10px 22px rgb(20 20 20 / 0.16); opacity: 0; pointer-events: none; }
+
+/* ── Conmutador y repetir ─────────────────────────────────────────────────── */
+/* Sin amarillo: el orden elegido va en carbón. */
+.cambio-conmutador { display: flex; flex-wrap: wrap; gap: 8px; }
+.cambio-conmutador .flp-button { padding-inline: 0.85rem; }
+.cambio-repetir { justify-self: start; }
+
+/* A 375 px cada hueco mide unos 93 px y todo cabe; por debajo, las palabras largas se
+   parten antes que desbordar la tira. */
+@media (max-width: 360px) {
+  .cambio-plan { column-gap: 6px; }
+  .cambio-tira-cuerpo { padding-inline: 6px; }
+  .cambio-sitio, .cambio-etiqueta { overflow-wrap: anywhere; }
+  /* A 320 px el hueco mide unos 75 px y «Lluvia 80 %» (≈ 79 px) se saldría: va en dos líneas. */
+  .cambio-lluvia-texto { white-space: normal; }
+}
+
+/* ── La toma ──────────────────────────────────────────────────────────────── */
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* 0 ms: el glifo del agente respira dos veces. */
+  .cambio-tarjeta[data-fase='rodando'] .cambio-glifo { animation: flp-breathe 1s ease-in-out 2; }
+
+  /* Lluvia sobre la jornada 8. */
+  .cambio-tarjeta[data-fase='lista'] .cambio-lluvia-barra { transform: scaleX(0); }
+  .cambio-tarjeta[data-fase='lista'] .cambio-lluvia-texto { opacity: 0; }
+  .cambio-tarjeta[data-fase='rodando'] .cambio-lluvia-barra { transition: transform 300ms var(--flp-ease) var(--cambio-lluvia); }
+  .cambio-tarjeta[data-fase='rodando'] .cambio-lluvia-texto { transition: opacity 200ms var(--flp-ease) calc(var(--cambio-lluvia) + 150ms); }
+
+  /* Plano y contraplano: «Análisis de riesgo» desde la izquierda, «Dinero ahorrado» desde la derecha. */
+  .cambio-tarjeta[data-fase='lista'] .cambio-cifra { opacity: 0; transform: translateX(-16px); }
+  .cambio-tarjeta[data-fase='lista'] .cambio-cifra + .cambio-cifra { transform: translateX(16px); }
+  .cambio-tarjeta[data-fase='rodando'] .cambio-cifra { transition: opacity 360ms var(--flp-ease) var(--cambio-riesgo), transform 360ms var(--flp-ease) var(--cambio-riesgo); }
+  .cambio-tarjeta[data-fase='rodando'] .cambio-cifra + .cambio-cifra { transition-delay: var(--cambio-ahorro); }
+
+  /* El sello «Por revisar»: es una propuesta y la apruebas tú. */
+  .cambio-tarjeta[data-fase='lista'] .cambio-sello { opacity: 0; transform: scale(1.08); }
+  .cambio-tarjeta[data-fase='rodando'] .cambio-sello { transition: opacity 200ms var(--flp-ease) var(--cambio-sello), transform 200ms var(--flp-ease) var(--cambio-sello); }
+}

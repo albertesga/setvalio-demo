@@ -1,13 +1,22 @@
-// Cabecera de la portada: logo, navegación, CTA y menú móvil.
+// Cabecera de la portada: logo, navegación, CTA y menú móvil. Su borde inferior es la
+// pista de montaje y, en escritorio, se marca el enlace de la sección en la que estás.
 
 import { useEffect, useRef, useState } from 'react'
 import { FilmpilotButton, FilmpilotLogo } from '../../brand/Filmpilot.jsx'
 import { IconChevronDown, IconChevronRight, IconClose, IconMenu } from '../../components/icons.jsx'
 import { Container, movimientoReducido } from './comun.jsx'
-import { NAV } from './datos.js'
+import { NAV, SECCIONES } from './datos.js'
+import { useSeccionActiva } from './movimiento.js'
+import { PistaMontaje } from './PistaMontaje.jsx'
+import './Cabecera.css'
 
 export function Cabecera({ abrirAgentes, clearSectionHash }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  // Se observan todas las secciones, no solo las de la nav: en el inicio, la foto o el
+  // cierre no queda marcado ningún enlace (tampoco el de antes). Solo cambia de estado al
+  // pasar de una sección a otra. Con la franja por defecto: el cabezal de la pista cambia
+  // de clip en su centro (LECTURA en PistaMontaje.jsx); si cambia una, cambia la otra.
+  const activa = useSeccionActiva(SECCIONES)
   const menuButtonRef = useRef(null)
   const headerRef = useRef(null)
   useEffect(() => {
@@ -34,7 +43,7 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
   }
 
   return (
-    <header ref={headerRef} className="landing-header">
+    <header ref={headerRef} className="landing-header cabecera-con-pista">
       <Container className="landing-header-inner">
         <button
           type="button"
@@ -49,7 +58,7 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
         </button>
         <nav className="landing-nav" aria-label="Navegación principal">
           {NAV.map(({ label, href }) => (
-            <a key={href} href={href}>
+            <a key={href} href={href} className={`cabecera-enlace${href === `#${activa}` ? ' is-activa' : ''}`}>
               {label}
             </a>
           ))}
@@ -63,6 +72,7 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
           </button>
         </div>
       </Container>
+      <PistaMontaje secciones={SECCIONES} />
       <nav
         id="landing-mobile-nav"
         className={`landing-mobile-nav${menuOpen ? ' is-open' : ''}`}

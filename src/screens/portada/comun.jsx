@@ -11,7 +11,7 @@ export function Container({ children, className = '' }) {
 export function ArrowLink({ children, onClick, className = '' }) {
   return (
     <button type="button" onClick={onClick} className={`landing-arrow-link ${className}`}>
-      {children}
+      <span className="landing-subrayado">{children}</span>
       <IconChevronRight size={17} aria-hidden="true" />
     </button>
   )
