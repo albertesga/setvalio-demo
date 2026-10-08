@@ -14,7 +14,8 @@ import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS }
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
 import { useMovimientoReducido } from '../useAgentes.js'
-import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable } from './Piezas.jsx'
+import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, diaCorto } from './Piezas.jsx'
+import { BloqueTira, BloqueAgenda, BloqueSemana, BloqueEquipo } from './Parte.jsx'
 import { PERSONAS } from '../mundo.js'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
@@ -32,7 +33,7 @@ function Titulo({ children, extra }) {
 
 function BloqueTexto({ b }) {
   return (
-    <p className="ag-prosa">
+    <p className={b.destacado ? 'ag-prosa ag-prosa--lead' : 'ag-prosa'}>
       <Tx value={b.texto} />
     </p>
   )
@@ -444,7 +445,7 @@ function BloqueDocumento({ b }) {
 // ── Aprobación ───────────────────────────────────────────────────────────────
 
 // Estados que cierran la decisión. «Pedida a otro rol» y «en revisión» siguen abiertas.
-const ESTADO_DECISION = {
+export const ESTADO_DECISION = {
   aprobada: { etiqueta: 'Aprobada', tono: 'positive' },
   rechazada: { etiqueta: 'Rechazada', tono: 'neutral' },
   preparada: { etiqueta: 'Paquete preparado · no enviado', tono: 'info' },
@@ -643,7 +644,7 @@ export { decisionesAbiertas }
 const CAPACIDAD_DECISION = { riesgo: 'Exploratorio', propuesta: 'Sin validar' }
 
 /** Si la tarjeta ya está en la conversación y sigue abierta, «Revisar» lleva a ella en vez de repetir el trabajo. */
-function irATarjeta(ref) {
+export function irATarjeta(ref) {
   if (!ref) return false
   const tarjetas = document.querySelectorAll(`.ag-aprobacion[data-ref="${ref.tipo}-${ref.id}"]:not(.is-decidida)`)
   const t = tarjetas[tarjetas.length - 1]
@@ -1296,25 +1297,9 @@ function BloqueLlamada({ b }) {
 
 // ── Riesgos de producción ────────────────────────────────────────────────────
 
-const SEVERIDAD = {
-  alta: { etiqueta: 'Riesgo alto', tono: 'negative', Icon: IconAlert },
-  media: { etiqueta: 'Riesgo medio', tono: 'atencion', Icon: IconClock },
-  baja: { etiqueta: 'Riesgo bajo', tono: 'neutral', Icon: null, dot: true },
-  controlado: { etiqueta: 'Controlado', tono: 'positive', Icon: IconCheck },
-}
+export { ChipSeveridad }
 
-export function ChipSeveridad({ severidad }) {
-  const s = SEVERIDAD[severidad] ?? SEVERIDAD.baja
-  const Icon = s.Icon
-  return (
-    <Tono tono={s.tono}>
-      {Icon ? <Icon size={12} strokeWidth={2.6} aria-hidden="true" /> : <span className="flp-state-dot" aria-hidden="true" />}
-      {s.etiqueta}
-    </Tono>
-  )
-}
-
-const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido · sigue vigilado' }
+export const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido · sigue vigilado' }
 
 /** Radar en directo: lee el mundo actual, así que cambia con cada novedad o decisión. */
 export function RadarRiesgos({ compacto = false }) {
@@ -1389,10 +1374,10 @@ function BloquePlan() {
               .map((j) => {
                 const r = marca[j.n]
                 return (
-                  <li key={j.n} className={`ag-plan-dia ${r ? `is-${r.severidad}` : ''} ${j.n === mundo.proyecto.diaActual + 1 ? 'is-hoy' : ''}`}>
+                  <li key={j.n} className={`ag-plan-dia ${r ? `is-${r.severidad}` : ''} ${j.n === mundo.proyecto.diaActual ? 'is-hoy' : ''}`}>
                     <span className="ag-plan-n tnum">
-                      J{j.n} · {fechaCortaIso(j.fecha)}
-                      {j.n === mundo.proyecto.diaActual + 1 && <strong> · hoy</strong>}
+                      J{j.n} · {diaCorto(j.fecha)}
+                      {j.n === mundo.proyecto.diaActual && <strong> · hoy</strong>}
                     </span>
                     <span className="min-w-0">
                       <span className="ag-plan-loc">{j.localizacion}</span>
@@ -1413,11 +1398,6 @@ function BloquePlan() {
 }
 
 const SEVERIDAD_ORDEN = { alta: 0, media: 1, baja: 2, controlado: 3 }
-const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
-function fechaCortaIso(iso) {
-  const d = new Date(`${iso}T12:00:00Z`)
-  return `${DIAS_SEMANA[d.getUTCDay()]} ${d.getUTCDate()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-}
 
 const REGISTRO = {
   texto: BloqueTexto,
@@ -1438,6 +1418,10 @@ const REGISTRO = {
   llamada: BloqueLlamada,
   riesgos: BloqueRiesgos,
   plan: BloquePlan,
+  tira: BloqueTira,
+  agenda: BloqueAgenda,
+  semana: BloqueSemana,
+  equipo: BloqueEquipo,
 }
 
 export function Bloque({ b, mensajeId }) {

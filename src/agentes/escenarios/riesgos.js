@@ -2,7 +2,7 @@
 // detalle de un riesgo y avisos que llegan solos (orden del día, lluvia).
 
 import { cuenta, fecha as fechaLarga, formatear } from '../texto.js'
-import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, UMBRALES, TIPOS, PREGUNTA } from '../rodaje.js'
+import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, UMBRALES, TIPOS, PREGUNTA, HECHAS } from '../rodaje.js'
 import { PERSONAS } from '../mundo.js'
 import { t, v, c, paso, sug, texto, aviso, lista } from './comun.js'
 
@@ -150,7 +150,7 @@ export const riesgos = {
   id: 'riesgos',
   titulo: (det) =>
     det.eventoId === 'EV-CITACION' ? 'Aviso urgente · orden del día' : det.eventoId === 'EV-LLUVIA' ? 'Aviso · previsión de lluvia' : det.entidades?.jornada != null && !det.entidades?.riesgo ? 'Jornada de rodaje' : det.entidades?.riesgo ? 'Riesgo de rodaje' : 'Parte de riesgos de rodaje',
-  ejemplos: ['¿Qué riesgos hay para las próximas jornadas?', '¿Va a llover en la jornada 18?', '¿Qué riesgo hay con las horas extra de noche?', '¿Está publicada la orden de rodaje de mañana?'],
+  ejemplos: ['¿Qué riesgos hay para las próximas jornadas?', PREGUNTA['RG-1'], PREGUNTA['RG-5'], PREGUNTA['RG-4']],
 
   planificar(m, det) {
     // Alertas que llegan solas.
@@ -170,7 +170,7 @@ export const riesgos = {
     const pedido = riesgoPedido(m, det)
     const recibirParte = m.entrantes.includes('EV-RIESGOS') ? [{ tipo: 'evento/recibir', eventoId: 'EV-RIESGOS' }] : []
     if (pedido?.jornada != null) {
-      return [paso('riesgos', t('Revisa la jornada {n} en el plan', { n: v(pedido.jornada, 'num') }), { tipo: 'lectura', acciones: recibirParte, salida: jornada(m, pedido.jornada) ? t('Sin riesgos abiertos en esa jornada') : t('Fuera del plan que vigila') })]
+      return [paso('riesgos', t('Revisa la jornada {n} en el plan', { n: v(pedido.jornada, 'num') }), { tipo: 'lectura', acciones: recibirParte, salida: jornada(m, pedido.jornada) ? t('Sin riesgos abiertos en esa jornada') : HECHAS.some((h) => h.n === pedido.jornada) ? t('Ya rodada') : t('Fuera del plan que vigila') })]
     }
     const id = pedido?.id
     if (id) {
@@ -189,7 +189,7 @@ export const riesgos = {
 
     const evaluados = evaluarRiesgos(m)
     return [
-      paso('riesgos', t('Lee el plan de las próximas jornadas'), { tipo: 'lectura', acciones: recibirParte, salida: t('De la jornada {a} a la {b}', { a: v(m.proyecto.diaActual + 1, 'num'), b: v(m.proyecto.diasRodaje, 'num') }) }),
+      paso('riesgos', t('Lee el plan de las próximas jornadas'), { tipo: 'lectura', acciones: recibirParte, salida: t('De la jornada {a} a la {b}', { a: v(m.proyecto.diaActual, 'num'), b: v(m.proyecto.diasRodaje, 'num') }) }),
       paso('riesgos', t('Mira la previsión del tiempo para los exteriores'), {
         paralelo: true,
         salida: () => {
@@ -240,13 +240,17 @@ export const riesgos = {
     const pedido = riesgoPedido(antes, det)
     if (pedido?.jornada != null) {
       const j = jornada(m, pedido.jornada)
+      const hecha = HECHAS.find((h) => h.n === pedido.jornada)
+      const rango = { a: v(m.proyecto.diaActual, 'num'), b: v(m.proyecto.diasRodaje, 'num') }
       return {
         bloques: [
           AVISO_EXPLORATORIO,
           texto(
             j
               ? t('Jornada {n} ({f}): {loc}, {tipo} de {franja}. No veo riesgos abiertos en esa jornada.', { n: v(j.n, 'num'), f: v(fechaLarga(j.fecha)), loc: v(j.localizacion), tipo: v(j.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j.franja.toLowerCase()) })
-              : t('La jornada {n} está fuera del plan que vigilo: de la {a} a la {b}.', { n: v(pedido.jornada, 'num'), a: v(m.proyecto.diaActual + 1, 'num'), b: v(m.proyecto.diasRodaje, 'num') }),
+              : hecha
+                ? t('La jornada {n} ya se rodó ({f}: {loc}, {tipo} de {franja}). Vigilo las que quedan, de la {a} a la {b}.', { n: v(hecha.n, 'num'), f: v(fechaLarga(hecha.fecha)), loc: v(hecha.localizacion), tipo: v(hecha.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(hecha.franja.toLowerCase()), ...rango })
+                : t('La jornada {n} está fuera del plan que vigilo: de la {a} a la {b}.', { n: v(pedido.jornada, 'num'), ...rango }),
           ),
         ],
         sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?')],
@@ -284,7 +288,7 @@ export const riesgos = {
       }
       return {
         bloques,
-        sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?'), sug(r.id === 'RG-1' ? '¿Qué riesgo hay con las horas extra de noche?' : '¿Va a llover en la jornada 18?')],
+        sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?'), sug(r.id === 'RG-1' ? PREGUNTA['RG-5'] : PREGUNTA['RG-1'])],
         fuentes,
         reglas: REGLAS,
         noHecho: NO_HECHO,
@@ -299,7 +303,7 @@ export const riesgos = {
       AVISO_EXPLORATORIO,
       texto(
         t('He revisado las jornadas {a} a {b}: {n}. {altos} y {medios}. El más urgente: {top}.', {
-          a: v(m.proyecto.diaActual + 1, 'num'),
+          a: v(m.proyecto.diaActual, 'num'),
           b: v(m.proyecto.diasRodaje, 'num'),
           n: cuenta(evaluados.length, 'riesgo', 'riesgos'),
           altos: cuenta(altos.length, 'alto', 'altos'),
@@ -313,7 +317,7 @@ export const riesgos = {
     for (const r of evaluados.filter((x) => x.decision || x.estado === 'aceptado')) bloques.push(tarjetaRiesgo(m, r.id))
     return {
       bloques,
-      sugerencias: [sug('¿Está publicada la orden de rodaje de mañana?'), sug('¿Tiene billete la actriz de la jornada 21?'), sug('Prepara el aviso a transportes por el cambio de localización de la jornada 20')],
+      sugerencias: [sug(PREGUNTA['RG-4']), sug(PREGUNTA['RG-2']), sug(PREGUNTA['RG-6'])],
       fuentes,
       reglas: REGLAS,
       noHecho: NO_HECHO,

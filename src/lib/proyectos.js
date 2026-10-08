@@ -219,17 +219,18 @@ const PROYECTOS_SEMILLA = [
     idioma: 'castellano',
     direccionNovel: false,
     obraDificil: false,
-    diasRodaje: 30,
-    semanasRodaje: 6,
-    fechaInicioRodaje: '04/05/2026',
+    diasRodaje: 20,
+    semanasRodaje: 4,
+    fechaInicioRodaje: '25/05/2026',
     fechaEntrega: '30/10/2026',
     productorEjecutivo: 'Marta Cobo',
     lineProducer: 'Álvaro Ferrer',
     // Campos de display usados por Panel/Topbar (compatibilidad).
     tipo: 'Largometraje de ficción',
     ubicacion: 'Madrid · con rodaje parcial en Canarias',
-    diaActual: 15,
-    fechaInforme: '01/06/2026',
+    // Jornada que se rueda hoy (martes 02/06/2026): van seis hechas.
+    diaActual: 7,
+    fechaInforme: '02/06/2026',
   },
   {
     id: 'p-marea-negra',

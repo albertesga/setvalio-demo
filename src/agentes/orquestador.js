@@ -23,6 +23,11 @@ const EVENTOS = {
 export function interpretar(mundo, entrada, contexto = {}) {
   if (entrada.tipo === 'evento') return { intencion: EVENTOS[entrada.eventoId] ?? 'no_entendido', entidades: {}, eventoId: entrada.eventoId }
   if (entrada.tipo === 'accion') return { intencion: 'accion', entidades: {}, accion: entrada.accion }
+  // El parte de la mañana: la cabecera del saludo lee el día y la persona de aquí.
+  if (entrada.tipo === 'saludo') {
+    const { diaActual, diasRodaje, titulo } = mundo.proyecto
+    return { intencion: 'saludo', entidades: { persona: entrada.persona ?? null, dia: diaActual, total: diasRodaje, fecha: mundo.corte.fecha, proyecto: titulo } }
+  }
   const det = { ...detectarIntencion(entrada.texto, mundo, contexto), texto: entrada.texto }
   // Un documento dudoso o con IGIC va a su guion aunque se pida «procesar».
   const doc = det.entidades.documento && mundo.documentos[det.entidades.documento]
@@ -43,6 +48,7 @@ function pasoOrquestador(det, entrada, agentes) {
   let titulo
   if (entrada.tipo === 'evento') titulo = t('Detecta una novedad y la pasa a {lista}', { lista: v(listaAgentes(agentes)) })
   else if (entrada.tipo === 'accion') titulo = t('Pasa tu decisión a {lista}', { lista: v(listaAgentes(agentes)) })
+  else if (entrada.tipo === 'saludo' || det.intencion === 'saludo') titulo = t('Pide el parte de la mañana a {lista}', { lista: v(listaAgentes(agentes)) })
   else if (agentes.length === 1) titulo = t('Pasa la petición a {lista}', { lista: v(listaAgentes(agentes)) })
   else titulo = t('Reparte la petición entre {lista}', { lista: v(listaAgentes(agentes)) })
   return { agente: 'orquestador', titulo, autonomia: 'ejecuta', duracionMs: DURACIONES.plan, acciones: [], salida: null, paralelo: false }

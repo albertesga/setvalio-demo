@@ -248,6 +248,11 @@ export const LEXICO = {
     frases: ['que puedes hacer', 'que sabes hacer', 'como funciona', 'que agentes', 'como decides', 'quien eres', 'que haces', 'casos de uso'],
     raices: { ayuda: 3, agente: 2, autonom: 2, decid: 1 },
   },
+  // El parte de la mañana. Un saludo dentro de otra petición («buenos días, prepárame el informe») no cuenta.
+  saludo: {
+    frases: ['buenos dias', 'buenas tardes', 'buenas', 'hola', 'ponme al dia', 'parte de la manana', 'parte del dia', 'parte de hoy', 'que hay hoy', 'que tenemos hoy', 'que pasa hoy', 'que esta pasando', 'que esta pasando hoy', 'novedades de hoy', 'como empieza el dia'],
+    raices: { hola: 2, saludo: 3 },
+  },
   resumen: {
     frases: ['como vamos', 'como va', 'estado del proyecto', 'como esta la produccion', 'situacion del rodaje', 'que tengo pendiente', 'que decisiones', 'que tengo que aprobar', 'que tengo que decidir', 'que tengo que revisar', 'tengo que revisar', 'cuanto llevamos gastado', 'cuanto hemos gastado', 'nos estamos pasando'],
     raices: { resum: 3, situacion: 2, gastad: 1, presupuest: 1, dinero: 1, pasando: 1 },
@@ -292,6 +297,7 @@ function puntuar(norm, tokens, entidades, mundo) {
   // «Aprueba las horas extra de Eléctricos Prado» es una orden de compra, no un riesgo.
   if (entidades.oc && !/riesg/.test(norm)) out.riesgos = 0
   if (/riesgo fiscal|riesgos fiscales/.test(norm)) out.riesgos = 0
+  if (Object.entries(out).some(([id, s]) => id !== 'saludo' && s >= 3)) out.saludo = 0
   return out
 }
 

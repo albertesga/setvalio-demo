@@ -119,14 +119,25 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     despachar({ tipo: 'actividad' })
   }, [despachar])
 
-  // Lo que pide la portada al abrir los agentes: el recorrido o una pregunta de ejemplo.
+  // Al abrir, los agentes saludan con el parte de la mañana. Si la portada pide algo,
+  // el recorrido empieza con el parte ya leído y una pregunta llega justo después de él.
   const pedidoAtendido = useRef(null)
+  const vacia = s.mensajes.length === 0
   useEffect(() => {
-    if (!contexto || pedidoAtendido.current === contexto) return
-    pedidoAtendido.current = contexto
-    if (contexto.tour && !s.tour) despachar({ tipo: 'tour/iniciar' })
-    else if (contexto.pregunta) enviar(contexto.pregunta)
-  }, [contexto, s.tour, despachar, enviar])
+    if (contexto && pedidoAtendido.current !== contexto) {
+      pedidoAtendido.current = contexto
+      if (contexto.tour) {
+        if (!s.tour) despachar({ tipo: 'tour/iniciar' })
+        return
+      }
+      if (contexto.pregunta) {
+        despachar({ tipo: 'saludar', instantaneo: true })
+        enviar(contexto.pregunta)
+        return
+      }
+    }
+    if (vacia && !s.tour) despachar({ tipo: 'saludar' })
+  }, [contexto, vacia, s.tour, despachar, enviar])
 
   // Al empezar el recorrido, el foco va a su barra: ahí están el paso, la nota y «Siguiente».
   const enRecorrido = !!s.tour
@@ -167,7 +178,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
       return
     }
     if (!anclado.current) {
-      setNuevos(true)
+      // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos mensajes».
+      if (!(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos(true)
       return
     }
     const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -214,7 +226,13 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     return out
   }, [s.mensajes])
 
-  const ctx = { mundo: s.mundo, persona, despachar, enviar, enviarEntrada, decidir, onNavigate, avisar, ocupado, deshacible: s.ultimaMutacion?.mensajeId, eventosPausados: s.eventosPausados, primerAviso }
+  // «Ver todo lo que está por revisar» desde el parte: la pestaña de la derecha o, sin ella, la hoja.
+  const verPorRevisar = useCallback(() => {
+    setPestana('revisar')
+    if (!window.matchMedia?.('(min-width: 1024px)').matches) setHoja('actividad')
+  }, [])
+
+  const ctx = { mundo: s.mundo, persona, despachar, enviar, enviarEntrada, decidir, onNavigate, avisar, ocupado, deshacible: s.ultimaMutacion?.mensajeId, eventosPausados: s.eventosPausados, primerAviso, verPorRevisar }
 
   const abrirHoja = (que) => {
     setHoja(que)
@@ -299,6 +317,9 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
 
   const vistos = casosVistos(s.casosVistos)
   const ultimaNovedadId = [...s.mensajes].reverse().find((m) => m.rol === 'novedad')?.id
+  // Solo está el parte de la mañana: debajo van las otras formas de empezar, no las sugerencias.
+  const soloSaludo = s.mensajes.length > 0 && s.mensajes.every((m) => m.rol === 'agentes' && m.origen === 'saludo')
+  const saludoListo = soloSaludo && s.mensajes[0].estado !== 'en_curso'
 
   return (
     <AgentesCtx.Provider value={ctx}>
@@ -336,9 +357,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             />
             <div ref={scrollRef} className="ag-scroll" onScroll={onScroll} onWheel={soltar} onTouchMove={() => (anclado.current = false)} onKeyDown={soltar}>
               <div className="ag-hilo">
-                {s.mensajes.length === 0 ? (
-                  <Inicio persona={persona} estados={estados} onAbrirAgente={setAgenteAbierto} onRecorrido={() => despachar({ tipo: 'tour/iniciar' })} />
-                ) : (
+                {s.mensajes.length > 0 && (
                   <section aria-labelledby="ag-titulo-conversacion" className="space-y-6">
                     <h2 id="ag-titulo-conversacion" className="sr-only">
                       Conversación
@@ -348,7 +367,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                     ))}
                   </section>
                 )}
-                {!tour && !ocupado && <Sugerencias items={sugerencias} onElegir={enviar} />}
+                {saludoListo && <Inicio estados={estados} onAbrirAgente={setAgenteAbierto} onRecorrido={() => despachar({ tipo: 'tour/iniciar' })} />}
+                {!tour && !ocupado && !soloSaludo && <Sugerencias items={sugerencias} onElegir={enviar} />}
                 <div ref={finRef} />
               </div>
             </div>

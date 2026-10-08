@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { IconChevronDown, IconBell, IconStop, IconArrowDown } from '../../components/icons.jsx'
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { AGENTES } from '../agentes.js'
+import { PERSONAS } from '../mundo.js'
+import { fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, StatusChip, nombresCortos } from './Piezas.jsx'
 import { Bloque, aprobacionPendiente } from './Bloques.jsx'
@@ -108,6 +110,55 @@ function Traza({ msg }) {
   )
 }
 
+// «Buenos días» hasta las dos, «Buenas tardes» hasta las nueve.
+function saludoDe(hora) {
+  const h = Number(String(hora).slice(0, 2))
+  return h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
+}
+
+/** Cabecera del parte de la mañana: el saludo sale al instante; el parte, cuando lo terminan los agentes. */
+function CabeceraSaludo({ msg, tituloId, enCurso, onSaltar, onDetener }) {
+  const { persona } = useCtx()
+  const e = msg.turno.entidades
+  const nombre = (PERSONAS[e.persona] ?? persona).nombre.split(' ')[0]
+  const fecha = fechaDia(e.fecha)
+  const n = nombresAgentes(msg.turno.agentes).length
+  return (
+    <header className="ag-saludo">
+      <p className="flp-kicker text-flp-muted">
+        {fecha.charAt(0).toUpperCase() + fecha.slice(1)} · {e.proyecto}
+      </p>
+      <h3 id={tituloId} tabIndex={-1} className="ag-saludo-titulo focus:outline-none">
+        {saludoDe(msg.hora)}, {nombre}. <span className="block text-flp-muted">Hoy es el día {e.dia} de rodaje.</span>
+      </h3>
+      <div className="ag-saludo-meta">
+        <AgentAvatar id="orquestador" size={28} trabajando={enCurso} />
+        <p className="min-w-0 flex-1 text-sm text-flp-muted">
+          {enCurso ? (
+            <span className="font-medium text-flp-ink">Los agentes preparan el parte de la mañana…</span>
+          ) : (
+            <>
+              <span className="font-medium text-flp-ink">Parte de la mañana</span> · <span className="tnum">{msg.hora}</span> · lo han preparado {n} agentes
+            </>
+          )}
+        </p>
+        {enCurso ? (
+          <div className="flex flex-none gap-2">
+            <button type="button" className="ag-boton-fila" onClick={onSaltar}>
+              Saltar al resultado
+            </button>
+            <button type="button" className="ag-boton-fila" onClick={onDetener}>
+              <IconStop size={14} aria-hidden="true" /> Detener
+            </button>
+          </div>
+        ) : (
+          msg.estado === 'hecho' && <StatusChip estado="hecho" />
+        )}
+      </div>
+    </header>
+  )
+}
+
 function MensajeAgentes({ msg, ultimo }) {
   const { despachar, deshacible, ocupado, mundo } = useCtx()
   const t = msg.turno
@@ -124,8 +175,19 @@ function MensajeAgentes({ msg, ultimo }) {
     tarjeta.scrollIntoView({ block: 'start', behavior: reducido ? 'auto' : 'smooth' })
     tarjeta.querySelector('h4')?.focus({ preventScroll: true })
   }
+  const saltar = () => {
+    despachar({ tipo: 'saltar' })
+    enfocarTitulo()
+  }
+  const detener = () => {
+    despachar({ tipo: 'detener' })
+    enfocarTitulo()
+  }
   return (
-    <article id={`msg-${msg.id}`} className={`ag-msg-agentes ${msg.deshecho ? 'is-deshecho' : ''}`} aria-labelledby={tituloId} aria-busy={enCurso || undefined}>
+    <article id={`msg-${msg.id}`} className={`ag-msg-agentes ${msg.origen === 'saludo' ? 'ag-msg-saludo' : ''} ${msg.deshecho ? 'is-deshecho' : ''}`} aria-labelledby={tituloId} aria-busy={enCurso || undefined}>
+      {msg.origen === 'saludo' ? (
+        <CabeceraSaludo msg={msg} tituloId={tituloId} enCurso={enCurso} onSaltar={saltar} onDetener={detener} />
+      ) : (
       <header className="flex items-center gap-2.5">
         <AgentAvatar id="orquestador" size={32} trabajando={enCurso} />
         <div className="min-w-0 flex-1">
@@ -149,29 +211,16 @@ function MensajeAgentes({ msg, ultimo }) {
         </div>
         {enCurso && (
           <div className="flex flex-none gap-2">
-            <button
-              type="button"
-              className="ag-boton-fila"
-              onClick={() => {
-                despachar({ tipo: 'saltar' })
-                enfocarTitulo()
-              }}
-            >
+            <button type="button" className="ag-boton-fila" onClick={saltar}>
               Saltar al resultado
             </button>
-            <button
-              type="button"
-              className="ag-boton-fila"
-              onClick={() => {
-                despachar({ tipo: 'detener' })
-                enfocarTitulo()
-              }}
-            >
+            <button type="button" className="ag-boton-fila" onClick={detener}>
               <IconStop size={14} aria-hidden="true" /> Detener
             </button>
           </div>
         )}
       </header>
+      )}
 
       {enCurso ? (
         <div className="mt-3">

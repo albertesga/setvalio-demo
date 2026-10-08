@@ -37,6 +37,16 @@ export function fechaCorta(iso) {
   return `${Number(d)} ${MESES[Number(m) - 1]}`
 }
 
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+/** '2026-06-05' → 'viernes 5 de junio'. */
+export function fechaDia(iso) {
+  if (!iso) return '—'
+  const [a, m, d] = iso.split('-').map(Number)
+  return `${DIAS_SEMANA[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]} ${d} de ${MESES_LARGOS[m - 1]}`
+}
+
 /** Días naturales entre dos fechas ISO (b − a). */
 export function diasEntre(a, b) {
   const [ya, ma, da] = a.split('-').map(Number)
@@ -60,6 +70,7 @@ const FORMATOS = {
   num,
   fecha,
   fechaCorta,
+  dia: fechaDia,
   dias: (n) => (Math.abs(n) === 1 ? `${num(n)} día` : `${num(n)} días`),
   texto: (s) => String(s ?? ''),
   id: (s) => String(s ?? ''),
@@ -102,13 +113,14 @@ export function renderTexto(tx) {
   return segmentos(tx).map((s) => s.texto).join('')
 }
 
-/** Une plantillas con un separador sin perder los valores. */
+/** Une plantillas con un separador sin perder los valores. Las claves se renombran
+ *  con letras (a, b, c…): una plantilla nunca lleva cifras. */
 export function unir(partes, sep = ' ') {
   const valores = {}
   const textos = partes.filter(Boolean).map((p, i) => {
     if (!esPlantilla(p)) return String(p)
     return p.plantilla.replace(/\{(\w+)\}/g, (_, k) => {
-      const clave = `${k}_${i}`
+      const clave = `${k}_${String.fromCharCode(97 + i)}`
       valores[clave] = p.valores[k]
       return `{${clave}}`
     })

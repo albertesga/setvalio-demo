@@ -28,7 +28,12 @@ export function Cabecera({ s, persona, pendientes, onPortada, onActividad, onDem
           Agentes <span className="text-flp-muted">· {s.mundo.proyecto.titulo}</span>
         </h1>
         <p className="flp-mono truncate text-flp-muted">
-          {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje} jornadas rodadas
+          <span className="hidden sm:inline">
+            Rodaje · día {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje}
+          </span>
+          <span className="sm:hidden">
+            Día {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje}
+          </span>
         </p>
       </div>
       {/* La insignia cuenta siempre lo «Por revisar»; las novedades sin leer, un punto aparte. */}

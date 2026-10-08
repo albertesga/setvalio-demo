@@ -305,7 +305,7 @@ export function PanelDecisiones({ s }) {
     'riesgo/reservar': 'aprueba una reserva por',
     'riesgo/aceptar': 'asume',
   }
-  const NOMBRE_RIESGO = { 'RG-1': 'la lluvia de la jornada 18', 'RG-5': 'las horas extra de noche' }
+  const NOMBRE_RIESGO = { 'RG-1': `la lluvia de la jornada ${s.mundo.rodaje.senales.lluvia.jornada}`, 'RG-5': 'las horas extra de noche' }
   const { ocupado } = useCtx()
   // Nombres legibles: las referencias internas (R1, L1…) no le dicen nada a nadie.
   const nombre = (ref) => {

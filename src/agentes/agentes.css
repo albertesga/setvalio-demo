@@ -211,7 +211,7 @@
 .ag-col-izq .ag-desplegable { border-bottom: 0; }
 
 /* ── Inicio ───────────────────────────────────────────────────────────────── */
-.ag-inicio { padding-bottom: 12px; }
+.ag-inicio { margin-top: 36px; padding-top: 24px; padding-bottom: 12px; border-top: 1px solid var(--flp-border); }
 .ag-inicio-titulo { margin-top: 12px; font-size: clamp(2rem, 4.4vw, 3rem); font-weight: 400; line-height: 1.04; letter-spacing: -0.045em; text-wrap: balance; }
 .ag-inicio-lead { max-width: 620px; margin-top: 14px; font-size: 17px; line-height: 1.55; }
 .ag-accesos { display: grid; gap: 12px; margin-top: 28px; }
@@ -579,3 +579,69 @@ button.ag-acceso:disabled { opacity: .6; cursor: not-allowed; }
 .ag-aviso-breve .ag-link { min-height: 32px; font-size: 13px; }
 /* Botones del pie del informe y chips de la hoja de un agente: que partan línea en móvil. */
 .ag-informe-pie .flp-button, .ag-hoja .ag-sugerencia { white-space: normal; }
+
+/* ── Parte de la mañana ───────────────────────────────────────────────────── */
+/* El saludo sale al instante; el parte lo van montando los agentes debajo. */
+.ag-saludo-titulo { margin-top: 10px; color: var(--flp-carbon); font-size: clamp(2rem, 4.4vw, 3rem); font-weight: 400; line-height: 1.04; letter-spacing: -0.045em; text-wrap: balance; }
+.ag-saludo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--flp-border); }
+.ag-msg-saludo > .mt-3:first-of-type { margin-top: 14px; }
+.ag-prosa--lead { max-width: 680px; font-size: 17px; line-height: 1.6; }
+
+/* Tira del rodaje: rodadas en carbón, hoy con borde y marca, riesgos como barra superior. */
+.ag-tira-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.ag-tira-progreso { height: 4px; margin: 12px 0 14px; overflow: hidden; border-radius: 999px; background: var(--flp-border); }
+.ag-tira-progreso span { display: block; height: 100%; border-radius: inherit; background: var(--flp-carbon); }
+.ag-tira-semanas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+@media (min-width: 640px) { .ag-tira-semanas { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ag-tira-sem { display: block; min-height: 36px; margin-bottom: 6px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.5; }
+.ag-tira-dias { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding-bottom: 8px; }
+.ag-tira-dia { position: relative; display: flex; height: 34px; align-items: center; justify-content: center; border: 1px solid var(--flp-border); border-radius: 4px; background: var(--flp-surface); }
+.ag-tira-n { color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+.ag-tira-dia.is-hecha { border-color: var(--flp-carbon); background: var(--flp-carbon); }
+.ag-tira-dia.is-hecha .ag-tira-n { color: var(--flp-chalk); }
+.ag-tira-dia.is-hoy { border: 2px solid var(--flp-carbon); }
+.ag-tira-dia.is-hoy .ag-tira-n { color: var(--flp-carbon); font-weight: 600; }
+.ag-tira-dia.is-hoy::after { content: ''; position: absolute; bottom: -8px; left: 50%; width: 7px; height: 7px; transform: translateX(-50%) rotate(45deg); background: var(--flp-carbon); }
+.ag-tira-dia.con-alta { box-shadow: inset 0 4px 0 var(--flp-error); }
+.ag-tira-dia.con-media { box-shadow: inset 0 4px 0 var(--flp-carbon); }
+.ag-tira-leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; color: var(--flp-muted); font-size: 12px; }
+.ag-tira-leyenda li { display: inline-flex; align-items: center; gap: 6px; }
+.ag-tira-leyenda i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--flp-border); border-radius: 3px; background: var(--flp-surface); }
+.ag-tira-leyenda i.is-hecha { border-color: var(--flp-carbon); background: var(--flp-carbon); }
+.ag-tira-leyenda i.is-hoy { border: 2px solid var(--flp-carbon); }
+.ag-tira-leyenda i.con-alta { box-shadow: inset 0 4px 0 var(--flp-error); }
+.ag-tira-leyenda i.con-media { box-shadow: inset 0 4px 0 var(--flp-carbon); }
+
+/* Para hoy: numerado por urgencia; lo decidido se tacha. */
+.ag-agenda-lista { display: grid; }
+.ag-agenda-item { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--flp-border); }
+.ag-agenda-item:first-child { padding-top: 2px; border-top: 0; }
+.ag-agenda-n { display: inline-flex; width: 26px; height: 26px; flex: none; align-items: center; justify-content: center; border-radius: 50%; background: var(--flp-carbon); color: var(--flp-chalk); font-family: var(--flp-font-mono); font-size: 13px; }
+.ag-agenda-n.is-hecho { background: var(--flp-success); }
+.ag-agenda-titulo { color: var(--flp-carbon); font-size: 16px; font-weight: 500; line-height: 1.3; }
+.ag-agenda-item.is-hecho .ag-agenda-titulo { color: var(--flp-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.ag-agenda-detalle { margin-top: 4px; color: var(--flp-muted); font-size: 14px; line-height: 1.55; }
+.ag-agenda-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; color: var(--flp-muted); font-size: 13px; }
+.ag-agenda-sub { display: grid; gap: 6px; margin-top: 10px; }
+.ag-agenda-sub-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 8px 8px 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-bg); }
+.ag-agenda-sub-item.is-hecho .text-flp-ink { color: var(--flp-muted); }
+/* Si no cabe al lado, el botón baja: el texto nunca se queda en una columna estrecha. */
+.ag-agenda-sub-texto { min-width: 0; flex: 1 1 220px; }
+.ag-agenda-resto { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--flp-border); color: var(--flp-muted); font-size: 13px; }
+
+/* Esta semana: un día por fila; hoy, con barra carbón. */
+.ag-semana { display: grid; gap: 6px; }
+.ag-semana-dia { display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; align-items: start; gap: 4px 12px; padding: 10px 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-surface); }
+.ag-semana-dia.is-hecha { background: transparent; }
+.ag-semana-dia.is-hecha .text-flp-ink { color: var(--flp-muted); }
+.ag-semana-dia.is-hoy { border-color: var(--flp-carbon); box-shadow: inset 3px 0 0 var(--flp-carbon); }
+.ag-semana-fecha { color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.5; }
+.ag-semana-estado { padding: 1px 8px; border: 1px solid var(--flp-control-border); border-radius: 999px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; white-space: nowrap; }
+.ag-semana-estado.is-hoy { border-color: var(--flp-carbon); background: var(--flp-carbon); color: var(--flp-chalk); }
+.ag-semana-siguiente { margin-top: 10px; color: var(--flp-muted); font-size: 13px; line-height: 1.55; }
+.ag-link--compacto { min-height: 32px; font-size: 13px; }
+
+/* Lo que ha hecho cada agente. */
+.ag-equipo { display: grid; gap: 12px; }
+@media (min-width: 720px) { .ag-equipo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; } }
+.ag-equipo li { display: flex; align-items: flex-start; gap: 10px; }

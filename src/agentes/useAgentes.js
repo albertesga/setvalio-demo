@@ -3,6 +3,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { obtener, suscribir, despachar } from './store.js'
+import { conversacionIniciada } from './sesion.js'
 
 export const RITMOS = {
   pausado: { etiqueta: 'Lento', factor: 0.6 },
@@ -30,7 +31,7 @@ export function useAgentes({ ritmo = 'normal' } = {}) {
   const activo = !!s.activo
   const activoId = s.activo?.id ?? null
   const hayCola = s.cola.length > 0
-  const esperaEventos = !s.tour && !s.eventosPausados && s.mundo.entrantes.length > 0 && s.mensajes.some((m) => m.rol === 'agentes')
+  const esperaEventos = !s.tour && !s.eventosPausados && s.mundo.entrantes.length > 0 && conversacionIniciada(s)
 
   useEffect(() => {
     if (activo && reducido) {

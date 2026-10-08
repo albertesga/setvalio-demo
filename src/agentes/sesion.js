@@ -1,5 +1,5 @@
-// Sesión de conversación: mensajes, reproducción de los pasos de cada agente,
-// novedades que llegan solas, deshacer y recorrido guiado.
+// Sesión de conversación: parte de la mañana, mensajes, reproducción de los pasos
+// de cada agente, novedades que llegan solas, deshacer y recorrido guiado.
 //
 // Es un reductor puro: el tiempo entra como acción ({ tipo: 'avanzar', ms }),
 // así que se prueba en Node con un reloj falso.
@@ -18,7 +18,7 @@ export const EVENTOS = [
   { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur' },
   { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar' },
   { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado una solicitud de compra' },
-  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia del miércoles' },
+  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana' },
   { id: 'EV-03', retrasoMs: 30_000, agente: 'cumplimiento', titulo: 'Un documento del dossier vence esta semana' },
 ]
 
@@ -90,6 +90,9 @@ function iniciar(s0, entrada) {
     ent = { ...entrada, accion: { ...entrada.accion, por: persona.nombre } }
     s.mensajes.push({ id: nuevoId(s, 'd'), rol: 'decision', texto: entrada.etiqueta ?? 'Decisión', por: persona.nombre, rolPersona: persona.rol, hora })
     s.actividad.unshift({ id: nuevoId(s, 'act'), hora, persona: persona.nombre, autonomia: null, texto: t('{por} decide: {que}', { por: v(persona.nombre), que: v(entrada.etiqueta ?? 'decisión') }) })
+  } else if (entrada.tipo === 'saludo') {
+    // El parte de la mañana no lo pide nadie: lo traen los agentes al abrir.
+    ent = { ...entrada, persona: s.persona }
   } else if (entrada.tipo === 'evento') {
     const ev = EVENTOS_POR_ID[entrada.eventoId]
     s.mensajes.push({ id: nuevoId(s, 's'), rol: 'novedad', eventoId: entrada.eventoId, agente: ev?.agente, titulo: ev?.titulo ?? 'Novedad', hora })
@@ -192,6 +195,18 @@ function encolar(s, entrada) {
   return iniciar(s, entrada)
 }
 
+/** ¿Ha pedido o decidido algo la persona? El parte de la mañana llega solo y no cuenta. */
+export function conversacionIniciada(s) {
+  return s.mensajes.some((m) => m.rol === 'agentes' && m.origen !== 'saludo')
+}
+
+/** El parte de la mañana abre la conversación una sola vez; instantáneo, sin reproducir los pasos. */
+function saludar(s, { instantaneo = false } = {}) {
+  if (s.mensajes.length || s.activo || s.tour) return s
+  const n = iniciar(s, { tipo: 'saludo' })
+  return instantaneo ? progresar(n, Infinity) : n
+}
+
 export function reducirSesion(s, a) {
   switch (a.tipo) {
     case 'enviar':
@@ -218,8 +233,9 @@ export function reducirSesion(s, a) {
         const [sig, ...resto] = n.cola
         return iniciar({ ...n, cola: resto }, sig)
       }
-      // Novedades: solo con la conversación empezada, sin recorrido y sin pausa.
-      const conversacionEmpezada = n.mensajes.some((m) => m.rol === 'agentes')
+      // Novedades: solo con la conversación empezada (el parte de la mañana no cuenta),
+      // sin recorrido y sin pausa.
+      const conversacionEmpezada = conversacionIniciada(n)
       const evento = EVENTOS.find((e) => n.mundo.entrantes.includes(e.id))
       if (!evento || n.tour || n.eventosPausados || !conversacionEmpezada) return n
       n = { ...n, inactivo: n.inactivo + ms }
@@ -282,9 +298,13 @@ export function reducirSesion(s, a) {
     case 'leerNovedades':
       return s.novedades ? { ...s, novedades: 0 } : s
 
+    case 'saludar':
+      return saludar(s, { instantaneo: !!a.instantaneo })
+
     case 'tour/iniciar': {
-      // El recorrido parte de la demo recién abierta para que cada paso cuente lo que pasa.
-      const limpia = crearSesion({ persona: s.persona })
+      // El recorrido parte de la demo recién abierta (con su parte de la mañana ya
+      // leído) para que cada paso cuente lo que pasa.
+      const limpia = saludar(crearSesion({ persona: s.persona }), { instantaneo: true })
       if (s.mensajes.length) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: se han cerrado la conversación y las decisiones anteriores.', hora: horaDe(0) })
       return pasoTour(limpia, 0)
     }

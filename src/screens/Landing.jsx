@@ -20,7 +20,7 @@ const AGENTS_PREVIEW = [
 
 // Agente de Riesgos de producción en «Cómo funciona». Las cifras son las de evaluarRiesgos()
 // sobre el mundo de los agentes (check:agentes lo comprueba): en juego, la exposición de los
-// riesgos con importe (lluvia en la jornada 18, la actriz sin billete y las horas extra de
+// riesgos con importe (lluvia en la jornada 8, la actriz sin billete y las horas extra de
 // noche); ahorrado, la reserva por lluvia que no hace falta si se aprueba cambiar el orden.
 const RIESGO = { enJuego: 119133, ahorrado: 26880 }
 
@@ -49,7 +49,7 @@ const DOSSIER = [
 ]
 
 const FAQ = [
-  ['¿Qué puedo probar aquí?', 'Los agentes trabajando sobre «La última función», un largometraje con 15 de sus 30 jornadas rodadas. Pides un informe, una explicación o el parte de riesgos del rodaje y ves cómo trabaja cada agente y qué te deja decidir.'],
+  ['¿Qué puedo probar aquí?', 'Los agentes trabajando sobre «La última función», un largometraje en su día 7 de rodaje, de 20. Te reciben con el parte de la mañana: lo que pasa hoy, lo que vence esta semana y lo que espera tu decisión. Después pides un informe, una explicación o el parte de riesgos y ves cómo trabaja cada agente y qué te deja decidir.'],
   ['¿Los agentes deciden por mí?', 'No. Hacen solos lo rutinario y reversible, como contabilizar una factura que casa con su pedido. Lo dudoso lo proponen y lo que compromete dinero o tiene riesgo fiscal espera la aprobación de la persona responsable.'],
   ['¿Sustituye a mi fiscalista?', 'No. Tu fiscalista revisa, valida y firma. Filmpilot prepara cálculos, evidencias y trazabilidad para que esa revisión sea más clara.'],
   ['¿Puedo trabajar con cine, series y documental?', 'Filmpilot contempla distintas tipologías, territorios, presupuestos por capítulos ICAA y requisitos de coproducción.'],
@@ -373,9 +373,9 @@ export default function Landing({ onNavigate }) {
                 <p>Cruza el plan de rodaje con la previsión del tiempo, las convocatorias y los permisos. Si algo puede desviar el coste, calcula cuánto dinero hay en juego y propone cómo evitarlo. El cambio lo apruebas tú.</p>
                 <p className="landing-riesgo-caso">
                   <StateChip state="review" />
-                  <span>80 % de lluvia en el exterior de la jornada 18: propone cambiarla por la 19, un interior con el decorado montado, sin coste en la previsión.</span>
+                  <span>80 % de lluvia en el exterior de la jornada 8: propone cambiarla por la 9, un interior con el decorado montado, sin coste en la previsión.</span>
                 </p>
-                <ArrowLink onClick={() => abrirAgentes({ pregunta: '¿Va a llover en la jornada 18?' })}>Ver cómo lo analiza</ArrowLink>
+                <ArrowLink onClick={() => abrirAgentes({ pregunta: '¿Va a llover en la jornada 8?' })}>Ver cómo lo analiza</ArrowLink>
               </div>
               <dl className="landing-riesgo-cifras">
                 <div>

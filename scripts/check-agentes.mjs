@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
-import { CAPITULOS, CAPITULOS_TOTAL, TOTALES, CASHFLOW_PROYECTADO } from '../src/lib/data.js'
+import { CAPITULOS, CAPITULOS_TOTAL, TOTALES, CASHFLOW_PROYECTADO, SALDO_HOY } from '../src/lib/data.js'
 import { evaluarTerritorio } from '../src/lib/incentivos.js'
 import { crearMundo, CORTE } from '../src/agentes/mundo.js'
 import * as c from '../src/agentes/calculos.js'
@@ -21,10 +21,11 @@ import { responder } from '../src/agentes/orquestador.js'
 import { ESCENARIOS } from '../src/agentes/escenarios/index.js'
 import { AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, ORDEN_AGENTES, agentesDeFamilia } from '../src/agentes/agentes.js'
 import { CASOS, RECORRIDO, CASO_DE_INTENCION } from '../src/agentes/casos.js'
-import { crearSesion, reducirSesion, estadoTour } from '../src/agentes/sesion.js'
+import { crearSesion, reducirSesion, estadoTour, conversacionIniciada } from '../src/agentes/sesion.js'
+import { agendaDelDia, PREGUNTAS_PARTE } from '../src/agentes/escenarios/saludo.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
-import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, LOCALIZACIONES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
+import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
 import { CASHFLOW } from '../src/lib/data.js'
 import { diasEntre } from '../src/agentes/texto.js'
@@ -147,14 +148,14 @@ const FRASES = [
   ['haz la transferencia al hotel', 'fuera_alcance', { motivo: 'pagos' }],
   ['¿qué tiempo hará mañana?', 'no_entendido'],
   ['¿Qué riesgos ves en las próximas jornadas?', 'riesgos'],
-  ['¿Va a llover en la jornada 18?', 'riesgos', { riesgo: 'RG-1', jornada: 18 }],
+  ['¿Va a llover en la jornada 8?', 'riesgos', { riesgo: 'RG-1', jornada: 8 }],
   ['¿Está publicada la orden de rodaje de mañana?', 'riesgos', { riesgo: 'RG-4' }],
-  ['¿Tiene billete la actriz de la jornada 21?', 'riesgos', { riesgo: 'RG-2' }],
+  ['¿Tiene billete la actriz de la jornada 11?', 'riesgos', { riesgo: 'RG-2' }],
   ['¿Cómo va el permiso de vía pública de Canarias?', 'riesgos', { riesgo: 'RG-3' }],
   ['¿Qué riesgo hay con las horas extra de noche?', 'riesgos', { riesgo: 'RG-5' }],
-  ['Prepara el aviso a transportes por el cambio de localización de la jornada 20', 'riesgos', { riesgo: 'RG-6' }],
+  ['Prepara el aviso a transportes por el cambio de localización de la jornada 10', 'riesgos', { riesgo: 'RG-6' }],
   ['previsión del tiempo para el miércoles', 'riesgos', { riesgo: 'RG-1' }],
-  ['¿y la jornada 23?', 'riesgos', { jornada: 23 }, { ultimaIntencion: 'riesgos' }],
+  ['¿y la jornada 13?', 'riesgos', { jornada: 13 }, { ultimaIntencion: 'riesgos' }],
   ['envía el informe de riesgos a producción', 'riesgos', { quiereEnviar: true }],
   ['aprueba las horas extra de Eléctricos Prado', 'aprobar_oc', { oc: 'OC-106' }],
   ['¿Tengo que dar permiso para llamar?', 'optimizar_proveedores'],
@@ -170,6 +171,11 @@ const FRASES = [
   ['envía el informe de coste a producción', 'informe_semanal', {}, { ultimaIntencion: 'riesgos', ultimasEntidades: { riesgo: 'RG-1' } }],
   ['manda la solicitud de compra a Marta', 'aprobar_oc', {}, { ultimaIntencion: 'riesgos', ultimasEntidades: { riesgo: 'RG-1' } }],
   ['manda el aviso', 'riesgos', { quiereEnviar: true }, { ultimaIntencion: 'riesgos', ultimasEntidades: { riesgo: 'RG-4' } }],
+  ['Buenos días', 'saludo'],
+  ['hola', 'saludo'],
+  ['Ponme al día', 'saludo'],
+  ['¿Qué está pasando?', 'saludo'],
+  ['Buenos días, prepárame el informe semanal', 'informe_semanal'],
   ['', 'no_entendido'],
 ]
 const mundoBase = crearMundo()
@@ -226,7 +232,7 @@ test('el informe semanal cuenta lo que dice data.js', () => {
   const t = c.totales(r.mundo)
   cerca(t.cef, TOTALES.cef)
   cerca(t.gastado, TOTALES.gastado + mundoBase.documentos['F-2026-067'].base)
-  assert.ok(r.mundo.informes.R3, 'genera el informe')
+  assert.ok(r.mundo.informes.R1, 'genera el informe')
   const kpis = r.turno.bloques.find((b) => b.tipo === 'kpis')
   cerca(kpis.items.find((k) => k.id === 'cef').valor, TOTALES.cef)
 })
@@ -259,7 +265,7 @@ test('aprobar OC-104 sube el CEF solo por el exceso y mueve la caja de su semana
   assert.equal(c.capitulo(m, '07').desviacion, 18_400)
   assert.ok(c.capitulo(m, '07').fueraRango)
   cerca(c.totales(m).cef, 2_439_400)
-  cerca(c.tesoreria(m).semanas.find((s) => s.semana === 'Rodaje 5').saldo, -60_400)
+  cerca(c.tesoreria(m).semanas.find((s) => s.semana === 'Rodaje 3').saldo, -60_400)
   assert.equal(reducir(m, { tipo: 'orden/aprobar', ocId: 'OC-104' }), m, 'idempotente')
 })
 test('aprobar solo lo previsto de OC-104 no mueve el CEF', () => {
@@ -292,9 +298,9 @@ test('ajustar la previsión de 01.03 deja la desviación total en +35.000 €', 
 })
 test('el informe queda desactualizado si cambian las cifras', () => {
   let m = reducir(frio, { tipo: 'informe/generar' })
-  assert.equal(c.informeDesactualizado(m, 'R3'), false)
+  assert.equal(c.informeDesactualizado(m, 'R1'), false)
   m = reducir(m, { tipo: 'orden/aprobar', ocId: 'OC-105' })
-  assert.equal(c.informeDesactualizado(m, 'R3'), true)
+  assert.equal(c.informeDesactualizado(m, 'R1'), true)
 })
 test('acciones que no proceden devuelven el mismo mundo', () => {
   assert.equal(reducir(frio, { tipo: 'orden/aprobar', ocId: 'OC-104' }), frio, 'OC-104 aún no ha llegado')
@@ -335,6 +341,7 @@ const entradasInvariantes = [
   { tipo: 'evento', eventoId: 'EV-RIESGOS' },
   { tipo: 'evento', eventoId: 'EV-CITACION' },
   { tipo: 'evento', eventoId: 'EV-LLUVIA' },
+  { tipo: 'saludo', persona: 'marta' },
 ]
 test('ninguna plantilla lleva cifras escritas a mano (mundo inicial)', () => {
   for (const e of entradasInvariantes) revisarTurno(responder(mundoBase, e).turno, e.texto ?? e.eventoId)
@@ -481,10 +488,10 @@ test('una aprobación parcial se cuenta como parcial en las respuestas', () => {
 })
 test('pedir otra vez el informe con las mismas cifras no borra su aprobación', () => {
   let m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
-  m = reducir(m, { tipo: 'informe/aprobar', informeId: 'R3', por: 'Marta Cobo' })
+  m = reducir(m, { tipo: 'informe/aprobar', informeId: 'R1', por: 'Marta Cobo' })
   const r = responder(m, { tipo: 'texto', texto: 'informe semanal' })
-  assert.equal(r.mundo.informes.R3.estado, 'aprobado')
-  assert.equal(r.mundo.informes.R3.edicion, 1)
+  assert.equal(r.mundo.informes.R1.estado, 'aprobado')
+  assert.equal(r.mundo.informes.R1.edicion, 1)
 })
 test('«¿Han llegado facturas nuevas?» no presenta como nueva una factura anterior', () => {
   const r = responder(mundoBase, { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' })
@@ -580,10 +587,13 @@ test('añadir un coste escrito sustituye lo estimado de su capítulo', () => {
 
 // ── 9. Riesgos de producción (exploratorio) ──────────────────────────────────
 console.log('Riesgos de producción')
-test('plan: la jornada 16 es el corte, solo laborables, semanas de la caja y la 30 cierra', () => {
+test('plan: hoy es la jornada 7, solo laborables, semanas de la caja y la 20 cierra', () => {
   const m = crearMundo()
   const js = m.rodaje.jornadas
-  assert.equal(js[0].n, m.proyecto.diaActual + 1)
+  assert.equal(js[0].n, m.proyecto.diaActual)
+  assert.equal(m.proyecto.diaActual, 7)
+  assert.equal(HECHAS.length, m.proyecto.diaActual - 1, 'van seis hechas')
+  assert.ok(HECHAS.every((j, i) => j.n === i + 1 && j.fecha < CORTE.fecha), 'las hechas, antes de hoy y en orden')
   assert.equal(js[0].fecha, CORTE.fecha)
   assert.equal(js.at(-1).n, m.proyecto.diasRodaje)
   for (const j of js) {
@@ -593,9 +603,9 @@ test('plan: la jornada 16 es el corte, solo laborables, semanas de la caja y la 
     assert.ok(LOCALIZACIONES.includes(j.localizacion), `J${j.n} localización`)
   }
   const a = crearMundo()
-  a.rodaje.jornadas[2].tipo = 'INT'
-  assert.equal(crearMundo().rodaje.jornadas[2].tipo, 'EXT', 'copias independientes')
-  assert.equal(JORNADAS[2].tipo, 'EXT')
+  a.rodaje.jornadas[1].tipo = 'INT'
+  assert.equal(crearMundo().rodaje.jornadas[1].tipo, 'EXT', 'copias independientes')
+  assert.equal(JORNADAS[1].tipo, 'EXT')
 })
 test('cifras de los riesgos y severidad inicial', () => {
   const r = Object.fromEntries(evaluarRiesgos(mundoBase).map((x) => [x.id, x]))
@@ -614,15 +624,15 @@ test('reservar RG-1: sube el CEF sin tocar capítulos ni caja, y el neto cuadra'
   for (const ref of CAPITULOS_TOTAL) cerca(c.capitulo(m, ref.id).cef, ref.cef, ref.id)
   cerca(c.desviaciones(m).resumen.neto, c.totales(m).desviacion)
   c.tesoreria(m).semanas.forEach((s, i) => cerca(s.saldo, CASHFLOW_PROYECTADO[i].saldo, s.semana))
-  const tarjeta = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 18?' }).turno.bloques.find((b) => b.tipo === 'aprobacion')
+  const tarjeta = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 8?' }).turno.bloques.find((b) => b.tipo === 'aprobacion')
   const reservar = tarjeta.acciones.find((a) => a.id === 'reservar')
   assert.equal(reservar.rol, 'Producción ejecutiva')
   assert.equal(puedeDecidir('Line producer', reservar.rol), false)
 })
-test('cambiar el orden de jornadas: J18 pasa a interior, cifras iguales e idempotente', () => {
+test('cambiar el orden de jornadas: J8 pasa a interior, cifras iguales e idempotente', () => {
   const m = reducir(frio, { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar' })
-  assert.equal(m.rodaje.jornadas.find((j) => j.n === 18).tipo, 'INT')
-  assert.equal(m.rodaje.jornadas.find((j) => j.n === 18).fecha, '2026-06-03')
+  assert.equal(m.rodaje.jornadas.find((j) => j.n === 8).tipo, 'INT')
+  assert.equal(m.rodaje.jornadas.find((j) => j.n === 8).fecha, '2026-06-03')
   cerca(c.totales(m).cef, TOTALES.cef)
   assert.equal(riesgoDe(m, 'RG-1').estado, 'mitigado')
   assert.equal(reducir(m, { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar' }), m)
@@ -665,7 +675,7 @@ test('borradores y radar sin cifras escritas a mano; turnos con «Exploratorio»
   for (const mm of mundos) {
     for (const r of evaluarRiesgos(mm)) for (const p of plantillas(r)) assert.ok(!/\d/.test(p.plantilla), `radar: «${p.plantilla}»`)
   }
-  for (const texto of ['¿Qué riesgos hay para las próximas jornadas?', '¿Tiene billete la actriz de la jornada 21?', '¿Cómo va el permiso de vía pública de Canarias?', 'Prepara el aviso a transportes por el cambio de localización de la jornada 20', '¿Está publicada la orden de rodaje de mañana?']) {
+  for (const texto of ['¿Qué riesgos hay para las próximas jornadas?', '¿Tiene billete la actriz de la jornada 11?', '¿Cómo va el permiso de vía pública de Canarias?', 'Prepara el aviso a transportes por el cambio de localización de la jornada 10', '¿Está publicada la orden de rodaje de mañana?']) {
     const r = responder(mundoBase, { tipo: 'texto', texto })
     revisarTurno(r.turno, texto)
     assert.equal(r.turno.bloques[0].tipo, 'aviso', `${texto}: empieza con el aviso`)
@@ -692,7 +702,7 @@ test('deshacer el cambio de orden restaura el plan y conserva la lluvia posterio
   s = correr(s, 8_000)
   assert.equal(s.ultimaMutacion?.mensajeId, decision.id, 'la novedad no borra el deshacer')
   s = reducirSesion(s, { tipo: 'deshacer', mensajeId: decision.id })
-  assert.equal(s.mundo.rodaje.jornadas.find((j) => j.n === 18).tipo, 'EXT')
+  assert.equal(s.mundo.rodaje.jornadas.find((j) => j.n === 8).tipo, 'EXT')
   assert.equal(s.mundo.rodaje.meteo['2026-06-03'], 0.9)
   assert.ok(!s.mundo.borradores['BOR-CAMBIO-EQUIPO'] && !s.mundo.borradores['BOR-CAMBIO-TRANSPORTE'], 'los avisos del cambio se van con el cambio')
 })
@@ -723,7 +733,7 @@ test('una reserva que se queda corta es una decisión abierta y el detalle deja 
   let m = reducir(mundoBase, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880 })
   m = reducir(m, { tipo: 'evento/recibir', eventoId: 'EV-LLUVIA' })
   assert.ok(decisionesRiesgos(m).some((d) => d.ref.id === 'RG-1'))
-  const r = responder(m, { tipo: 'texto', texto: '¿Va a llover en la jornada 18?' })
+  const r = responder(m, { tipo: 'texto', texto: '¿Va a llover en la jornada 8?' })
   const tj = r.turno.bloques.find((b) => b.tipo === 'aprobacion')
   assert.ok(tj && tj.acciones.some((a) => a.id === 'reservar'))
 })
@@ -740,31 +750,33 @@ test('asumir con reserva la libera; tras asumir se puede cambiar el plan; asumid
   m = reducir(r.mundo, tj.acciones[0].accion)
   assert.equal(riesgoDe(m, 'RG-1').estado, 'mitigado')
 })
-test('tras cambiar el orden, RG-1 sigue hablando de la jornada 18 y dice que está resuelto', () => {
+test('tras cambiar el orden, RG-1 sigue hablando de la jornada 8 y dice que está resuelto', () => {
   const m = reducir(mundoBase, { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar' })
   const r = riesgoDe(m, 'RG-1')
-  assert.deepEqual(r.jornadas, [18])
+  assert.deepEqual(r.jornadas, [8])
   assert.match(renderTexto(r.respuesta), /Orden cambiado/)
   const txt = responder(reducir(mundoBase, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880 }), { tipo: 'accion', accion: { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar', por: 'Prueba' } })
   assert.match(txt.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /Se libera la reserva/)
 })
 test('el informe se desactualiza con reservas o riesgos altos nuevos, y las desviaciones nombran la reserva', () => {
   let m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
-  assert.equal(c.informeDesactualizado(m, 'R3'), false)
+  assert.equal(c.informeDesactualizado(m, 'R1'), false)
   const conReserva = reducir(m, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880 })
-  assert.equal(c.informeDesactualizado(conReserva, 'R3'), true)
+  assert.equal(c.informeDesactualizado(conReserva, 'R1'), true)
   const citacion = reducir(m, { tipo: 'evento/recibir', eventoId: 'EV-CITACION' })
-  assert.equal(c.informeDesactualizado(citacion, 'R3'), true)
+  assert.equal(c.informeDesactualizado(citacion, 'R1'), true)
   const d = responder(conReserva, { tipo: 'texto', texto: '¿Qué capítulos están fuera de rango?' })
   assert.match(d.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /reservas de riesgos/)
 })
-test('preguntas por jornadas: la que tiene riesgo, una sin riesgo y una fuera del plan', () => {
-  const sin = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 29?' })
-  assert.match(renderTexto(sin.turno.bloques.find((b) => b.tipo === 'texto').texto), /Jornada 29.*No veo riesgos/)
-  const fuera = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 12?' }, { ultimaIntencion: 'riesgos' })
+test('preguntas por jornadas: la que tiene riesgo, una sin riesgo, una ya rodada y una fuera del plan', () => {
+  const sin = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 19?' })
+  assert.match(renderTexto(sin.turno.bloques.find((b) => b.tipo === 'texto').texto), /Jornada 19.*No veo riesgos/)
+  const hecha = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 4?' }, { ultimaIntencion: 'riesgos' })
+  assert.match(renderTexto(hecha.turno.bloques.find((b) => b.tipo === 'texto').texto), /ya se rodó/)
+  const fuera = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 25?' }, { ultimaIntencion: 'riesgos' })
   assert.match(renderTexto(fuera.turno.bloques.find((b) => b.tipo === 'texto').texto), /fuera del plan/)
-  const con = responder(mundoBase, { tipo: 'texto', texto: '¿y la jornada 23?' }, { ultimaIntencion: 'riesgos' })
-  assert.ok(con.turno.bloques.some((b) => b.tipo === 'borrador'), 'la 23 es el permiso: prepara el aviso')
+  const con = responder(mundoBase, { tipo: 'texto', texto: '¿y la jornada 13?' }, { ultimaIntencion: 'riesgos' })
+  assert.ok(con.turno.bloques.some((b) => b.tipo === 'borrador'), 'la 13 es el permiso: prepara el aviso')
 })
 test('un aviso descartado se puede volver a preparar', () => {
   let m = responder(mundoBase, { tipo: 'texto', texto: '¿Está publicada la orden de rodaje de mañana?' }).mundo
@@ -810,6 +822,97 @@ test('la portada enseña las cifras del agente de riesgos', () => {
   assert.ok(src.includes(`${Math.round(lluvia.probabilidad * 100)} % de lluvia en el exterior de la jornada ${lluvia.jornadas[0]}: propone cambiarla por la ${lluvia.intercambio}`))
   assert.ok(src.includes(`pregunta: '${PREGUNTA['RG-1']}'`))
   assert.equal(responder(crearMundo(), { tipo: 'texto', texto: PREGUNTA['RG-1'] }).turno.intencion, 'riesgos')
+})
+
+// ── 11. Parte de la mañana ───────────────────────────────────────────────────
+console.log('Parte de la mañana')
+const textoDe = (b) => renderTexto(b.texto)
+test('saludar abre la conversación con el parte, una sola vez, y se reproduce como cualquier turno', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'saludar' })
+  assert.equal(s.mensajes.length, 1)
+  const msg = () => s.mensajes[0]
+  assert.equal(msg().origen, 'saludo')
+  assert.equal(msg().turno.intencion, 'saludo')
+  assert.equal(msg().estado, 'en_curso')
+  assert.deepEqual([msg().turno.entidades.dia, msg().turno.entidades.total, msg().turno.entidades.persona], [7, 20, 'marta'])
+  assert.equal(reducirSesion(s, { tipo: 'saludar' }), s, 'no saluda dos veces')
+  assert.ok(msg().turno.duracionMs <= 9000)
+  s = correr(s, 8_000)
+  assert.equal(msg().estado, 'hecho')
+  assert.equal(msg().bloquesVisibles, msg().turno.bloques.length)
+  assert.ok(!s.mundo.entrantes.includes('EV-RIESGOS'), 'el parte ya cuenta los riesgos: el parte de riesgos no llega solo')
+  const inst = reducirSesion(crearSesion(), { tipo: 'saludar', instantaneo: true })
+  assert.equal(inst.mensajes[0].estado, 'hecho')
+  assert.equal(inst.activo, null)
+})
+test('el parte no cuenta como conversación: las novedades esperan a que pidas algo', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'saludar' })
+  s = correr(s, 60_000, 500)
+  assert.equal(s.mensajes.length, 1, 'solo el parte')
+  assert.equal(conversacionIniciada(s), false)
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
+  s = correr(s, 30_000, 250)
+  assert.ok(conversacionIniciada(s))
+  assert.ok(s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-01'), 'la primera novedad es la factura')
+  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-RIESGOS'))
+})
+test('el recorrido empieza con el parte ya leído y Álvaro recibe su propio saludo', () => {
+  const s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
+  assert.equal(s.mensajes[0].origen, 'saludo')
+  assert.equal(s.mensajes[0].estado, 'hecho')
+  assert.equal(s.mensajes[1].rol, 'guia')
+  const a = reducirSesion(crearSesion({ persona: 'alvaro' }), { tipo: 'saludar' })
+  assert.equal(a.mensajes[0].turno.entidades.persona, 'alvaro')
+})
+test('el parte cuenta el día 7 de 20 con las cifras del mundo', () => {
+  const r = responder(mundoBase, { tipo: 'saludo', persona: 'marta' })
+  revisarTurno(r.turno, 'parte de la mañana')
+  const lead = r.turno.bloques.find((b) => b.tipo === 'texto' && b.destacado)
+  const txt = textoDe(lead)
+  assert.match(txt, /jornada 7 en Madrid centro/)
+  assert.match(txt, /van 6 de 20/)
+  assert.match(txt, /viernes 19 de junio/)
+  assert.ok(txt.includes(eur(TOTALES.cef)), 'coste estimado final')
+  assert.match(txt, /Escenografía es el único capítulo/)
+  assert.match(txt, /jornada 8 de mañana, un exterior con un 80\s%/)
+  const kpis = Object.fromEntries(r.turno.bloques.find((b) => b.tipo === 'kpis').items.map((k) => [k.id, k.valor]))
+  cerca(kpis.cef, TOTALES.cef)
+  cerca(kpis.gastado, TOTALES.gastado)
+  cerca(kpis.caja, SALDO_HOY)
+  assert.equal(kpis.revisar, 8)
+  for (const tipo of ['tira', 'agenda', 'semana', 'equipo']) assert.ok(r.turno.bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
+  assert.equal(r.turno.bloques.find((b) => b.tipo === 'semana').semana, 'Rodaje 2')
+})
+test('«Para hoy»: lluvia de mañana, avisos, compras y certificado, en ese orden', () => {
+  const ag = agendaDelDia(mundoBase)
+  assert.deepEqual(ag.items.map((i) => i.id), ['riesgo-RG-1', 'avisos', 'compras', 'dossier-DOS-01'])
+  assert.deepEqual(ag.items[1].subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
+  assert.deepEqual(ag.items[2].subitems.map((s) => s.id), ['OC-105', 'OC-106'])
+  assert.match(renderTexto(ag.items[0].cuando), /antes de publicar su orden del día/)
+  assert.match(renderTexto(ag.items[3].detalle), /620\.000\s€/)
+  assert.equal(ag.resto, 5)
+})
+test('cada botón del parte lleva a un guion que lo resuelve', () => {
+  const ag = agendaDelDia(mundoBase)
+  const entradas = ag.items.flatMap((i) => [...(i.acciones ?? []).map((a) => a.entrada), ...(i.subitems ?? []).map((s) => s.entrada), i.entrada])
+  for (const e of [...new Set(entradas), ...Object.values(PREGUNTAS_PARTE)]) {
+    const r = responder(mundoBase, { tipo: 'texto', texto: e })
+    assert.ok(!['no_entendido', 'desambiguar'].includes(r.turno.intencion), `${e} → ${r.turno.intencion}`)
+  }
+  assert.equal(responder(mundoBase, { tipo: 'texto', texto: 'Revisa la orden de compra OC-106' }).turno.entidades.oc, 'OC-106')
+})
+test('lo decidido sale de «Para hoy» y el parte se rehace con lo que queda', () => {
+  let m = reducir(mundoBase, { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar', por: 'Marta Cobo' })
+  m = reducir(m, { tipo: 'orden/aprobar', ocId: 'OC-105', por: 'Marta Cobo' })
+  m = reducir(m, { tipo: 'orden/rechazar', ocId: 'OC-106', por: 'Marta Cobo' })
+  const ag = agendaDelDia(m)
+  assert.ok(!ag.items.some((i) => i.id === 'riesgo-RG-1' || i.id === 'compras'))
+  assert.equal(ag.items[0].id, 'avisos')
+  const r = responder(m, { tipo: 'texto', texto: 'Ponme al día' })
+  revisarTurno(r.turno, 'parte pedido')
+  assert.equal(r.turno.intencion, 'saludo')
+  assert.match(textoDe(r.turno.bloques[0]), /El parte del día 7 de rodaje/)
+  assert.match(textoDe(r.turno.bloques.find((b) => b.destacado)), /Lo primero hoy: preparar 3 avisos/)
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

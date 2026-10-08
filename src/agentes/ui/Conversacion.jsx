@@ -5,8 +5,6 @@ import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { IconArrowUp, IconChevronRight, IconPlay, IconClock } from '../../components/icons.jsx'
 import { AGENTES, AUTONOMIA } from '../agentes.js'
 import { CASOS, GRUPOS_CASOS, ETIQUETA_CAPACIDAD, LEYENDA_CAPACIDAD, RECORRIDO } from '../casos.js'
-import { decisionesAbiertas } from '../pendientes.js'
-import { evaluarRiesgos } from '../rodaje.js'
 import { POLITICAS } from '../politicas.js'
 import { formatear } from '../texto.js'
 import { useCtx } from './contexto.js'
@@ -50,30 +48,23 @@ function useListo(ms) {
   return listo
 }
 
-/** Inicio: tres accesos (informe, cómo vamos, recorrido) y el resto plegado. */
-export function Inicio({ persona, estados, onAbrirAgente, onRecorrido }) {
+/**
+ * Otras formas de empezar: van debajo del parte de la mañana mientras la
+ * conversación no ha empezado. El informe semanal es la acción principal.
+ */
+export function Inicio({ estados, onAbrirAgente, onRecorrido }) {
   const { enviar: enviarCtx, mundo, ocupado } = useCtx()
   const listo = useListo(400)
   const enviar = (texto) => listo && enviarCtx(texto)
   const hero = CASOS.find((x) => x.grupo === 'hero')
-  const nombre = persona.nombre.split(' ')[0]
-  const pendientes = decisionesAbiertas(mundo).length
-  const altos = evaluarRiesgos(mundo).filter((r) => r.severidad === 'alta').length
-  const ahora = [pendientes ? `${pendientes} por revisar` : 'Nada por revisar', altos ? `${altos} ${altos === 1 ? 'riesgo alto' : 'riesgos altos'}` : 'sin riesgos altos'].join(' · ')
+  const informe = mundo.informes[mundo.periodo.id]
   const idAcceso = useId().replace(/:/g, '')
   return (
     <div className="ag-inicio">
-      <p className="flp-kicker text-flp-muted">Lunes 1 de junio de 2026</p>
-      <h2 className="ag-inicio-titulo">
-        Buenos días, {nombre}. <span className="block">¿Qué revisamos hoy?</span>
-      </h2>
-      <p className="ag-inicio-lead">
-        Un equipo de agentes. Una producción bajo control. <span className="text-flp-muted">Hacen solos lo rutinario, te proponen lo dudoso y te piden aprobación cuando hay dinero o riesgo en juego. Elige por dónde empezar o escribe abajo lo que necesites.</span>
-      </p>
-
+      <h2 className="flp-kicker text-flp-muted">Otras formas de empezar</h2>
       <div className="ag-accesos">
         <button type="button" className="ag-acceso ag-acceso--principal" onClick={() => enviar(hero.prompt)} disabled={ocupado} aria-labelledby={`${idAcceso}-t`} aria-describedby={`${idAcceso}-d`}>
-          <span className="flp-kicker text-flp-muted">Empieza aquí</span>
+          <span className="flp-kicker text-flp-muted">{informe ? 'Informe semanal' : `Pendiente · ${mundo.periodo.etiqueta}, ${mundo.periodo.fechas}`}</span>
           <strong id={`${idAcceso}-t`} className="ag-acceso-titulo">
             {hero.titulo}
           </strong>
@@ -81,24 +72,9 @@ export function Inicio({ persona, estados, onAbrirAgente, onRecorrido }) {
             {hero.descripcion} Lo preparan {nombresCortos(hero.agentes.map((a) => AGENTES[a].nombre))}.
           </span>
           <span className="flp-button flp-button--primary ag-acceso-cta" aria-hidden="true">
-            Pedir el informe <IconChevronRight size={16} />
+            {informe ? 'Ver el informe' : 'Pedir el informe'} <IconChevronRight size={16} />
           </span>
         </button>
-
-        <div className="ag-acceso">
-          <span className="flp-kicker text-flp-muted">Ahora mismo</span>
-          <strong className="ag-acceso-titulo">¿Cómo vamos?</strong>
-          <span className="text-sm font-medium text-flp-ink">{ahora}</span>
-          <span className="ag-acceso-desc">Lo que espera tu decisión y lo que puede alterar las próximas jornadas. El aviso de riesgos es exploratorio.</span>
-          <span className="mt-auto flex flex-wrap gap-2 pt-2">
-            <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={() => enviar('¿Cómo vamos?')}>
-              Ver el resumen
-            </FilmpilotButton>
-            <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={() => enviar('¿Qué riesgos hay para las próximas jornadas?')}>
-              Ver los riesgos
-            </FilmpilotButton>
-          </span>
-        </div>
 
         <div className="ag-acceso">
           <span className="flp-kicker text-flp-muted">Con guía</span>
@@ -110,24 +86,37 @@ export function Inicio({ persona, estados, onAbrirAgente, onRecorrido }) {
             Empezar el recorrido guiado
           </FilmpilotButton>
         </div>
+
+        <div className="ag-acceso">
+          <span className="flp-kicker text-flp-muted">Con tus palabras</span>
+          <strong className="ag-acceso-titulo">Pregunta lo que necesites</strong>
+          <span className="ag-acceso-desc">Escribe abajo como se lo dirías a tu equipo. Por ejemplo:</span>
+          <span className="mt-auto flex flex-wrap gap-2 pt-1">
+            {['¿Por qué se desvía Escenografía?', '¿Cómo cerraremos el proyecto y llegamos con la caja?'].map((p) => (
+              <button key={p} type="button" className="ag-sugerencia" disabled={ocupado} onClick={() => enviar(p)}>
+                {p}
+              </button>
+            ))}
+          </span>
+        </div>
       </div>
 
       <div className="ag-inicio-mas">
-        <Desplegable titulo={`Todos los casos de uso (${CASOS.length})`} resumen="Presupuesto y proveedores, cierre de semana, facturas, dossier fiscal y riesgos">
+        <Desplegable nivel={3} titulo={`Todos los casos de uso (${CASOS.length})`} resumen="Presupuesto y proveedores, cierre de semana, facturas, dossier fiscal y riesgos">
           <p className="mb-3 text-xs text-flp-muted">{LEYENDA_CAPACIDAD}</p>
           <section className="mt-1" aria-labelledby="grupo-hero">
-            <h3 id="grupo-hero" className="flp-kicker mb-2 text-flp-muted">
+            <h4 id="grupo-hero" className="flp-kicker mb-2 text-flp-muted">
               Recomendado
-            </h3>
+            </h4>
             <div className="ag-casos-grid">
               <TarjetaCaso caso={hero} onElegir={enviar} deshabilitado={ocupado} destacado />
             </div>
           </section>
           {GRUPOS_CASOS.map((g) => (
             <section key={g.id} className="mt-4" aria-labelledby={`grupo-${g.id}`}>
-              <h3 id={`grupo-${g.id}`} className="flp-kicker mb-2 text-flp-muted">
+              <h4 id={`grupo-${g.id}`} className="flp-kicker mb-2 text-flp-muted">
                 {g.titulo}
-              </h3>
+              </h4>
               <div className="ag-casos-grid">
                 {CASOS.filter((x) => x.grupo === g.id).map((x) => (
                   <TarjetaCaso key={x.id} caso={x} onElegir={enviar} deshabilitado={ocupado} />
@@ -137,7 +126,7 @@ export function Inicio({ persona, estados, onAbrirAgente, onRecorrido }) {
           ))}
         </Desplegable>
 
-        <Desplegable titulo="Cómo actúan los agentes" resumen="Ejemplos de cada nivel">
+        <Desplegable nivel={3} titulo="Cómo actúan los agentes" resumen="Ejemplos de cada nivel">
           <ul className="ag-leyenda" aria-label="Niveles de autonomía">
             <li>
               <AutonomyBadge nivel="ejecuta" />
@@ -154,7 +143,7 @@ export function Inicio({ persona, estados, onAbrirAgente, onRecorrido }) {
           </ul>
         </Desplegable>
 
-        <Desplegable className="xl:hidden" titulo="Conoce a los agentes" resumen="El Orquestador y tres familias: presupuesto, financiación y documentación">
+        <Desplegable nivel={3} className="xl:hidden" titulo="Conoce a los agentes" resumen="El Orquestador y tres familias: presupuesto, financiación y documentación">
           <AgentesPorFamilia estados={estados} onAbrir={onAbrirAgente} />
         </Desplegable>
       </div>
