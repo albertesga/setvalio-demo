@@ -1,16 +1,16 @@
-// Bloques del parte de la mañana: la tira del rodaje, «Para hoy», la semana y
-// lo que ha hecho cada agente. La tira, «Para hoy» y la semana leen el mundo
-// actual: lo que decides en la conversación se tacha aquí también.
+// Bloques del parte de la mañana: la tira del rodaje, «Para hoy» y lo que ha hecho
+// cada agente. La tira y «Para hoy» leen el mundo actual: lo que decides en la
+// conversación se tacha aquí también.
 
 import { useId } from 'react'
 import { IconCheck, IconChevronRight, IconClock } from '../../components/icons.jsx'
 import * as c from '../calculos.js'
 import { AGENTES } from '../agentes.js'
 import { decisionesAbiertas } from '../pendientes.js'
-import { evaluarRiesgos, riesgo as riesgoDe, HECHAS, PREGUNTA } from '../rodaje.js'
+import { evaluarRiesgos, riesgo as riesgoDe, HECHAS } from '../rodaje.js'
 import { renderTexto, fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
-import { Tx, Tono, AgentAvatar, ChipSeveridad, diaCorto, rangoFechas } from './Piezas.jsx'
+import { Tx, Tono, AgentAvatar, rangoFechas } from './Piezas.jsx'
 import { ESTADO_DECISION, ESTADO_RIESGO, irATarjeta } from './Bloques.jsx'
 
 const PESO = { alta: 0, media: 1, baja: 2, controlado: 3 }
@@ -41,7 +41,6 @@ function riesgoPorJornada(riesgos) {
 
 // «Madrid centro · interiores» → «Madrid centro».
 const sitio = (loc) => loc.split(' · ')[0]
-const minuscula = (s) => s.charAt(0).toLowerCase() + s.slice(1)
 const tipo = (j) => `${j.tipo === 'EXT' ? 'Exterior' : 'Interior'} · ${j.franja.toLowerCase()}`
 
 // ── Tira del rodaje ──────────────────────────────────────────────────────────
@@ -243,7 +242,7 @@ function Linea({ it, n }) {
 
 /** «Para hoy»: lo urgente, ordenado; se tacha en cuanto se decide. */
 export function BloqueAgenda({ b }) {
-  const { mundo, verPorRevisar } = useCtx()
+  const { mundo, enviar, ocupado } = useCtx()
   const id = useId().replace(/:/g, '')
   const estados = b.items.map((it) => estadoLinea(mundo, it.ref))
   const hechas = estados.filter((e) => e.hecho).length
@@ -269,91 +268,10 @@ export function BloqueAgenda({ b }) {
       )}
       {resto.length > 0 && (
         <p className="ag-agenda-resto">
-          <span>
-            Y {plural(resto.length, 'decisión más', 'decisiones más')}, menos urgentes, en «Por revisar».
-          </span>
-          {verPorRevisar && (
-            <button type="button" className="ag-link" onClick={verPorRevisar}>
-              Ver todo lo que está por revisar
-            </button>
-          )}
-        </p>
-      )}
-    </section>
-  )
-}
-
-// ── Esta semana ──────────────────────────────────────────────────────────────
-
-/** La semana de rodaje en curso, día a día, con los riesgos de cada jornada. */
-export function BloqueSemana({ b }) {
-  const { mundo, enviar, ocupado } = useCtx()
-  const id = useId().replace(/:/g, '')
-  const hoy = mundo.proyecto.diaActual
-  const riesgos = evaluarRiesgos(mundo)
-  const semanas = porSemana(todasLasJornadas(mundo))
-  const i = semanas.findIndex((g) => g.semana === b.semana)
-  if (i < 0) return null
-  const { jornadas } = semanas[i]
-  const siguiente = semanas[i + 1]
-  const sigLugares = siguiente ? [...new Set(siguiente.jornadas.map((j) => sitio(j.localizacion)))] : []
-  const sigNoches = siguiente ? siguiente.jornadas.filter((j) => j.franja === 'Noche').length : 0
-  const sigRiesgos = siguiente ? riesgos.filter((r) => r.severidad !== 'controlado' && r.jornadas.some((n) => siguiente.jornadas.some((j) => j.n === n))) : []
-  return (
-    <section className="ag-panel" aria-labelledby={`${id}-t`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h4 id={`${id}-t`} className="text-sm font-semibold text-flp-ink">
-          Esta semana en el rodaje · {b.semana}
-        </h4>
-        <span className="ag-etiqueta-capacidad">Exploratorio</span>
-      </div>
-      <ol className="ag-semana">
-        {jornadas.map((j) => {
-          const rs = j.n >= hoy ? riesgos.filter((r) => r.jornadas.includes(j.n)).sort((a, z) => PESO[a.severidad] - PESO[z.severidad]) : []
-          const estado = j.n < hoy ? 'Rodada' : j.n === hoy ? 'Hoy' : j.n === hoy + 1 ? 'Mañana' : null
-          return (
-            <li key={j.n} className={`ag-semana-dia ${j.n < hoy ? 'is-hecha' : ''} ${j.n === hoy ? 'is-hoy' : ''}`}>
-              <span className="ag-semana-fecha tnum">
-                <span className="block">{diaCorto(j.fecha)}</span>
-                <span className="block text-flp-muted">J{j.n}</span>
-              </span>
-              <div className="min-w-0">
-                <span className="block text-sm font-medium text-flp-ink">{j.localizacion}</span>
-                <span className="block text-xs text-flp-muted">
-                  {tipo(j)}
-                  {j.nota ? ` · ${j.nota}` : ''}
-                </span>
-                {rs.length > 0 && (
-                  <ul className="mt-1.5 space-y-1">
-                    {rs.map((r) => (
-                      <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <ChipSeveridad severidad={r.severidad} />
-                        <span className="text-xs text-flp-ink">
-                          <Tx value={r.titulo} />
-                        </span>
-                        {r.severidad !== 'controlado' && (
-                          <button type="button" className="ag-link ag-link--compacto" disabled={ocupado} onClick={() => enviar(PREGUNTA[r.id])} aria-label={`Ver qué propone: ${renderTexto(r.titulo)}`}>
-                            Ver qué propone
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {estado ? <span className={`ag-semana-estado ${j.n === hoy ? 'is-hoy' : ''}`}>{estado}</span> : <span aria-hidden="true" />}
-            </li>
-          )
-        })}
-      </ol>
-      {siguiente && (
-        <p className="ag-semana-siguiente">
-          <strong className="font-medium text-flp-ink">
-            La semana que viene, {rangoFechas(siguiente.jornadas[0].fecha, siguiente.jornadas[siguiente.jornadas.length - 1].fecha)}:
-          </strong>{' '}
-          {sigLugares.join(' y ')}, jornadas <span className="tnum">{siguiente.jornadas[0].n}</span> a <span className="tnum">{siguiente.jornadas[siguiente.jornadas.length - 1].n}</span>
-          {sigNoches ? `, ${sigNoches === 1 ? 'una de noche' : `${sigNoches} de noche`}` : ''}.
-          {sigRiesgos.length > 0 && ` ${plural(sigRiesgos.length, 'riesgo', 'riesgos')} a la vista: ${sigRiesgos.map((r) => minuscula(renderTexto(r.titulo))).join('; ')}.`}
+          <span>Y {plural(resto.length, 'decisión más', 'decisiones más')}, menos urgentes.</span>
+          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar('¿Qué tengo que revisar?')}>
+            Verlas todas
+          </button>
         </p>
       )}
     </section>

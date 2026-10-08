@@ -873,15 +873,15 @@ test('el parte cuenta el día 7 de 20 con las cifras del mundo', () => {
   assert.match(txt, /van 6 de 20/)
   assert.match(txt, /viernes 19 de junio/)
   assert.ok(txt.includes(eur(TOTALES.cef)), 'coste estimado final')
-  assert.match(txt, /Escenografía es el único capítulo/)
+  assert.match(txt, /solo Escenografía pasa del umbral/)
   assert.match(txt, /jornada 8 de mañana, un exterior con un 80\s%/)
   const kpis = Object.fromEntries(r.turno.bloques.find((b) => b.tipo === 'kpis').items.map((k) => [k.id, k.valor]))
   cerca(kpis.cef, TOTALES.cef)
   cerca(kpis.gastado, TOTALES.gastado)
   cerca(kpis.caja, SALDO_HOY)
   assert.equal(kpis.revisar, 8)
-  for (const tipo of ['tira', 'agenda', 'semana', 'equipo']) assert.ok(r.turno.bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
-  assert.equal(r.turno.bloques.find((b) => b.tipo === 'semana').semana, 'Rodaje 2')
+  for (const tipo of ['tira', 'agenda', 'equipo']) assert.ok(r.turno.bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
+  assert.ok(!r.turno.bloques.some((b) => b.tipo === 'semana'), 'sin la semana: la tira ya la enseña')
 })
 test('«Para hoy»: lluvia de mañana, avisos, compras y certificado, en ese orden', () => {
   const ag = agendaDelDia(mundoBase)
@@ -895,11 +895,12 @@ test('«Para hoy»: lluvia de mañana, avisos, compras y certificado, en ese ord
 test('cada botón del parte lleva a un guion que lo resuelve', () => {
   const ag = agendaDelDia(mundoBase)
   const entradas = ag.items.flatMap((i) => [...(i.acciones ?? []).map((a) => a.entrada), ...(i.subitems ?? []).map((s) => s.entrada), i.entrada])
-  for (const e of [...new Set(entradas), ...Object.values(PREGUNTAS_PARTE)]) {
+  for (const e of [...new Set(entradas), ...Object.values(PREGUNTAS_PARTE), '¿Qué tengo que revisar?']) {
     const r = responder(mundoBase, { tipo: 'texto', texto: e })
     assert.ok(!['no_entendido', 'desambiguar'].includes(r.turno.intencion), `${e} → ${r.turno.intencion}`)
   }
   assert.equal(responder(mundoBase, { tipo: 'texto', texto: 'Revisa la orden de compra OC-106' }).turno.entidades.oc, 'OC-106')
+  assert.equal(responder(mundoBase, { tipo: 'texto', texto: '¿Qué tengo que revisar?' }).turno.intencion, 'resumen', '«Verlas todas» lleva a la lista de decisiones')
 })
 test('lo decidido sale de «Para hoy» y el parte se rehace con lo que queda', () => {
   let m = reducir(mundoBase, { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar', por: 'Marta Cobo' })

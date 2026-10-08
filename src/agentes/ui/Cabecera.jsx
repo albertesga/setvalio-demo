@@ -3,15 +3,12 @@
 
 import { useState } from 'react'
 import { FilmpilotLogo, FilmpilotSymbol, FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconBell, IconChevronDown, IconArrowLeft, IconPlay } from '../../components/icons.jsx'
+import { IconChevronDown, IconArrowLeft, IconPlay } from '../../components/icons.jsx'
 import { PERSONAS } from '../mundo.js'
 import { RITMOS } from '../useAgentes.js'
 import { LEYENDA_CAPACIDAD, RECORRIDO } from '../casos.js'
 
-const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
-
-export function Cabecera({ s, persona, pendientes, onPortada, onActividad, onDemo }) {
-  const etiquetaCampana = [plural(pendientes, 'por revisar', 'por revisar'), s.novedades ? plural(s.novedades, 'novedad sin leer', 'novedades sin leer') : null].filter(Boolean).join(', ')
+export function Cabecera({ s, persona, onPortada, onAgentes, onDemo }) {
   return (
     <header className="ag-header">
       <button type="button" className="ag-header-marca" onClick={onPortada} aria-label="Filmpilot, volver a la portada">
@@ -36,11 +33,10 @@ export function Cabecera({ s, persona, pendientes, onPortada, onActividad, onDem
           </span>
         </p>
       </div>
-      {/* La insignia cuenta siempre lo «Por revisar»; las novedades sin leer, un punto aparte. */}
-      <button type="button" className="ag-icon-button ag-campana relative" aria-label={`Panel: por revisar, actividad, riesgos y agentes. ${etiquetaCampana}`} onClick={onActividad}>
-        <IconBell size={20} />
-        {pendientes > 0 && <span className="ag-badge tnum">{pendientes}</span>}
-        {s.novedades > 0 && <span className="ag-campana-punto" aria-hidden="true" />}
+      {/* En móvil no cabe el carril de agentes: se abre en una hoja. */}
+      <button type="button" className="ag-agentes-boton" aria-haspopup="dialog" aria-controls="ag-hoja-agentes" onClick={onAgentes}>
+        <FilmpilotSymbol size={16} />
+        Agentes
       </button>
       <button type="button" className="ag-demo-boton" aria-haspopup="dialog" aria-controls="ag-hoja-demo" onClick={onDemo} aria-label={`Opciones de la demo. Ahora la ves como ${persona.nombre}, ${persona.rol}`}>
         <span className="ag-demo-etiqueta">Demo</span>

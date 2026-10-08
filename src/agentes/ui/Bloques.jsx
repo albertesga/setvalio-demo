@@ -15,7 +15,7 @@ import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
 import { useMovimientoReducido } from '../useAgentes.js'
 import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, diaCorto } from './Piezas.jsx'
-import { BloqueTira, BloqueAgenda, BloqueSemana, BloqueEquipo } from './Parte.jsx'
+import { BloqueTira, BloqueAgenda, BloqueEquipo } from './Parte.jsx'
 import { PERSONAS } from '../mundo.js'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
@@ -1420,7 +1420,6 @@ const REGISTRO = {
   plan: BloquePlan,
   tira: BloqueTira,
   agenda: BloqueAgenda,
-  semana: BloqueSemana,
   equipo: BloqueEquipo,
 }
 
