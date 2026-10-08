@@ -3,11 +3,10 @@
 // Datos de ejemplo: plan de jornadas, previsión del tiempo, convocatorias,
 // permisos y avisos. No se consulta ningún servicio externo.
 //
-// Calendario del mundo de los agentes: el rodaje empezó el lunes 11/05/2026 y
-// rueda cinco días por semana, así que hoy (lunes 01/06) es la jornada 16 y
-// «día 15 de 30» son las jornadas hechas. Coincide con PERIODO (Rodaje 3 =
-// 25–31 may) y con CASHFLOW (Rodaje 4–6). No coinciden fechaInicioRodaje
-// '04/05/2026' de proyectos.js ni las facturas «semana 3»: aquí no se usan.
+// Calendario del mundo de los agentes: el rodaje empezó el lunes 25/05/2026 y
+// rueda cinco días por semana, así que hoy (martes 02/06) se rueda la jornada 7
+// y van seis hechas. Coincide con PERIODO (Rodaje 1 = 25–31 may), con CASHFLOW
+// (Rodaje 2–4) y con proyectos.js (20 jornadas desde el 25/05).
 //
 // Este módulo no importa calculos.js: calculos.js lo importa a él.
 
@@ -20,22 +19,32 @@ const [MADRID, APOLO, EXTERIORES, CANARIAS] = LOCALIZACIONES
 
 const J = (n, fecha, semana, localizacion, tipo, franja, extra = {}) => ({ n, fecha, semana, localizacion, tipo, franja, roles: ['Protagonistas', 'Equipo técnico'], nota: '', ...extra })
 
+// Jornadas ya rodadas: no se vigilan, pero dan contexto (la tira del parte de la mañana).
+export const HECHAS = [
+  J(1, '2026-05-25', 'Rodaje 1', MADRID, 'INT', 'Día', { nota: 'Primera jornada' }),
+  J(2, '2026-05-26', 'Rodaje 1', APOLO, 'INT', 'Noche', { nota: 'El teatro solo está libre de noche' }),
+  J(3, '2026-05-27', 'Rodaje 1', APOLO, 'INT', 'Noche'),
+  J(4, '2026-05-28', 'Rodaje 1', APOLO, 'INT', 'Noche'),
+  J(5, '2026-05-29', 'Rodaje 1', MADRID, 'INT', 'Día', { nota: 'Citación tardía tras las noches' }),
+  J(6, '2026-06-01', 'Rodaje 2', MADRID, 'INT', 'Día', { nota: 'Jornada ampliada (refuerzo de catering, OC-109)' }),
+]
+
+// Plan que vigila el agente de riesgos: de hoy al cierre.
 export const JORNADAS = [
-  J(16, '2026-06-01', 'Rodaje 4', MADRID, 'INT', 'Día', { nota: 'Jornada ampliada (refuerzo de catering, OC-109)' }),
-  J(17, '2026-06-02', 'Rodaje 4', MADRID, 'INT', 'Día'),
-  J(18, '2026-06-03', 'Rodaje 4', EXTERIORES, 'EXT', 'Día', { nota: 'Azotea, sin cobertura' }),
-  J(19, '2026-06-04', 'Rodaje 4', APOLO, 'INT', 'Día', { nota: 'Decorado montado' }),
-  J(20, '2026-06-05', 'Rodaje 4', MADRID, 'INT', 'Día', { nota: 'Cambiada desde Exteriores Madrid', anterior: EXTERIORES }),
-  J(21, '2026-06-08', 'Rodaje 5', CANARIAS, 'EXT', 'Día', { roles: ['Protagonistas', 'Actriz secundaria', 'Equipo técnico'] }),
-  J(22, '2026-06-09', 'Rodaje 5', CANARIAS, 'EXT', 'Día', { roles: ['Protagonistas', 'Actriz secundaria', 'Equipo técnico'] }),
-  J(23, '2026-06-10', 'Rodaje 5', CANARIAS, 'EXT', 'Día', { nota: 'Vía pública' }),
-  J(24, '2026-06-11', 'Rodaje 5', CANARIAS, 'EXT', 'Noche'),
-  J(25, '2026-06-12', 'Rodaje 5', CANARIAS, 'EXT', 'Noche'),
-  J(26, '2026-06-15', 'Rodaje 6', APOLO, 'INT', 'Día'),
-  J(27, '2026-06-16', 'Rodaje 6', APOLO, 'INT', 'Día'),
-  J(28, '2026-06-17', 'Rodaje 6', MADRID, 'INT', 'Día'),
-  J(29, '2026-06-18', 'Rodaje 6', EXTERIORES, 'EXT', 'Día'),
-  J(30, '2026-06-19', 'Rodaje 6', APOLO, 'INT', 'Día', { nota: 'Cierre de rodaje' }),
+  J(7, '2026-06-02', 'Rodaje 2', MADRID, 'INT', 'Día'),
+  J(8, '2026-06-03', 'Rodaje 2', EXTERIORES, 'EXT', 'Día', { nota: 'Azotea, sin cobertura' }),
+  J(9, '2026-06-04', 'Rodaje 2', APOLO, 'INT', 'Día', { nota: 'Decorado montado' }),
+  J(10, '2026-06-05', 'Rodaje 2', MADRID, 'INT', 'Día', { nota: 'Cambiada desde Exteriores Madrid', anterior: EXTERIORES }),
+  J(11, '2026-06-08', 'Rodaje 3', CANARIAS, 'EXT', 'Día', { roles: ['Protagonistas', 'Actriz secundaria', 'Equipo técnico'] }),
+  J(12, '2026-06-09', 'Rodaje 3', CANARIAS, 'EXT', 'Día', { roles: ['Protagonistas', 'Actriz secundaria', 'Equipo técnico'] }),
+  J(13, '2026-06-10', 'Rodaje 3', CANARIAS, 'EXT', 'Día', { nota: 'Vía pública' }),
+  J(14, '2026-06-11', 'Rodaje 3', CANARIAS, 'EXT', 'Noche'),
+  J(15, '2026-06-12', 'Rodaje 3', CANARIAS, 'EXT', 'Noche'),
+  J(16, '2026-06-15', 'Rodaje 4', APOLO, 'INT', 'Día'),
+  J(17, '2026-06-16', 'Rodaje 4', APOLO, 'INT', 'Día'),
+  J(18, '2026-06-17', 'Rodaje 4', MADRID, 'INT', 'Día'),
+  J(19, '2026-06-18', 'Rodaje 4', EXTERIORES, 'EXT', 'Día'),
+  J(20, '2026-06-19', 'Rodaje 4', APOLO, 'INT', 'Día', { nota: 'Cierre de rodaje' }),
 ]
 
 // Previsión del tiempo de ejemplo: probabilidad de lluvia por fecha.
@@ -46,14 +55,15 @@ export const METEO = {
 }
 
 export const SENALES = {
-  // El exterior de esta semana y el interior con el que se puede intercambiar.
-  lluvia: { jornada: 18, intercambio: 19, actualizacion: 0.9 },
-  citacion: { jornada: 17, publicada: false, alerta: false },
-  billete: { jornadas: [21, 22], rol: 'Actriz secundaria', contratoFirmado: true, emitido: false },
-  permiso: { jornada: 23, solicitado: '2026-05-20', resuelto: false, organismo: 'Ayuntamiento de Las Palmas de Gran Canaria' },
-  cambio: { jornada: 20, de: EXTERIORES, a: MADRID, avisados: ['Dirección', 'Arte'], sinAvisar: 'Transportes Madrid Film S.L.' },
-  // OC-106 (28/05) paga las horas extra de las noches de las jornadas 12 a 14.
-  noches: { jornadas: [24, 25], anteriores: [12, 13, 14], oc: 'OC-106', partida: '03.03' },
+  // El exterior de mañana y el interior con el que se puede intercambiar.
+  lluvia: { jornada: 8, intercambio: 9, actualizacion: 0.9 },
+  // La orden del día de mañana: la del exterior con lluvia.
+  citacion: { jornada: 8, publicada: false, alerta: false },
+  billete: { jornadas: [11, 12], rol: 'Actriz secundaria', contratoFirmado: true, emitido: false },
+  permiso: { jornada: 13, solicitado: '2026-05-20', resuelto: false, organismo: 'Ayuntamiento de Las Palmas de Gran Canaria' },
+  cambio: { jornada: 10, de: EXTERIORES, a: MADRID, avisados: ['Dirección', 'Arte'], sinAvisar: 'Transportes Madrid Film S.L.' },
+  // OC-106 (28/05) paga las horas extra de las noches del Teatro Apolo, jornadas 2 a 4.
+  noches: { jornadas: [14, 15], anteriores: [2, 3, 4], oc: 'OC-106', partida: '03.03' },
 }
 
 // Umbrales de severidad (se citan en las reglas de cada respuesta).
@@ -117,7 +127,7 @@ export function evaluarRiesgos(m) {
   const dec = m.decisionesRiesgo ?? {}
   const out = []
 
-  // RG-1 · lluvia en el exterior de esta semana. Se identifica por la jornada original.
+  // RG-1 · lluvia en el exterior de mañana. Se identifica por la jornada original.
   const ll = senales.lluvia
   const j1 = jornadaOriginal(ll.jornada)
   const ji = jornadaOriginal(ll.intercambio)
@@ -306,15 +316,15 @@ export function riesgosAltos(m) {
 
 // Pregunta que abre cada riesgo en la conversación.
 export const PREGUNTA = {
-  'RG-1': '¿Va a llover en la jornada 18?',
-  'RG-2': '¿Tiene billete la actriz de la jornada 21?',
+  'RG-1': '¿Va a llover en la jornada 8?',
+  'RG-2': '¿Tiene billete la actriz de la jornada 11?',
   'RG-3': '¿Cómo va el permiso de vía pública de Canarias?',
   'RG-4': '¿Está publicada la orden de rodaje de mañana?',
   'RG-5': '¿Qué riesgo hay con las horas extra de noche?',
-  'RG-6': 'Prepara el aviso a transportes por el cambio de localización de la jornada 20',
+  'RG-6': 'Prepara el aviso a transportes por el cambio de localización de la jornada 10',
 }
 
-// Jornada → riesgo («¿y la jornada 23?»).
+// Jornada → riesgo («¿y la jornada 13?»).
 export function riesgoDeJornada(m, n) {
   return evaluarRiesgos(m).find((r) => r.jornadas.includes(n)) ?? null
 }

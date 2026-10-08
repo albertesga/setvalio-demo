@@ -423,8 +423,9 @@ export const resumen = {
     return {
       bloques: [
         texto(
-          t('{dia} de {total} jornadas rodadas. Coste estimado final {cef} ({pct} sobre presupuesto) y {n} por revisar.', {
+          t('Día {dia} de {total} de rodaje: {hechas} rodadas. Coste estimado final {cef} ({pct} sobre presupuesto) y {n} por revisar.', {
             dia: v(m.proyecto.diaActual, 'num'),
+            hechas: cuenta(m.proyecto.diaActual - 1, 'jornada', 'jornadas'),
             total: v(m.proyecto.diasRodaje, 'num'),
             cef: v(tot.cef, 'eur'),
             pct: v(tot.desviacionPct, 'pctSigned'),

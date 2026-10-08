@@ -4,7 +4,7 @@
 // con lo que los totales de partida son exactamente TOTALES. No se usa
 // costeProyectoDemo (mezcla el presupuesto del proyecto con el CEF estático).
 //
-// Corte fijo: lunes 1 de junio de 2026. Lo que src/lib/data.js fecha después
+// Corte fijo: martes 2 de junio de 2026, día 7 de rodaje. Lo que src/lib/data.js fecha después
 // (bandeja de gastos, órdenes de compra) se re-fecha aquí antes del corte; cada
 // copia indica de dónde sale. Un solo esquema de pedidos: OC-NNN.
 
@@ -14,8 +14,9 @@ import { isoDesde } from './texto.js'
 import { crearPropuesta } from './propuesta.js'
 import { crearRodaje } from './rodaje.js'
 
-export const CORTE = { fecha: '2026-06-01', etiqueta: 'lunes 1 de junio de 2026' }
-export const PERIODO = { id: 'R3', etiqueta: 'Rodaje 3', fechas: '25–31 may', desde: '2026-05-25', hasta: '2026-05-31' }
+export const CORTE = { fecha: '2026-06-02', etiqueta: 'martes 2 de junio de 2026' }
+// La semana que cierra el informe: la primera de rodaje.
+export const PERIODO = { id: 'R1', etiqueta: 'Rodaje 1', fechas: '25–31 may', desde: '2026-05-25', hasta: '2026-05-31' }
 
 const PROYECTO = PROYECTOS.find((p) => p.id === PROYECTO_DEMO_ID)
 
@@ -135,12 +136,12 @@ function crearOrdenes(documentos) {
   // Copia de ORDENES_BASE (src/screens/Compras.jsx), re-fechadas antes del corte.
   // OC-107 y OC-109 ya están dentro del comprometido de su partida.
   const compras = [
-    { id: 'OC-104', proveedor: 'Hotel NH', concepto: 'Ampliación alojamiento exteriores', partida: '07.02', importe: 18_400, solicitante: 'Producción', fecha: '2026-06-01', estado: 'Por llegar', semanaPago: 'Rodaje 5' },
-    { id: 'OC-105', proveedor: 'Camera Rental Madrid', concepto: 'Ópticas adicionales semana 4', partida: '06.01', importe: 12_600, solicitante: 'Dirección de fotografía', fecha: '2026-05-29', estado: 'Pendiente', semanaPago: 'Rodaje 4' },
-    { id: 'OC-106', proveedor: 'Eléctricos Prado', concepto: 'Horas extra acumuladas noche', partida: '03.03', importe: 9_800, solicitante: 'Jefe de producción', fecha: '2026-05-28', estado: 'Pendiente', semanaPago: 'Rodaje 4' },
+    { id: 'OC-104', proveedor: 'Hotel NH', concepto: 'Ampliación alojamiento exteriores', partida: '07.02', importe: 18_400, solicitante: 'Producción', fecha: '2026-06-01', estado: 'Por llegar', semanaPago: 'Rodaje 3' },
+    { id: 'OC-105', proveedor: 'Camera Rental Madrid', concepto: 'Ópticas adicionales semana 2', partida: '06.01', importe: 12_600, solicitante: 'Dirección de fotografía', fecha: '2026-05-29', estado: 'Pendiente', semanaPago: 'Rodaje 2' },
+    { id: 'OC-106', proveedor: 'Eléctricos Prado', concepto: 'Horas extra acumuladas noche', partida: '03.03', importe: 9_800, solicitante: 'Jefe de producción', fecha: '2026-05-28', estado: 'Pendiente', semanaPago: 'Rodaje 2' },
     { id: 'OC-107', proveedor: 'Atrezzo Norte', concepto: 'Reposición decoración escena teatro', partida: '04.02', importe: 4_750, solicitante: 'Arte', fecha: '2026-05-27', estado: 'Aprobada', semanaPago: null },
     { id: 'OC-108', proveedor: 'Dron Services Madrid', concepto: 'Plano aéreo no previsto', partida: '06.02', importe: 14_200, solicitante: 'Dirección', fecha: '2026-05-26', estado: 'Rechazada', semanaPago: null },
-    { id: 'OC-109', proveedor: 'Catering Estela S.L.', concepto: 'Refuerzo catering jornada 16', partida: '07.03', importe: 3_900, solicitante: 'Producción', fecha: '2026-05-26', estado: 'Aprobada', semanaPago: null },
+    { id: 'OC-109', proveedor: 'Catering Estela S.L.', concepto: 'Refuerzo catering jornada 6', partida: '07.03', importe: 3_900, solicitante: 'Producción', fecha: '2026-05-26', estado: 'Aprobada', semanaPago: null },
   ]
   for (const o of compras) {
     ordenes[o.id] = { aliasLegacy: null, facturado: 0, capitulo: o.partida.slice(0, 2), ...o }

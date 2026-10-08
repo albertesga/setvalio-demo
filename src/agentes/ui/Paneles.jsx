@@ -1,17 +1,13 @@
-// Paneles laterales: agentes por familia, casos de uso, actividad, decisiones y riesgos.
+// Carril de agentes: el Orquestador y las tres familias, el detalle de cada agente y los casos de uso.
 
 import { useId, useRef } from 'react'
-import { AgentGlyph, StateChip } from '../../brand/Filmpilot.jsx'
-import { IconCheck, IconPlay, IconPause } from '../../components/icons.jsx'
+import { AgentGlyph } from '../../brand/Filmpilot.jsx'
+import { IconCheck } from '../../components/icons.jsx'
 import { AGENTES, ORDEN_AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, agentesDeFamilia } from '../agentes.js'
 import { CASOS, ETIQUETA_CAPACIDAD } from '../casos.js'
-import { EVENTOS } from '../sesion.js'
-import * as c from '../calculos.js'
-import { fechaCorta } from '../texto.js'
 import { useCtx } from './contexto.js'
-import { Tx, AgentAvatar, AutonomyBadge, Tono, Hoja } from './Piezas.jsx'
-import { ListaDecisiones, decisionesAbiertas, RadarRiesgos } from './Bloques.jsx'
-import { riesgosAltos } from '../rodaje.js'
+import { Tx, AgentAvatar, AutonomyBadge, Hoja } from './Piezas.jsx'
+import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
 
 // Qué agente sostiene cada tipo de decisión pendiente.
 const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores', riesgo: 'riesgos' }
@@ -198,161 +194,4 @@ export function CasosTracker({ vistos, cabecera = true }) {
   )
 }
 
-function ItemActividad({ it }) {
-  return (
-    <li className="ag-actividad-item">
-      <span className="tnum w-12 flex-none pt-1 text-xs text-flp-muted">{it.previa ? fechaCorta(it.fecha) : it.hora}</span>
-      {it.agente ? (
-        <AgentAvatar id={it.agente} size={28} />
-      ) : (
-        <span className="ag-persona" aria-hidden="true">
-          {(it.persona ?? '?')
-            .split(' ')
-            .map((p) => p[0])
-            .join('')
-            .slice(0, 2)}
-        </span>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm leading-snug text-flp-ink">
-          {it.agente && <strong>{AGENTES[it.agente].nombre} · </strong>}
-          <Tx value={it.texto} />
-        </p>
-        {it.salida && (
-          <p className="mt-0.5 text-xs text-flp-muted">
-            <Tx value={it.salida} />
-          </p>
-        )}
-        {(it.evento || (it.autonomia && it.autonomia !== 'ejecuta')) && (
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {it.evento && <Tono tono="info">Novedad</Tono>}
-            {it.autonomia && it.autonomia !== 'ejecuta' && <AutonomyBadge nivel={it.autonomia} />}
-          </div>
-        )}
-      </div>
-    </li>
-  )
-}
-
-export function PanelActividad({ s }) {
-  const { despachar, ocupado } = useCtx()
-  const sesion = s.actividad.filter((x) => !x.previa)
-  const previas = s.actividad.filter((x) => x.previa)
-  const quedan = EVENTOS.filter((e) => s.mundo.entrantes.includes(e.id)).length
-  const enDirecto = !s.eventosPausados && !s.tour
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className={`ag-directo ${enDirecto ? 'is-on' : ''}`}>
-          <span aria-hidden="true" />
-          {s.tour ? 'Novedades en pausa durante el recorrido' : enDirecto ? 'Novedades en directo' : 'Novedades en pausa'}
-        </span>
-        <div className="flex gap-1.5">
-          <button type="button" className="ag-boton-fila" aria-pressed={s.eventosPausados} onClick={() => despachar({ tipo: 'pausarEventos', valor: !s.eventosPausados })}>
-            {s.eventosPausados ? <IconPlay size={14} aria-hidden="true" /> : <IconPause size={14} aria-hidden="true" />}
-            {s.eventosPausados ? 'Reanudar novedades' : 'Pausar novedades'}
-          </button>
-        </div>
-      </div>
-      {quedan > 0 && (
-        <div className="mb-4 rounded-flp-sm border border-dashed border-flp-control bg-flp-surface px-3 py-2.5 text-xs text-flp-muted">
-          {s.mensajes.some((m) => m.rol === 'agentes')
-            ? `Quedan ${quedan} ${quedan === 1 ? 'novedad' : 'novedades'} de ejemplo. Llegan solas cuando dejas de usar la pantalla unos segundos.`
-            : 'Cuando empieces a conversar irán llegando avisos de riesgos, facturas y solicitudes de ejemplo.'}
-          <button type="button" className="ag-link ml-1" disabled={ocupado} onClick={() => despachar({ tipo: 'simularEvento' })}>
-            Traer la siguiente novedad
-          </button>
-        </div>
-      )}
-      {sesion.length > 0 && (
-        <>
-          <h3 className="flp-kicker mb-1 text-flp-muted">Esta sesión</h3>
-          <ul className="mb-4">
-            {sesion.map((it) => (
-              <ItemActividad key={it.id} it={it} />
-            ))}
-          </ul>
-        </>
-      )}
-      <h3 className="flp-kicker mb-1 text-flp-muted">Antes de esta sesión</h3>
-      <ul>
-        {previas.map((it) => (
-          <ItemActividad key={it.id} it={it} />
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-export function PanelDecisiones({ s }) {
-  const decididas = [...s.mundo.historial].reverse().filter((h) => h.por && h.ref && ['orden', 'documento', 'revision', 'cef', 'informe', 'borrador', 'llamadas', 'eleccion', 'linea', 'riesgo'].includes(h.ref.tipo) && !['Conciliación', 'Informes'].includes(h.por))
-  const VERBO = {
-    'orden/aprobar': 'aprueba',
-    'orden/rechazar': 'rechaza',
-    'orden/escalar': 'pide aprobación de',
-    'documento/contabilizar': 'contabiliza',
-    'documento/aplazar': 'deja en revisión',
-    'documento/revision': 'envía al fiscalista',
-    'partida/ajustarCef': 'ajusta la previsión de',
-    'informe/aprobar': 'aprueba el informe de',
-    'borrador/marcarListo': 'revisa el borrador para',
-    'borrador/descartar': 'descarta el borrador para',
-    'propuesta/autorizarLlamadas': 'autoriza las llamadas',
-    'propuesta/noLlamar': 'decide no llamar',
-    'propuesta/elegir': 'elige proveedor de',
-    'propuesta/anadirLinea': 'añade a la propuesta:',
-    'riesgo/mitigar': 'cambia el plan por',
-    'riesgo/reservar': 'aprueba una reserva por',
-    'riesgo/aceptar': 'asume',
-  }
-  const NOMBRE_RIESGO = { 'RG-1': 'la lluvia de la jornada 18', 'RG-5': 'las horas extra de noche' }
-  const { ocupado } = useCtx()
-  // Nombres legibles: las referencias internas (R1, L1…) no le dicen nada a nadie.
-  const nombre = (ref) => {
-    if (ref.tipo === 'riesgo') return NOMBRE_RIESGO[ref.id] ?? 'un riesgo'
-    if (ref.tipo === 'llamadas') return 'las llamadas a proveedores de Itsasoa'
-    if (ref.tipo === 'informe') return s.mundo.informes[ref.id]?.periodo?.etiqueta ?? ref.id
-    if (ref.tipo === 'eleccion' || ref.tipo === 'linea') return (s.mundo.propuesta?.lineas ?? []).find((l) => l.id === ref.id)?.concepto?.toLowerCase() ?? 'una línea de la propuesta'
-    if (ref.tipo === 'borrador') return s.mundo.borradores[ref.id]?.para ?? 'un borrador'
-    return ref.id
-  }
-  return (
-    <div>
-      <p className="mb-3 text-sm text-flp-muted">Lo que espera tu decisión o la de tu equipo. Pulsa «Revisar» para ir a la tarjeta.</p>
-      {ocupado && <p className="mb-3 text-xs font-medium text-flp-ink">Los agentes están trabajando: podrás revisar en cuanto terminen.</p>}
-      <ListaDecisiones compacta />
-      {decididas.length > 0 && (
-        <>
-          <h3 className="flp-kicker mb-2 mt-5 text-flp-muted">Decididas en esta sesión</h3>
-          <ul className="space-y-2">
-            {decididas.map((h) => (
-              <li key={h.version} className="text-sm text-flp-muted">
-                <strong className="font-medium text-flp-ink">{h.por}</strong> {VERBO[h.tipo] ?? 'decide'} <span className="font-medium text-flp-ink">{nombre(h.ref)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  )
-}
-
 export { CASOS }
-
-export function PanelRiesgos({ s }) {
-  const altos = riesgosAltos(s.mundo).length
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <AgentAvatar id="riesgos" size={28} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-flp-ink">Riesgos de producción</p>
-          <p className="text-xs text-flp-muted">{altos ? `${altos} ${altos === 1 ? 'riesgo alto abierto' : 'riesgos altos abiertos'}` : 'Sin riesgos altos abiertos'} · vigila las jornadas que quedan</p>
-        </div>
-        <span className="ag-etiqueta-capacidad">Exploratorio</span>
-      </div>
-      <RadarRiesgos compacto />
-      <p className="mt-3 text-xs text-flp-muted">Plan, previsión del tiempo, convocatorias y permisos son de ejemplo.</p>
-    </div>
-  )
-}

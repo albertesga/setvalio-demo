@@ -9,11 +9,9 @@ import { CASOS } from '../agentes/casos.js'
 import { AgentesCtx } from '../agentes/ui/contexto.js'
 import { Hoja, Desplegable } from '../agentes/ui/Piezas.jsx'
 import { Mensaje } from '../agentes/ui/Mensajes.jsx'
-import { decisionesAbiertas } from '../agentes/ui/Bloques.jsx'
-import { Inicio, Sugerencias, Redactor, BarraRecorrido } from '../agentes/ui/Conversacion.jsx'
+import { Sugerencias, Redactor, BarraRecorrido } from '../agentes/ui/Conversacion.jsx'
 import { Cabecera, OpcionesDemo } from '../agentes/ui/Cabecera.jsx'
-import { AgentesPorFamilia, CasosTracker, DetalleAgente, PanelActividad, PanelDecisiones, PanelRiesgos, estadoAgentes, casosVistos } from '../agentes/ui/Paneles.jsx'
-import { riesgosAltos } from '../agentes/rodaje.js'
+import { AgentesPorFamilia, CasosTracker, DetalleAgente, estadoAgentes, casosVistos } from '../agentes/ui/Paneles.jsx'
 
 // La pantalla ocupa el alto visible y desplaza sus columnas por dentro: el documento no se mueve.
 // (El color del navegador lo fija App.jsx según la ruta.)
@@ -54,32 +52,14 @@ function Anunciador({ s }) {
   )
 }
 
-// ¿Está a la vista la columna izquierda (≥ 1280 px)? Entonces la pestaña «Agentes» sobra.
-function useAnchoXL() {
-  const consulta = '(min-width: 1280px)'
-  const [xl, setXl] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(consulta).matches)
-  useEffect(() => {
-    const mq = window.matchMedia?.(consulta)
-    if (!mq) return
-    const cambio = () => setXl(mq.matches)
-    mq.addEventListener('change', cambio)
-    return () => mq.removeEventListener('change', cambio)
-  }, [])
-  return xl
-}
-
-const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
-
 export default function Agentes({ onNavigate, contexto, pushToast }) {
   useBloqueoScroll()
-  const xl = useAnchoXL()
   const [ritmo, setRitmo] = useState('normal')
   const { s, despachar } = useAgentes({ ritmo })
   const persona = personaDe(s)
   const ocupado = !!s.activo
   const tour = estadoTour(s)
-  const [hoja, setHoja] = useState(null) // 'actividad' | 'demo'
-  const [pestana, setPestana] = useState('revisar')
+  const [hoja, setHoja] = useState(null) // 'agentes' (móvil) | 'demo'
   const [agenteAbierto, setAgenteAbierto] = useState(null)
   const scrollRef = useRef(null)
   const finRef = useRef(null)
@@ -119,14 +99,25 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     despachar({ tipo: 'actividad' })
   }, [despachar])
 
-  // Lo que pide la portada al abrir los agentes: el recorrido o una pregunta de ejemplo.
+  // Al abrir, el parte de la mañana ya está escrito: no se ve a los agentes prepararlo.
+  // Si la portada pide algo, el recorrido empieza después del parte y una pregunta llega justo debajo.
   const pedidoAtendido = useRef(null)
+  const vacia = s.mensajes.length === 0
   useEffect(() => {
-    if (!contexto || pedidoAtendido.current === contexto) return
-    pedidoAtendido.current = contexto
-    if (contexto.tour && !s.tour) despachar({ tipo: 'tour/iniciar' })
-    else if (contexto.pregunta) enviar(contexto.pregunta)
-  }, [contexto, s.tour, despachar, enviar])
+    if (contexto && pedidoAtendido.current !== contexto) {
+      pedidoAtendido.current = contexto
+      if (contexto.tour) {
+        if (!s.tour) despachar({ tipo: 'tour/iniciar' })
+        return
+      }
+      if (contexto.pregunta) {
+        despachar({ tipo: 'saludar', instantaneo: true })
+        enviar(contexto.pregunta)
+        return
+      }
+    }
+    if (vacia && !s.tour) despachar({ tipo: 'saludar', instantaneo: true })
+  }, [contexto, vacia, s.tour, despachar, enviar])
 
   // Al empezar el recorrido, el foco va a su barra: ahí están el paso, la nota y «Siguiente».
   const enRecorrido = !!s.tour
@@ -167,7 +158,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
       return
     }
     if (!anclado.current) {
-      setNuevos(true)
+      // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos mensajes».
+      if (!(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos(true)
       return
     }
     const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -189,8 +181,6 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   }, [firma])
 
   const estados = useMemo(() => estadoAgentes(s), [s])
-  const pendientes = decisionesAbiertas(s.mundo).length
-  const altos = riesgosAltos(s.mundo).length
   const trabajando = Object.entries(estados).filter(([, e]) => e.estado === 'trabajando').map(([id]) => id)
 
   const ultimoAgentes = [...s.mensajes].reverse().find((m) => m.rol === 'agentes')
@@ -216,86 +206,23 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
 
   const ctx = { mundo: s.mundo, persona, despachar, enviar, enviarEntrada, decidir, onNavigate, avisar, ocupado, deshacible: s.ultimaMutacion?.mensajeId, eventosPausados: s.eventosPausados, primerAviso }
 
-  const abrirHoja = (que) => {
-    setHoja(que)
-    if (que === 'actividad') despachar({ tipo: 'leerNovedades' })
-  }
-
-  const PESTANAS = [
-    { id: 'revisar', etiqueta: 'Por revisar', n: pendientes, sr: plural(pendientes, 'por revisar', 'por revisar'), estilo: 'is-revisar' },
-    { id: 'actividad', etiqueta: 'Actividad', punto: s.novedades > 0, sr: s.novedades ? plural(s.novedades, 'novedad sin leer', 'novedades sin leer') : '' },
-    { id: 'riesgos', etiqueta: 'Riesgos', n: altos, sr: plural(altos, 'riesgo alto', 'riesgos altos'), estilo: 'is-riesgo' },
-    { id: 'agentes', etiqueta: 'Agentes' },
-  ]
-  const panelDerecho = (pref) => {
-    // En la columna lateral (≥ 1280 px) la pestaña «Agentes» se oculta: el carril ya está a la vista.
-    const activa = pref === 'lateral' && xl && pestana === 'agentes' ? 'revisar' : pestana
-    return (
+  // El carril de agentes y casos de uso: a la izquierda desde 1024 px; en móvil, en una hoja.
+  const carril = (enHoja) => (
     <>
-      <div className="ag-tabs" role="tablist" aria-label="Por revisar, actividad, riesgos y agentes">
-        {PESTANAS.map(({ id, etiqueta, n, punto, sr, estilo }) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`${pref}-tab-${id}`}
-            aria-selected={activa === id}
-            aria-controls={activa === id ? `${pref}-tabpanel-${id}` : undefined}
-            tabIndex={activa === id ? 0 : -1}
-            className={`ag-tab ${id === 'agentes' && pref === 'lateral' ? 'ag-tab--agentes' : ''}`}
-            onClick={() => {
-              setPestana(id)
-              if (id === 'actividad') despachar({ tipo: 'leerNovedades' })
-            }}
-            onKeyDown={(e) => {
-              const visibles = [...e.currentTarget.parentElement.querySelectorAll('[role="tab"]')].filter((el) => el.offsetParent !== null)
-              const i = visibles.indexOf(e.currentTarget)
-              let sig = null
-              if (e.key === 'ArrowRight') sig = visibles[(i + 1) % visibles.length]
-              if (e.key === 'ArrowLeft') sig = visibles[(i + visibles.length - 1) % visibles.length]
-              if (e.key === 'Home') sig = visibles[0]
-              if (e.key === 'End') sig = visibles[visibles.length - 1]
-              if (!sig) return
-              e.preventDefault()
-              sig.click()
-              sig.focus()
-            }}
-          >
-            {etiqueta}
-            {n ? (
-              <span className={`ag-tab-n tnum ${estilo ?? ''}`} aria-hidden="true">
-                {n}
-              </span>
-            ) : null}
-            {punto ? <span className="ag-tab-punto" aria-hidden="true" /> : null}
-            {sr && (n || punto) ? <span className="sr-only">, {sr}</span> : null}
-          </button>
-        ))}
-      </div>
-      <div id={`${pref}-tabpanel-${activa}`} role="tabpanel" aria-labelledby={`${pref}-tab-${activa}`} className="ag-panel-scroll">
-        {activa === 'actividad' && <PanelActividad s={s} />}
-        {activa === 'revisar' && <PanelDecisiones s={s} />}
-        {activa === 'riesgos' && <PanelRiesgos s={s} />}
-        {activa === 'agentes' && (
-          <>
-            <AgentesPorFamilia
-              estados={estados}
-              onAbrir={(id) => {
-                setHoja(null)
-                setAgenteAbierto(id)
-              }}
-            />
-            <div className="mt-5 border-t border-flp-line">
-              <Desplegable titulo="Casos de uso" resumen={`${vistos} de ${CASOS.length} vistos`} nivel={3}>
-                <CasosTracker vistos={s.casosVistos} cabecera={false} />
-              </Desplegable>
-            </div>
-          </>
-        )}
+      <AgentesPorFamilia
+        estados={estados}
+        onAbrir={(id) => {
+          if (enHoja) setHoja(null)
+          setAgenteAbierto(id)
+        }}
+      />
+      <div className="mt-5 border-t border-flp-line pt-1">
+        <Desplegable titulo="Casos de uso" resumen={`${vistos} de ${CASOS.length} vistos`} nivel={enHoja ? 3 : 2}>
+          <CasosTracker vistos={s.casosVistos} cabecera={false} />
+        </Desplegable>
       </div>
     </>
-    )
-  }
+  )
 
   const vistos = casosVistos(s.casosVistos)
   const ultimaNovedadId = [...s.mensajes].reverse().find((m) => m.rol === 'novedad')?.id
@@ -306,7 +233,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         <a href="#ag-entrada" className="ag-skip">
           Ir al campo de mensaje
         </a>
-        <Cabecera s={s} persona={persona} pendientes={pendientes} onPortada={() => onNavigate('landing')} onActividad={() => abrirHoja('actividad')} onDemo={() => setHoja('demo')} />
+        <Cabecera s={s} persona={persona} onPortada={() => onNavigate('landing')} onAgentes={() => setHoja('agentes')} onDemo={() => setHoja('demo')} />
 
         <div className="ag-cuerpo">
           <aside className="ag-col-izq" aria-labelledby="ag-titulo-agentes">
@@ -314,12 +241,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
               <h2 id="ag-titulo-agentes" className="sr-only">
                 Agentes
               </h2>
-              <AgentesPorFamilia estados={estados} onAbrir={setAgenteAbierto} />
-              <div className="mt-5 border-t border-flp-line pt-1">
-                <Desplegable titulo="Casos de uso" resumen={`${vistos} de ${CASOS.length} vistos`}>
-                  <CasosTracker vistos={s.casosVistos} cabecera={false} />
-                </Desplegable>
-              </div>
+              {carril(false)}
             </div>
           </aside>
 
@@ -336,9 +258,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             />
             <div ref={scrollRef} className="ag-scroll" onScroll={onScroll} onWheel={soltar} onTouchMove={() => (anclado.current = false)} onKeyDown={soltar}>
               <div className="ag-hilo">
-                {s.mensajes.length === 0 ? (
-                  <Inicio persona={persona} estados={estados} onAbrirAgente={setAgenteAbierto} onRecorrido={() => despachar({ tipo: 'tour/iniciar' })} />
-                ) : (
+                {s.mensajes.length > 0 && (
                   <section aria-labelledby="ag-titulo-conversacion" className="space-y-6">
                     <h2 id="ag-titulo-conversacion" className="sr-only">
                       Conversación
@@ -380,14 +300,10 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
               <p className="ag-pie-nota">Agentes simulados con datos de ejemplo. No se envía nada ni se mueve dinero.</p>
             </div>
           </main>
-
-          <aside className="ag-col-der" aria-label="Por revisar, actividad, riesgos y agentes">
-            {panelDerecho('lateral')}
-          </aside>
         </div>
 
-        <Hoja abierta={hoja === 'actividad'} onCerrar={cerrarHoja} titulo="Por revisar, actividad, riesgos y agentes" id="ag-hoja-actividad">
-          {hoja === 'actividad' && panelDerecho('hoja')}
+        <Hoja abierta={hoja === 'agentes'} onCerrar={cerrarHoja} titulo="Agentes y casos de uso" id="ag-hoja-agentes">
+          {hoja === 'agentes' && carril(true)}
         </Hoja>
 
         <Hoja abierta={hoja === 'demo'} onCerrar={cerrarHoja} titulo="Opciones de la demo" subtitulo={`Ahora: ${persona.nombre} · ${persona.rol}`} id="ag-hoja-demo">

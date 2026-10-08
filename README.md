@@ -5,8 +5,8 @@ el coste y vigila el rodaje de producciones de cine y televisión. Tiene dos
 pantallas: la **portada** y el **prototipo de agentes**. Todos los datos son de
 demostración y viven en memoria; no hay backend ni persistencia.
 
-El proyecto de ejemplo es **La última función**, un largometraje en rodaje
-(15 de 30 jornadas).
+El proyecto de ejemplo es **La última función**, un largometraje en rodaje:
+martes 2 de junio de 2026, día 7 de 20.
 
 ## Arranque
 
@@ -31,10 +31,27 @@ responden.
 ## Agentes (prototipo conversacional)
 
 **Probar los agentes** abre una conversación con los agentes de Filmpilot sobre
-La última función (también con `?vista=agentes`). La pantalla de inicio tiene
-tres accesos (el informe semanal, «¿Cómo vamos?» y el recorrido guiado) y el
-resto de casos plegado; lo que no es conversación (ver como otro rol, velocidad,
-reinicio) está detrás del botón **Demo** de la cabecera.
+La última función (también con `?vista=agentes`). Empieza con el **parte de la
+mañana** ya escrito: «Buenos días, Marta. Hoy es el día 7 de rodaje.» y, debajo,
+lo que está pasando:
+
+- dónde se rueda hoy, cómo va el coste y qué toca primero;
+- la tira de las 20 jornadas, con las rodadas, la de hoy y los riesgos;
+- las cifras clave;
+- «Para hoy», lo urgente por orden y con su botón: la lluvia de mañana, los
+  avisos al equipo, las compras pendientes y el certificado que vence el
+  viernes. Se tacha a medida que decides;
+- lo que ha hecho cada agente, en una línea.
+
+Todo sale del motor, sin cifras escritas a mano, y «Ponme al día» lo vuelve a
+pedir con lo que ya has decidido. La pantalla tiene dos columnas: el carril de
+agentes y casos de uso (en móvil, el botón **Agentes** de la cabecera) y la
+conversación. Lo que no es conversación (ver como otro rol, velocidad,
+recorrido guiado, reinicio) está detrás del botón **Demo**.
+
+El mundo de la demo es el martes 2 de junio de 2026: el rodaje empezó el lunes
+25 de mayo, van seis jornadas rodadas y hoy se rueda la 7 de 20
+(`src/agentes/rodaje.js`, con `HECHAS` y el plan que vigila Riesgos).
 
 Los agentes se agrupan en tres familias, cada una con su glifo:
 **Presupuesto** (Presupuesto, Proveedores, Control de costes y Riesgos),
@@ -57,9 +74,9 @@ das, enseña cada llamada: cómo se presenta, qué confirma y el precio final. T
 eliges el proveedor y la propuesta se recalcula. Las llamadas son simuladas.
 
 **Riesgos de producción** (exploratorio) es un agente proactivo que vigila el plan
-de rodaje: un parte de riesgos llega solo al empezar a conversar, los avisos
-urgentes llegan mientras hablas y la pestaña «Riesgos» muestra el radar en
-directo. Propone una respuesta (cambiar el orden de jornadas, un aviso al equipo
+de rodaje: el parte de la mañana ya cuenta sus riesgos, los avisos
+urgentes llegan mientras hablas y «¿Qué riesgos hay para las próximas jornadas?»
+enseña el radar en directo. Propone una respuesta (cambiar el orden de jornadas, un aviso al equipo
 en borrador) y, si hay dinero en juego, una reserva que solo sube el coste
 estimado final si producción ejecutiva la aprueba. Plan, previsión del tiempo,
 convocatorias y permisos son de ejemplo.

@@ -210,7 +210,7 @@ export const FACTURAS = [
     id: 'F-2026-052',
     proveedor: 'Panavision Madrid',
     cif: 'A-28997120',
-    concepto: 'Alquiler cámara y ópticas — semana 3',
+    concepto: 'Alquiler cámara y ópticas — semana 1',
     fecha: '22/05/2026',
     vencimiento: '21/06/2026',
     base: 9_600,
@@ -226,7 +226,7 @@ export const FACTURAS = [
     id: 'F-2026-053',
     proveedor: 'Iluminación Lumen S.L.',
     cif: 'B-86540199',
-    concepto: 'Alquiler material eléctrico — semana 3',
+    concepto: 'Alquiler material eléctrico — semana 1',
     fecha: '22/05/2026',
     vencimiento: '21/06/2026',
     base: 7_500,
@@ -258,7 +258,7 @@ export const FACTURAS = [
     id: 'F-2026-061',
     proveedor: 'Transportes Madrid Film S.L.',
     cif: 'B-83110472',
-    concepto: 'Camiones cámara y grip — semana 3',
+    concepto: 'Camiones cámara y grip — semana 1',
     fecha: '23/05/2026',
     vencimiento: '22/06/2026',
     base: 3_400,
@@ -274,7 +274,7 @@ export const FACTURAS = [
     id: 'F-2026-067',
     proveedor: 'Catering El Claqueta',
     cif: 'B-87553014',
-    concepto: 'Comidas de equipo — semana 3 (180 servicios)',
+    concepto: 'Comidas de equipo — pruebas de cámara y vestuario (180 servicios)',
     fecha: '24/05/2026',
     vencimiento: '23/06/2026',
     base: 5_720,
@@ -344,11 +344,11 @@ export const FACTURA_DEMO = {
 // ── Tesorería ────────────────────────────────────────────────────────────────
 export const SALDO_HOY = 312_000
 
-// Previsión semanal a partir de hoy (semana en curso = Rodaje 4).
+// Previsión semanal a partir de hoy (semana en curso = Rodaje 2: el rodaje empezó el 25/05).
 export const CASHFLOW = [
-  { semana: 'Rodaje 4', fechas: '01–07 jun', cobros: 0, pagos: 168_000, concepto: 'Nóminas equipo + proveedores semana', enCurso: true },
-  { semana: 'Rodaje 5', fechas: '08–14 jun', cobros: 0, pagos: 198_000, concepto: 'Nóminas + Canarias (viajes y alojamiento)' },
-  { semana: 'Rodaje 6', fechas: '15–21 jun', cobros: 300_000, pagos: 186_000, concepto: 'Licencia Movistar+ (2.º pago) · cierre de rodaje' },
+  { semana: 'Rodaje 2', fechas: '01–07 jun', cobros: 0, pagos: 168_000, concepto: 'Nóminas equipo + proveedores semana', enCurso: true },
+  { semana: 'Rodaje 3', fechas: '08–14 jun', cobros: 0, pagos: 198_000, concepto: 'Nóminas + Canarias (viajes y alojamiento)' },
+  { semana: 'Rodaje 4', fechas: '15–21 jun', cobros: 300_000, pagos: 186_000, concepto: 'Licencia Movistar+ (2.º pago) · cierre de rodaje' },
   { semana: 'Post. 1', fechas: '22–28 jun', cobros: 0, pagos: 96_000, concepto: 'Arranque de montaje y postproducción' },
   { semana: 'Post. 2', fechas: '29 jun–05 jul', cobros: 250_000, pagos: 120_000, concepto: 'Anticipo del crédito fiscal (monetización)' },
   { semana: 'Post. 3', fechas: '06–12 jul', cobros: 0, pagos: 78_000, concepto: 'Sonido, etalonaje y VFX' },

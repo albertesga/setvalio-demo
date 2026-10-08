@@ -121,6 +121,41 @@ export function Tono({ tono = 'neutral', children, className = '' }) {
   return <span className={`ag-chip flp-state ${TONOS[tono] ?? ''} ${className}`}>{children}</span>
 }
 
+// Severidad de un riesgo de rodaje: siempre con texto.
+const SEVERIDAD = {
+  alta: { etiqueta: 'Riesgo alto', tono: 'negative', Icon: IconAlert },
+  media: { etiqueta: 'Riesgo medio', tono: 'atencion', Icon: IconClock },
+  baja: { etiqueta: 'Riesgo bajo', tono: 'neutral', Icon: null, dot: true },
+  controlado: { etiqueta: 'Controlado', tono: 'positive', Icon: IconCheck },
+}
+
+export function ChipSeveridad({ severidad }) {
+  const s = SEVERIDAD[severidad] ?? SEVERIDAD.baja
+  const Icon = s.Icon
+  return (
+    <Tono tono={s.tono}>
+      {Icon ? <Icon size={12} strokeWidth={2.6} aria-hidden="true" /> : <span className="flp-state-dot" aria-hidden="true" />}
+      {s.etiqueta}
+    </Tono>
+  )
+}
+
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** '2026-06-03' → 'mié 3/06'. */
+export function diaCorto(iso) {
+  const d = new Date(`${iso}T12:00:00Z`)
+  return `${DIAS_CORTOS[d.getUTCDay()]} ${d.getUTCDate()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/** Dos fechas ISO → '25–29 may' o '29 may–2 jun'. */
+export function rangoFechas(a, b) {
+  const [, ma, da] = a.split('-').map(Number)
+  const [, mb, db] = b.split('-').map(Number)
+  return ma === mb ? `${da}–${db} ${MESES_CORTOS[mb - 1]}` : `${da} ${MESES_CORTOS[ma - 1]}–${db} ${MESES_CORTOS[mb - 1]}`
+}
+
 /** Bloque plegable accesible: un botón con aria-expanded y su contenido. */
 export function Desplegable({ titulo, resumen, nivel = 2, abiertoInicial = false, className = '', children }) {
   const [abierto, setAbierto] = useState(abiertoInicial)
