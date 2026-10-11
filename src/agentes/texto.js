@@ -61,10 +61,12 @@ export function isoDesde(ddmmaaaa) {
 }
 
 const sinCorte = (s) => s.replace(' %', '\u00a0%')
+// El signo menos tipográfico, como eurSigned: «−54.000 €» en todas las cifras de los agentes.
+const conMenos = (s) => s.replace(/^-/, '−')
 
 const FORMATOS = {
-  eur,
-  eurCents,
+  eur: (n) => conMenos(eur(n)),
+  eurCents: (n) => conMenos(eurCents(n)),
   eurSigned,
   // Espacio de no separación antes de «%»: «80 %» no se parte en dos líneas.
   pct: (n) => sinCorte(pct(n, 1)),
