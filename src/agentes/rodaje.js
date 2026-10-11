@@ -1,4 +1,4 @@
-// Plan de rodaje y riesgos de producción de «La última función» (EXPLORATORIO).
+// Plan de rodaje y riesgos de producción de «La última función» (en exploración).
 //
 // Datos de ejemplo: plan de jornadas, previsión del tiempo, convocatorias,
 // permisos y avisos. No se consulta ningún servicio externo.
@@ -11,7 +11,7 @@
 // Este módulo no importa calculos.js: calculos.js lo importa a él.
 
 import { CASHFLOW } from '../lib/data.js'
-import { t, v, diasEntre, fecha as fechaLarga, formatear } from './texto.js'
+import { t, v, diasEntre, fechaDia, formatear } from './texto.js'
 
 // Nombres de LOCALIZACIONES de src/screens/Coste.jsx (copiados: es JSX y Node no lo importa).
 export const LOCALIZACIONES = ['Madrid centro · interiores', 'Teatro Apolo · decorado', 'Exteriores Madrid', 'Canarias · scouting y bloque 2', 'Postproducción inicial']
@@ -66,7 +66,7 @@ export const SENALES = {
   noches: { jornadas: [14, 15], anteriores: [2, 3, 4], oc: 'OC-106', partida: '03.03' },
 }
 
-// Umbrales de severidad (se citan en las reglas de cada respuesta).
+// Límites de severidad (se citan en las reglas de cada respuesta).
 export const UMBRALES = { probabilidad: 0.7, diasAlta: 7, exposicion: 20_000, diasUrgente: 5 }
 
 export const TIPOS = {
@@ -146,7 +146,7 @@ export function evaluarRiesgos(m) {
     intercambio: ji.n,
     titulo: t('Lluvia en el exterior de la jornada {n}', { n: v(j1.n, 'num') }),
     senales: [
-      t('Previsión de ejemplo para el {f}: {p} de lluvia', { f: v(fechaLarga(j1.fecha)), p: v(pOriginal, 'pct0') }),
+      t('Pronóstico para el {f}: {p} de lluvia', { f: v(fechaDia(j1.fecha)), p: v(pOriginal, 'pct0') }),
       t('Jornada {n}: exterior de {franja} en {loc} ({nota})', { n: v(j1.n, 'num'), franja: v(j1.franja.toLowerCase()), loc: v(j1.localizacion), nota: v(j1.nota) }),
       t('Una jornada de esa semana cuesta unos {c}: pagos previstos de la semana entre cinco jornadas', { c: v(exp1, 'eur') }),
     ],
@@ -171,7 +171,7 @@ export function evaluarRiesgos(m) {
     senales: [
       t('Convocada en las {j} del bloque de Canarias', { j: v(etiquetaJ(b.jornadas)) }),
       t('Contrato firmado; billete todavía sin emitir'),
-      t('Exposición máxima si no llega: el coste de esas jornadas, unos {c}', { c: v(exp2, 'eur') }),
+      t('Si no llega, podría costar lo que esas jornadas: unos {c}', { c: v(exp2, 'eur') }),
     ],
     porQue: t('Sin ella no se pueden rodar sus secuencias en Canarias y habría que reprogramarlas.'),
     respuesta: t('Pedir hoy a coordinación de producción que emita el billete.'),
@@ -189,7 +189,7 @@ export function evaluarRiesgos(m) {
     reserva: null,
     titulo: t('Permiso de vía pública pendiente'),
     senales: [
-      t('Solicitado el {f} al {org}', { f: v(fechaLarga(pm.solicitado)), org: v(pm.organismo) }),
+      t('Solicitado el {f} al {org}', { f: v(fechaDia(pm.solicitado)), org: v(pm.organismo) }),
       t('Sin resolución, y la jornada {n} es en vía pública', { n: v(pm.jornada, 'num') }),
       t('Impacto por estimar: depende del plan B de localización'),
     ],
@@ -242,7 +242,7 @@ export function evaluarRiesgos(m) {
     respuesta:
       dec['RG-5']?.estado === 'mitigado'
         ? t('Noches replanificadas con una citación más tardía: reduce las horas extra, no las elimina.')
-        : t('Replanificar las noches con una citación más tardía, o reservar el coste en la previsión.'),
+        : t('Replanificar las noches con una citación más tardía, o apartar dinero por si vuelve a haber horas extra.'),
     decision: true,
   })
 
@@ -304,7 +304,7 @@ export function decisionesRiesgos(m) {
       nivel: 'aprueba',
       rol: 'Line producer y producción ejecutiva',
       importe: r.reserva,
-      titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, ${etiquetaJ(r.jornadas)}${r.reservaCorta ? ' (reserva corta)' : ''}`,
+      titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, ${etiquetaJ(r.jornadas)}${r.reservaCorta ? ' (la reserva se queda corta)' : ''}`,
       entrada: PREGUNTA[r.id],
     }))
 }

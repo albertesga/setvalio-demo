@@ -1,6 +1,17 @@
 import { createContext, useContext } from 'react'
 
-// mundo, persona, despachar, enviar(texto), decidir(accion, etiqueta), onNavigate, avisar(texto)
+// Contrato del contexto de la pantalla de agentes (lo rellena src/screens/Agentes.jsx):
+// - mundo, persona, despachar, onNavigate, avisar(texto)
+// - enviar(texto) y enviarEntrada(entrada): entrada = { tipo:'texto', texto } | { tipo:'evento', eventoId }
+//   (para una historia, enviarEntrada(entradaDeHistoria(h, mundo)))
+// - decidir(accion, etiqueta)
+// - ocupado: los agentes están trabajando
+// - iniciarRecorrido(): empieza el recorrido guiado y vuelve a seguir la conversación.
+//   Con la demo recién abierta (solo el parte) empieza al momento; si ya hay conversación,
+//   abre la hoja «¿Empezar el recorrido desde cero?». Quien lo llama no pregunta nada.
+// - enRecorrido: hay un recorrido en marcha
+// - vistos: ids de HISTORIAS vistas, en el orden del arco (vistosDe(s))
+// - deshacible, eventosPausados, primerAviso
 export const AgentesCtx = createContext(null)
 
 export function useCtx() {

@@ -1,9 +1,17 @@
-// Guiones fiscales: cumplimiento (elegibilidad, IGIC, dossier) e incentivo (exploratorio).
+// Guiones fiscales: cumplimiento (elegibilidad, IGIC, dossier) e incentivo (en exploración).
 
 import { reducir } from '../acciones.js'
 import { cuenta } from '../texto.js'
 import { ROLES } from '../politicas.js'
-import { t, v, c, paso, sug, texto, aviso, bloqueDocumento, bloqueDossier } from './comun.js'
+import { t, v, c, paso, sug, texto, aviso, bloqueDocumento, bloqueDossier, minuscula } from './comun.js'
+
+// Lo que le falta a un gasto para ser justificable, dicho como lo diría una persona.
+function loQueFalta(el) {
+  const faltan = el.criterios
+    .filter((x) => x.ok !== true)
+    .map((x) => (x.id === 'pago' && x.ok === null ? 'falta el pago' : x.id === 'territorio' ? 'el fiscalista tiene que validar el gasto en Canarias' : minuscula(x.detalle)))
+  return faltan.length > 1 ? `${faltan.slice(0, -1).join(', ')} y ${faltan.at(-1)}` : faltan[0] ?? ''
+}
 
 const pendientesFiscales = (m) => Object.values(m.documentos).filter((d) => d.estado === 'en_bandeja' && d.estado !== 'por_llegar')
 
@@ -15,9 +23,9 @@ function tarjetaFiscal(m, d) {
     agente: 'cumplimiento',
     nivel: 'aprueba',
     rol: ROLES.fiscalista,
-    titulo: t('Validación territorial de {id}', { id: v(d.id, 'id') }),
-    resumen: t('Factura con IGIC ({tasa}): cuenta como gasto en Canarias. Que compute para el incentivo canario lo decide el fiscalista, no un agente.', { tasa: v(d.impuesto.tasa / 100, 'pct0') }),
-    acciones: [{ id: 'enviar', etiqueta: 'Preparar para el fiscalista', variante: 'primary', accion: { tipo: 'documento/revision', docId: d.id, rol: ROLES.fiscalista }, rol: null }],
+    titulo: t('¿Cuenta como gasto en Canarias la factura de {prov}?', { prov: v(d.proveedor) }),
+    resumen: t('{id} lleva IGIC ({tasa}): es un gasto hecho en Canarias. Que cuente para el incentivo canario lo decide el fiscalista, no un agente.', { id: v(d.id, 'id'), tasa: v(d.impuesto.tasa / 100, 'pct0') }),
+    acciones: [{ id: 'enviar', etiqueta: 'Preparar para el fiscalista', burbuja: `Paso ${d.id} al fiscalista`, variante: 'primary', accion: { tipo: 'documento/revision', docId: d.id, rol: ROLES.fiscalista }, rol: null }],
     nota: 'En la demo no sale nada: el paquete queda preparado.',
   }
 }
@@ -38,7 +46,7 @@ export const cumplimiento = {
       const el = c.elegibilidad(m, docId)
       return [
         paso('cumplimiento', t('Revisa los criterios de elegibilidad de {id}', { id: v(docId, 'id') }), { tipo: 'revision', salida: t('{n} cumplidos de {total}', { n: v(el.criterios.filter((x) => x.ok === true).length, 'num'), total: v(el.criterios.length, 'num') }) }),
-        paso('excepciones', t('Asigna quién valida lo que falta'), { autonomia: 'aprueba', salida: el.territorio === 'canarias' ? t('Validación territorial: {rol}', { rol: v(ROLES.fiscalista) }) : t('Sin validación fiscal pendiente') }),
+        paso('excepciones', t('Asigna quién valida lo que falta'), { autonomia: 'aprueba', salida: el.territorio === 'canarias' ? t('Gasto en Canarias: lo valida el {rol}', { rol: v(minuscula(ROLES.fiscalista)) }) : t('Sin validación fiscal pendiente') }),
       ]
     }
     const docs = pendientesFiscales(m)
@@ -57,7 +65,7 @@ export const cumplimiento = {
     if (det.eventoId === 'EV-03') {
       const dos = c.dossier(m)[0]
       return {
-        bloques: [aviso('aviso', 'Vencimiento próximo', t('{doc} vence el {f}: quedan {dias}. Sin él no se puede aplicar la deducción.', { doc: v(dos.documento), f: v(dos.deadline, 'fecha'), dias: v(dos.dias, 'dias') })), bloqueDossier(m), nota],
+        bloques: [aviso('aviso', 'Vencimiento próximo', t('{doc} vence el {f}: quedan {dias}. Sin él no se puede aplicar la deducción.', { doc: v(dos.documento), f: v(dos.deadline, 'dia'), dias: v(dos.dias, 'dias') })), bloqueDossier(m), nota],
         sugerencias: [sug('¿Qué bloquea el dossier fiscal?'), sug('Revisa el IGIC de la factura F-2026-072')],
         fuentes: ['Dossier fiscal'],
         reglas,
@@ -73,12 +81,12 @@ export const cumplimiento = {
         texto(
           el.estado === 'elegible'
             ? t('{id} cumple los criterios de elegibilidad.', { id: v(docId, 'id') })
-            : t('{id} de {prov} todavía no es justificable: {faltan}.', { id: v(docId, 'id'), prov: v(d.proveedor), faltan: v(el.criterios.filter((x) => x.ok !== true).map((x) => x.detalle.toLowerCase()).join('; ')) }),
+            : t('{id} de {prov} todavía no es justificable: {faltan}.', { id: v(docId, 'id'), prov: v(d.proveedor), faltan: v(loQueFalta(el)) }),
         ),
         bloqueDocumento(m, docId, { conciliacion: false, elegibilidad: true }),
       ]
-      if (el.territorio === 'canarias') bloques.push(tarjetaFiscal(m, d))
-      bloques.push(nota)
+      // La tarjeta ya dice que lo decide el fiscalista: la nota solo va sin ella.
+      bloques.push(el.territorio === 'canarias' ? tarjetaFiscal(m, d) : nota)
       return {
         bloques,
         sugerencias: [sug(`Pide a ${d.proveedor} la documentación que falta`), sug('¿Qué bloquea el dossier fiscal?'), sug('¿Cuánto supondría llegar al 50 % de gasto en Canarias?')],
@@ -92,7 +100,9 @@ export const cumplimiento = {
     const filas = docs.map((d) => {
       const el = c.elegibilidad(m, d.id)
       const get = (id) => el.criterios.find((x) => x.id === id)?.ok
-      return { id: d.id, documento: `${d.id} · ${d.proveedor}`, factura: get('factura'), pago: get('pago'), pedido: get('pedido'), capitulo: get('capitulo'), estado: el.estado === 'elegible' ? 'Elegible' : el.estado === 'condicionado' ? 'Condicionado' : 'Revisar' }
+      // Lo que aún depende de otro paso se dice por su nombre: falta el pago o lo valida el fiscalista.
+      const pendiente = get('pago') === null ? 'Falta el pago' : 'Lo valida el fiscalista'
+      return { id: d.id, documento: `${d.id} · ${d.proveedor}`, factura: get('factura'), pago: get('pago'), pedido: get('pedido'), capitulo: get('capitulo'), estado: el.estado === 'elegible' ? 'Elegible' : el.estado === 'condicionado' ? pendiente : 'Revisar' }
     })
     const dos = c.dossier(m)
     const prox = dos.reduce((a, x) => (x.dias < a.dias ? x : a), dos[0])
@@ -116,8 +126,7 @@ export const cumplimiento = {
         filas,
       })
     }
-    if (igic) bloques.push(tarjetaFiscal(m, igic))
-    bloques.push(nota)
+    bloques.push(igic ? tarjetaFiscal(m, igic) : nota)
     const sugerencias = []
     if (igic) sugerencias.push(sug(`Pide a ${igic.proveedor} la documentación que falta`))
     sugerencias.push(sug('¿Cuánto supondría llegar al 50 % de gasto en Canarias?'), sug('Prepárame el informe semanal de coste'))
@@ -125,7 +134,7 @@ export const cumplimiento = {
   },
 }
 
-// ── Incentivo (exploratorio) ─────────────────────────────────────────────────
+// ── Incentivo (en exploración) ──────────────────────────────────────────────
 
 export const incentivo = {
   id: 'incentivo',
@@ -151,15 +160,15 @@ export const incentivo = {
     const ayuda = canAyuda.ayuda
 
     const filas = [
-      { id: 'comun', escenario: 'Territorio común', deduccion: comun.deduccionNeta, efectivo: comun.efectivo, nota: '' },
+      { id: 'comun', escenario: 'Resto de España', deduccion: comun.deduccionNeta, efectivo: comun.efectivo, nota: '' },
       { id: 'can-actual', escenario: `Canarias con el gasto actual (${Math.round(pctActual * 100)} %)`, deduccion: canActual.deduccionNeta, efectivo: canActual.efectivo, nota: canActual.cumpleRequisito ? '' : `No cumple el requisito: ${canActual.requisitoLabel}` },
       { id: 'can-pedido', escenario: `Canarias con el ${Math.round(pctPedido * 100)} % del gasto`, deduccion: canPedido.deduccionNeta, efectivo: canPedido.efectivo, nota: canPedido.cumpleRequisito ? 'Cumple el requisito de gasto' : `No cumple el requisito: ${canPedido.requisitoLabel}` },
     ]
     if (otro && otro.pctGasto > 0) filas.unshift({ id: 'otro', escenario: `${otro.territorio} con el ${Math.round(otro.pctGasto * 100)} % del gasto`, deduccion: otro.deduccionNeta, efectivo: otro.efectivo, nota: otro.cumpleRequisito ? 'Cumple el requisito de gasto' : `No cumple el requisito: ${otro.requisitoLabel}` })
-    if (ayuda) filas.push({ id: 'can-ayuda', escenario: `Lo anterior con la ${ayuda.fuente}`, deduccion: canAyuda.deduccionNeta, efectivo: canAyuda.efectivo, nota: canAyuda.topaIntensidad ? 'Recortada por el tope de intensidad' : 'La ayuda reduce la base' })
+    if (ayuda) filas.push({ id: 'can-ayuda', escenario: `Lo anterior con la ${ayuda.fuente}`, deduccion: canAyuda.deduccionNeta, efectivo: canAyuda.efectivo, nota: canAyuda.topaIntensidad ? 'Recortada por el límite de ayudas públicas' : 'La ayuda reduce la base' })
 
     const bloques = [
-      aviso('exploratorio', 'Exploratorio', t('El simulador de incentivos se exploró como posible puerta de entrada; no forma parte del alcance decidido. Es una estimación orientativa y no sustituye el criterio del fiscalista.')),
+      aviso('exploratorio', 'En exploración', t('En exploración: es una estimación orientativa; la cifra buena te la da tu fiscalista.')),
       ...(otro
         ? [
             texto(
@@ -172,7 +181,7 @@ export const incentivo = {
       texto(
         canActual.cumpleRequisito
           ? t('Con el gasto actual en Canarias ({pct}) la deducción estimada es {d}.', { pct: v(pctActual, 'pct0'), d: v(canActual.deduccionNeta, 'eur') })
-          : t('Con el {pct} del gasto en Canarias no se cumple el requisito ({req}), así que aplican los tipos comunes: {d}. Con el {pp} serían {dp}.', {
+          : t('Con el {pct} del gasto en Canarias no se cumple el requisito ({req}), así que se aplica la deducción general: {d}. Con el {pp} serían {dp}.', {
               pct: v(pctActual, 'pct0'),
               req: v(canActual.requisitoLabel),
               d: v(canActual.deduccionNeta, 'eur'),
@@ -193,14 +202,14 @@ export const incentivo = {
       },
     ]
     if (ayuda && canAyuda.topaIntensidad) {
-      bloques.push(texto(t('Con la ayuda ({ayuda}), deducción y ayudas no pueden pasar del {cap} del coste ({tope}): la deducción se recorta a {d}.', { ayuda: v(ayuda.importe, 'eur'), cap: v(canAyuda.capPct, 'pct0'), tope: v(canAyuda.capIntensidad, 'eur'), d: v(canAyuda.deduccionNeta, 'eur') })))
+      bloques.push(texto(t('Con la ayuda de {ayuda}, deducción y ayudas no pueden pasar del {cap} del coste, {tope}: es el límite de ayudas públicas, así que la deducción se recorta a {d}.', { ayuda: v(ayuda.importe, 'eur'), cap: v(canAyuda.capPct, 'pct0'), tope: v(canAyuda.capIntensidad, 'eur'), d: v(canAyuda.deduccionNeta, 'eur') })))
     }
     if (plan) bloques.push(texto(t('El plan de financiación cuenta con {imp} de incentivo ({estado}). Conviene revisar esa cifra con el fiscalista.', { imp: v(plan.importe, 'eur'), estado: v(plan.estado.toLowerCase()) })))
     return {
       bloques,
       sugerencias: [sug('¿Qué bloquea el dossier fiscal?'), sug('Prepárame el informe semanal de coste')],
       fuentes: ['Motor de incentivos (reglas V2)', 'Reparto de gasto por territorio', 'Plan de financiación'],
-      reglas: [t('Doble tramo sobre el primer millón y el resto; requisito de gasto mínimo por territorio'), t('Las subvenciones reducen la base; tope de intensidad de ayudas sobre el coste')],
+      reglas: [t('Doble tramo sobre el primer millón y el resto; requisito de gasto mínimo por territorio'), t('Las subvenciones reducen la base; límite de ayudas públicas sobre el coste')],
       noHecho: [t('No ha cambiado el reparto de gasto ni el plan de financiación.'), t('No es una validación fiscal.')],
     }
   },

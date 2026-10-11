@@ -1,0 +1,241 @@
+/* Pantalla de agentes: cabecera, carril (historias, cómo actúan y equipo), pie con el
+   redactor y barra del recorrido. Se importa en src/screens/Agentes.jsx después de
+   agentes.css. Solo tokens --flp-*; el amarillo, solo en el contador «Por revisar» y
+   en la acción principal. Texto de 12 px como mínimo y zonas táctiles de 44 px. */
+
+/* ── Cabecera ─────────────────────────────────────────────────────────────── */
+.ag-header {
+  display: block; min-height: 0; flex: none;
+  padding: max(6px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--flp-border);
+  background: var(--flp-chalk);
+}
+.ag-header-fila { display: flex; min-height: 48px; align-items: center; gap: 4px 8px; }
+@media (min-width: 768px) {
+  .ag-header { padding-block: 8px; }
+  .ag-header-fila { gap: 10px; }
+}
+.ag-header-marca { display: inline-flex; min-height: 44px; flex: none; align-items: center; border-radius: 6px; color: var(--flp-carbon); }
+.ag-header-sep { width: 1px; height: 28px; flex: none; background: var(--flp-border); }
+.ag-header-titulo { overflow: hidden; color: var(--flp-carbon); font-size: 15px; font-weight: 500; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Historias y recorrido: en móvil, una segunda fila a lo ancho; desde 768 px, en la fila.
+   Las historias sobran con el carril a la vista (desde 1024 px). */
+.ag-header-fila { flex-wrap: wrap; }
+.ag-header-acciones { display: grid; order: 10; flex: 1 0 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 2px; }
+.ag-header-acciones > * { width: 100%; }
+@media (min-width: 768px) {
+  .ag-header-fila { flex-wrap: nowrap; }
+  .ag-header-acciones { display: flex; order: 0; flex: none; gap: 10px; padding-top: 0; }
+  .ag-header-acciones > * { width: auto; }
+}
+@media (min-width: 1024px) { .ag-header-acciones .ag-header-historias { display: none; } }
+
+.ag-header-historias {
+  display: inline-flex; min-height: 44px; flex: none; align-items: center; justify-content: center; padding: 0 16px;
+  border: 1px solid var(--flp-control-border); border-radius: var(--flp-radius-pill); color: var(--flp-carbon); font-size: 15px; font-weight: 500;
+  transition: border-color var(--flp-duration) var(--flp-ease);
+}
+.ag-header-historias:hover { border-color: var(--flp-carbon); }
+
+/* Contador «Por revisar · n»: discreto, el chip de estado de la marca dentro de una zona de 44 px. */
+.ag-contador { display: inline-flex; min-height: 44px; flex: none; align-items: center; border-radius: var(--flp-radius-pill); }
+.ag-contador-chip {
+  display: inline-flex; min-height: 26px; align-items: center; padding: 2px 10px; border-radius: var(--flp-radius-pill);
+  background: var(--flp-signal); color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.3; white-space: nowrap;
+  transition: background-color var(--flp-duration) var(--flp-ease);
+}
+.ag-contador:hover .ag-contador-chip { background: var(--flp-signal-hover); }
+.ag-contador:focus-visible { outline: 2px solid var(--flp-carbon); outline-offset: 2px; }
+
+/* Opciones de la demo: borde fino en escritorio; en móvil, «⋯». */
+.ag-demo-boton {
+  display: inline-flex; min-width: 44px; min-height: 44px; flex: none; align-items: center; justify-content: center; gap: 6px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: var(--flp-radius-pill); background: transparent;
+  color: var(--flp-carbon); font-size: 15px; font-weight: 500; white-space: nowrap;
+  transition: border-color var(--flp-duration) var(--flp-ease);
+}
+@media (min-width: 768px) { .ag-demo-boton { padding: 0 12px 0 16px; border-color: var(--flp-border); } }
+.ag-demo-boton:hover { border-color: var(--flp-carbon); }
+
+.ag-menu-item { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 8px; padding: 0 12px; border-radius: 6px; color: var(--flp-carbon); font-size: 14px; font-weight: 500; text-align: left; }
+.ag-menu-item:hover { background: color-mix(in srgb, var(--flp-carbon) 5%, transparent); }
+.ag-menu-item--peligro { color: var(--flp-error); }
+
+.ag-confirmar { padding: 12px 14px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-sm); background: var(--flp-surface); }
+
+/* Opciones de la demo: radios en filas, un control segmentado y un interruptor. */
+.ag-opciones { display: grid; gap: 6px; }
+.ag-opcion-radio {
+  display: flex; min-height: 52px; align-items: center; gap: 12px; padding: 8px 12px; cursor: pointer;
+  border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-surface);
+}
+.ag-opcion-radio:has(input:checked) { border-color: var(--flp-carbon); box-shadow: inset 0 0 0 1px var(--flp-carbon); }
+.ag-opcion-radio input { width: 18px; height: 18px; flex: none; accent-color: var(--flp-carbon); }
+.ag-segmentado { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; padding: 3px; border: 1px solid var(--flp-control-border); border-radius: 999px; background: var(--flp-surface); }
+.ag-segmentado label { position: relative; display: flex; min-height: 44px; align-items: center; justify-content: center; cursor: pointer; }
+.ag-segmentado input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.ag-segmentado span { width: 100%; padding: 8px 6px; border-radius: 999px; color: var(--flp-muted); font-size: 14px; text-align: center; }
+.ag-segmentado input:checked + span { background: var(--flp-carbon); color: var(--flp-chalk); }
+.ag-segmentado input:focus-visible + span { outline: 2px solid var(--flp-carbon); outline-offset: 2px; }
+.ag-interruptor {
+  display: flex; min-height: 52px; align-items: center; gap: 12px; padding: 8px 12px; cursor: pointer;
+  border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-surface);
+}
+.ag-interruptor input { width: 20px; height: 20px; flex: none; accent-color: var(--flp-carbon); cursor: pointer; }
+.ag-interruptor-estado { flex: none; color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px; }
+
+/* ── Cuerpo y carril ──────────────────────────────────────────────────────── */
+.ag-cuerpo { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+/* Dos columnas: el carril a la izquierda (desde 1024 px) y la conversación. */
+.ag-col-izq { display: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--flp-border); background: var(--flp-chalk); }
+@media (min-width: 1024px) {
+  .ag-cuerpo { grid-template-columns: 296px minmax(0, 1fr); }
+  .ag-col-izq { display: flex; }
+}
+@media (min-width: 1536px) {
+  .ag-cuerpo { grid-template-columns: 320px minmax(0, 1fr); }
+}
+.ag-panel-scroll { min-height: 0; flex: 1; overflow-y: auto; padding: 12px 12px 20px; overscroll-behavior: contain; }
+
+.ag-carril { display: grid; gap: 18px; }
+
+/* Lo que puedes ver: seis historias en filas de dos líneas, sin cortar. */
+.ag-casos-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 4px 8px 6px; }
+.ag-casos-cuenta { flex: none; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+.ag-casos-lista { display: grid; gap: 2px; }
+.ag-casos-despues { margin: 12px 8px 2px; }
+.ag-caso-fila {
+  display: flex; width: 100%; min-height: 44px; align-items: flex-start; gap: 10px; padding: 8px;
+  border-radius: var(--flp-radius-sm); color: var(--flp-carbon); font-size: 14px; font-weight: 400; text-align: left;
+  transition: background-color var(--flp-duration) var(--flp-ease);
+}
+.ag-caso-fila:hover:not(:disabled) { background: color-mix(in srgb, var(--flp-carbon) 5%, transparent); }
+.ag-caso-fila:disabled { cursor: not-allowed; }
+.ag-caso-fila:disabled .ag-caso-titulo { color: var(--flp-muted); }
+.ag-caso-fila:focus-visible { outline: 2px solid var(--flp-carbon); outline-offset: -2px; }
+/* Flecha que pasa a check carbón cuando la historia está vista. */
+.ag-caso-icono {
+  display: inline-flex; width: 20px; height: 20px; flex: none; margin-top: 1px; align-items: center; justify-content: center;
+  border: 1px solid var(--flp-control-border); border-radius: 50%; color: var(--flp-carbon);
+}
+.ag-caso-fila.is-visto .ag-caso-icono { border-color: var(--flp-carbon); background: var(--flp-carbon); color: var(--flp-chalk); }
+.ag-caso-arco { display: block; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.4; }
+.ag-caso-titulo { display: block; color: var(--flp-carbon); font-size: 14px; font-weight: 500; line-height: 1.35; }
+.ag-caso-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; }
+.ag-caso-nivel { color: var(--flp-muted); font-size: 12px; line-height: 1.4; }
+.ag-caso-desc { display: block; margin-top: 2px; color: var(--flp-muted); font-size: 12px; line-height: 1.45; }
+
+/* Cómo actúan: tres líneas. */
+.ag-leyenda { padding: 14px 8px 0; border-top: 1px solid var(--flp-border); }
+.ag-leyenda dl { display: grid; gap: 8px; margin-top: 8px; }
+.ag-leyenda-fila dt { color: var(--flp-carbon); font-size: 13px; font-weight: 500; line-height: 1.35; }
+.ag-leyenda-fila dd { color: var(--flp-muted); font-size: 12px; line-height: 1.45; }
+
+/* El equipo: el Orquestador y las tres familias, filas de 40 px (44 en pantallas táctiles). */
+.ag-familias { display: grid; gap: 2px; padding-top: 14px; border-top: 1px solid var(--flp-border); }
+.ag-familias > .flp-kicker { padding: 0 8px 6px; }
+.ag-familia { min-width: 0; padding-top: 8px; border-top: 0; }
+.ag-familia-cab { display: flex; align-items: center; gap: 6px; padding: 0 8px 2px; color: var(--flp-muted); }
+.ag-familia-nombre { color: var(--flp-muted); font-size: 12px; font-weight: 500; }
+.ag-agente {
+  display: flex; width: 100%; min-height: 40px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--flp-radius-sm);
+  text-align: left; transition: background-color var(--flp-duration) var(--flp-ease);
+}
+@media (pointer: coarse) { .ag-agente { min-height: 44px; } }
+.ag-agente:hover { background: color-mix(in srgb, var(--flp-carbon) 5%, transparent); }
+
+/* Plegable accesible (Desplegable de Piezas.jsx). */
+.ag-desplegable { border-bottom: 1px solid var(--flp-border); }
+.ag-desplegable-boton { display: flex; width: 100%; min-height: 56px; align-items: center; gap: 12px; padding: 10px 2px; color: var(--flp-carbon); }
+.ag-desplegable .ag-plegable.is-open .ag-plegable-dentro { padding: 2px 0 16px; }
+.ag-col-izq .ag-desplegable { border-bottom: 0; }
+
+/* ── Pie: redactor, sugerencias y aviso ───────────────────────────────────── */
+/* Durante el recorrido, cada paso sube arriba: hace falta sitio debajo para colocarlo. */
+.ag-app.is-recorrido .ag-hilo { padding-bottom: 45vh; padding-bottom: 45dvh; }
+
+.ag-pie {
+  position: relative; flex: none; width: 100%; max-width: 800px; margin-inline: auto;
+  padding: 8px 16px max(10px, env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) { .ag-pie { padding-inline: 28px; } }
+.ag-pie-nota { margin-top: 6px; overflow: hidden; color: var(--flp-muted); font-size: 12px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+/* En móvil, tras la primera petición el aviso ya se ha leído: deja sitio a la conversación. */
+@media (max-width: 639px) { .ag-app.is-conversando .ag-pie-nota { display: none; } }
+.ag-nuevos {
+  position: absolute; z-index: 5; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--flp-carbon); color: var(--flp-chalk);
+  font-size: 14px; font-weight: 500; box-shadow: var(--flp-shadow);
+}
+.ag-trabajando-linea { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+
+.ag-redactor {
+  display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 16px;
+  border: 1px solid var(--flp-control-border); border-radius: 24px; background: var(--flp-surface);
+}
+.ag-redactor:focus-within { border-color: var(--flp-carbon); box-shadow: 0 0 0 1px var(--flp-carbon); }
+.ag-redactor-campo {
+  min-height: 44px; flex: 1; resize: none; padding: 11px 0; border: 0; background: transparent;
+  color: var(--flp-carbon); font-size: 16px; line-height: 1.4; outline: none;
+}
+.ag-redactor-campo::placeholder { color: var(--flp-muted); }
+.ag-redactor-campo:focus-visible { outline: none; }
+.ag-redactor-boton {
+  display: inline-flex; width: 44px; height: 44px; flex: none; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--flp-signal); color: var(--flp-carbon);
+  transition: background-color var(--flp-duration) var(--flp-ease);
+}
+.ag-redactor-boton:hover:not(:disabled) { background: var(--flp-signal-hover); }
+.ag-redactor-boton:disabled { background: var(--flp-chalk); color: var(--flp-control-border); cursor: not-allowed; }
+
+/* Sugerencias al final de la última respuesta («Para seguir»), dentro del hilo. */
+.ag-sugerencias-hilo { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--flp-border); }
+.ag-sugerencias { display: flex; flex-wrap: wrap; gap: 8px; }
+.ag-sugerencia {
+  display: inline-flex; min-height: 44px; max-width: 100%; align-items: center; padding: 8px 16px;
+  border: 1px solid var(--flp-control-border); border-radius: 22px; background: var(--flp-surface);
+  color: var(--flp-carbon); font-size: 14px; line-height: 1.3; text-align: left;
+}
+.ag-sugerencia:hover:not(:disabled) { border-color: var(--flp-carbon); }
+.ag-sugerencia:disabled { opacity: .5; cursor: not-allowed; }
+.ag-hoja .ag-sugerencia { white-space: normal; }
+
+/* ── Barra del recorrido ──────────────────────────────────────────────────── */
+/* Escritorio: paso, título y nota entera. Móvil: una línea («2/6 · Lo hace solo») que abre la nota. */
+.ag-tourbar {
+  display: flex; flex: none; flex-wrap: nowrap; align-items: center; gap: 16px; padding: 12px 20px;
+  background: var(--flp-carbon); color: var(--flp-chalk);
+}
+.ag-tourbar:focus-visible { outline: 2px solid var(--flp-signal); outline-offset: -4px; }
+.ag-tourbar-texto { min-width: 0; flex: 1; }
+.ag-tourbar-linea { display: none; }
+.ag-tourbar-kicker { display: block; color: var(--flp-muted); }
+.ag-tourbar-titulo { display: block; color: var(--flp-text); font-size: 15px; font-weight: 500; line-height: 1.35; }
+.ag-tourbar-nota { display: block; max-width: 76ch; margin-top: 2px; color: var(--flp-muted); font-size: 13px; line-height: 1.45; }
+.ag-tourbar-botones { display: flex; flex: none; align-items: center; gap: 8px; }
+/* Esperando a los agentes: secundario y legible, no un amarillo apagado. */
+.ag-tourbar .flp-button.is-bloqueado { opacity: 1; color: var(--flp-muted); cursor: not-allowed; }
+.ag-tourbar .flp-button.is-bloqueado:hover { border-color: var(--flp-control-border); background: transparent; }
+
+@media (max-width: 639px) {
+  .ag-tourbar { flex-wrap: wrap; gap: 0 4px; padding: 8px 8px 8px 12px; }
+  .ag-tourbar-texto { display: contents; }
+  .ag-tourbar-kicker, .ag-tourbar-titulo { display: none; }
+  .ag-tourbar-linea {
+    display: flex; min-width: 0; min-height: 44px; flex: 1 1 0; align-items: center; gap: 6px;
+    color: var(--flp-text); font-size: 14px; font-weight: 500; text-align: left;
+  }
+  .ag-tourbar-linea:focus-visible { outline: 2px solid var(--flp-signal); outline-offset: 2px; border-radius: 6px; }
+  .ag-tourbar-botones { order: 2; gap: 4px; }
+  .ag-tourbar-botones .flp-button { padding-inline: 12px; }
+  .ag-tourbar-nota { display: none; order: 3; flex-basis: 100%; margin: 0; padding: 2px 0 6px; }
+  .ag-tourbar.is-nota .ag-tourbar-nota { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-caso-fila, .ag-agente, .ag-contador-chip, .ag-demo-boton, .ag-header-historias, .ag-redactor-boton { transition: none; }
+}
+
+/* Durante el recorrido no llegan novedades solas: «Pausar novedades» sobra. */
+.ag-app.is-recorrido .ag-msg-novedad .ag-link { display: none; }

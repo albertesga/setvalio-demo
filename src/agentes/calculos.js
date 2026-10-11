@@ -198,7 +198,10 @@ export function conciliar(mundo, docId) {
   const o = mundo.ordenes[d.oc]
   if (!o) return { resultado: 'oc_desconocida', oc: d.oc }
   if (o.estado !== 'Aprobada' && o.estado !== 'Facturada') return { resultado: 'oc_no_aprobada', oc: o.id, orden: o }
-  const abierto = r2((o.importeAprobado ?? o.importe) - o.facturado)
+  // Una factura ya contabilizada está dentro de lo facturado del pedido: se concilia
+  // contra lo que estaba abierto antes de contabilizarla, no contra lo que queda.
+  const propio = d.estado === 'contabilizada' ? Math.min(d.base, o.facturado) : 0
+  const abierto = r2((o.importeAprobado ?? o.importe) - o.facturado + propio)
   const diferencia = r2(d.base - abierto)
   const ok = Math.abs(diferencia) <= POLITICAS.toleranciaConciliacion * Math.max(abierto, 1)
   return { resultado: ok ? 'ok' : 'diferencia', oc: o.id, orden: o, abierto, diferencia }
@@ -216,7 +219,7 @@ export function elegibilidad(mundo, docId) {
   const territorial = d.impuesto?.tipo === 'IGIC'
   if (territorial) {
     const revisada = mundo.revisiones[d.id]
-    criterios.push({ id: 'territorio', etiqueta: 'Validación territorial', ok: null, detalle: revisada ? 'Paquete preparado para el fiscalista' : 'IGIC: gasto en Canarias, lo valida el fiscalista' })
+    criterios.push({ id: 'territorio', etiqueta: 'Gasto en Canarias', ok: null, detalle: revisada ? 'Paquete preparado para el fiscalista' : 'Lleva IGIC, así que lo valida el fiscalista' })
   }
   const estado = criterios.some((c) => c.ok === false) ? 'revisar' : criterios.some((c) => c.ok === null) ? 'condicionado' : 'elegible'
   return { criterios, estado, territorio: territorial ? 'canarias' : 'comun' }
@@ -240,7 +243,7 @@ export function excepciones(mundo) {
     out.push({ id: `ex-${o.id}`, tipo: 'orden', ref: { tipo: 'orden', id: o.id }, nivel: imp.nivel, rol: imp.rol, importe: o.importe, titulo: `Compra a ${o.proveedor} (${o.id})`, entrada: `Revisa la orden de compra ${o.id}` })
   }
   for (const inc of incoherenciasPrevision(mundo)) {
-    out.push({ id: `ex-cef-${inc.codigo}`, tipo: 'prevision', ref: { tipo: 'cef', id: inc.codigo }, nivel: 'propone', rol: ROLES.lineProducer, importe: inc.exceso, titulo: `${inc.codigo} ${inc.nombre}: previsión por debajo de lo comprometido`, entrada: '¿Cómo cerraremos el proyecto?' })
+    out.push({ id: `ex-cef-${inc.codigo}`, tipo: 'prevision', ref: { tipo: 'cef', id: inc.codigo }, nivel: 'propone', rol: ROLES.lineProducer, importe: inc.exceso, titulo: `${inc.nombre}: más comprometido que previsto`, entrada: '¿Cuánto nos costará al final y llegamos de caja?' })
   }
   const peso = { aprueba: 0, propone: 1 }
   return out.sort((a, b) => peso[a.nivel] - peso[b.nivel] || b.importe - a.importe)

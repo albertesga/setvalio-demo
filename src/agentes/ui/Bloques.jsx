@@ -4,8 +4,8 @@
 
 import { useEffect, useId, useState } from 'react'
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconDownload, IconPlay, IconClock } from '../../components/icons.jsx'
-import { formatear, renderTexto, fecha as fechaLarga } from '../texto.js'
+import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconPlay, IconClock } from '../../components/icons.jsx'
+import { formatear, renderTexto, esPlantilla, fecha as fechaLarga } from '../texto.js'
 import * as c from '../calculos.js'
 import { puedeDecidir } from '../politicas.js'
 import { AGENTES, AUTONOMIA } from '../agentes.js'
@@ -13,17 +13,19 @@ import { useCtx } from './contexto.js'
 import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
+import { ETIQUETA_CAPACIDAD } from '../casos.js'
 import { useMovimientoReducido } from '../useAgentes.js'
-import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, diaCorto } from './Piezas.jsx'
+import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, StatusChip, EtiquetaCapacidad, diaCorto } from './Piezas.jsx'
 import { BLOQUES_PARTE } from './Parte.jsx'
 import { PERSONAS } from '../mundo.js'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
 
+// Título de panel: uno solo para todos, antetítulo en muted.
 function Titulo({ children, extra }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <h4 className="text-sm font-semibold text-flp-ink">{children}</h4>
+    <div className="ag-panel-titulo">
+      <h4 className="flp-kicker text-flp-muted">{children}</h4>
       {extra}
     </div>
   )
@@ -41,34 +43,36 @@ function BloqueTexto({ b }) {
 
 const AVISOS_DE_ALCANCE = new Set(['exploratorio', 'porvalidar', 'fase'])
 
-function BloqueAviso({ b, mensajeId }) {
-  const { primerAviso } = useCtx()
-  const [abierto, setAbierto] = useState(false)
-  const etiqueta = { exploratorio: 'Exploratorio', porvalidar: 'Sin validar', fase: 'Fase posterior', aviso: 'Atención', info: 'Nota' }[b.tono] ?? 'Nota'
-  const tono = { exploratorio: 'neutral', porvalidar: 'neutral', fase: 'neutral', aviso: 'atencion', info: 'info' }[b.tono] ?? 'info'
-  // El aviso de alcance entero sale la primera vez; después basta la etiqueta (y el texto, si se pide).
-  if (AVISOS_DE_ALCANCE.has(b.tono) && primerAviso?.[b.tono] && mensajeId && primerAviso[b.tono] !== mensajeId && !abierto) {
-    return (
-      <p className="ag-aviso-breve" role="note">
-        <Tono tono={tono}>{etiqueta}</Tono>
-        <span className="text-xs text-flp-muted">Datos de ejemplo, como se explica más arriba.</span>
-        <button type="button" className="ag-link" onClick={() => setAbierto(true)}>
-          Qué significa
-        </button>
-      </p>
-    )
+// Si el texto ya empieza por la etiqueta («En exploración: …»), no se repite al lado.
+function sinPrefijo(tx, prefijo) {
+  const quitar = (x) => {
+    const resto = x.slice(prefijo.length).replace(/^[\s:.·—-]+/, '')
+    return resto.charAt(0).toUpperCase() + resto.slice(1)
   }
+  if (typeof tx === 'string') return tx.startsWith(prefijo) ? quitar(tx) : tx
+  if (esPlantilla(tx) && tx.plantilla.startsWith(prefijo)) return { ...tx, plantilla: quitar(tx.plantilla) }
+  return tx
+}
+
+function BloqueAviso({ b }) {
+  const alcance = AVISOS_DE_ALCANCE.has(b.tono)
+  const etiqueta = alcance ? ETIQUETA_CAPACIDAD.exploratoria : b.tono === 'aviso' ? 'Atención' : 'Nota'
+  const textoAviso = alcance ? sinPrefijo(b.texto, etiqueta) : b.texto
   return (
-    <div className={`ag-aviso ag-aviso--${b.tono}`} role="note">
+    <div className={`ag-aviso ag-aviso--${alcance ? 'exploratorio' : b.tono}`} role="note">
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <Tono tono={tono}>
-          {b.tono === 'aviso' && <IconAlert size={12} strokeWidth={2.6} aria-hidden="true" />}
-          {etiqueta}
-        </Tono>
+        {alcance ? (
+          <EtiquetaCapacidad />
+        ) : (
+          <Tono tono={b.tono === 'aviso' ? 'atencion' : 'info'}>
+            {b.tono === 'aviso' && <IconAlert size={12} strokeWidth={2.6} aria-hidden="true" />}
+            {etiqueta}
+          </Tono>
+        )}
         {b.titulo && b.titulo !== etiqueta && <strong className="text-sm text-flp-ink">{b.titulo}</strong>}
       </div>
       <p className="text-sm leading-relaxed text-flp-muted">
-        <Tx value={b.texto} />
+        <Tx value={textoAviso} />
       </p>
     </div>
   )
@@ -125,7 +129,11 @@ function BloqueLista({ b }) {
 function BloqueKpis({ b }) {
   return (
     <div className="ag-panel ag-panel--flush">
-      {b.titulo && <div className="border-b border-flp-line px-4 py-2.5 text-xs font-semibold text-flp-muted">{b.titulo}</div>}
+      {b.titulo && (
+        <div className="ag-panel-cab">
+          <Titulo>{b.titulo}</Titulo>
+        </div>
+      )}
       <dl className="ag-kpis">
         {b.items.map((k) => (
           <div key={k.id} className="ag-kpi">
@@ -195,9 +203,7 @@ function BloqueTabla({ b }) {
     }
     return texto
   }
-  return (
-    <div className="ag-panel ag-panel--flush">
-      {b.titulo && <div className="px-4 pt-3.5 text-sm font-semibold text-flp-ink">{b.titulo}</div>}
+  const tabla = (
       <div className="ag-tabla-scroll" tabIndex={0} role="region" aria-label={b.titulo || 'Tabla'}>
         <table className="ag-tabla">
           <thead>
@@ -215,11 +221,11 @@ function BloqueTabla({ b }) {
                 {b.columnas.map((col, i) => {
                   const Tag = i === 0 ? 'th' : 'td'
                   return (
-                    <Tag key={col.id} scope={i === 0 ? 'row' : undefined} className={`${col.alinear === 'right' ? 'text-right tnum' : col.alinear === 'center' ? 'text-center' : 'text-left'} ${col.texto ? 'is-texto' : ''}`}>
+                    <Tag key={col.id} scope={i === 0 ? 'row' : undefined} data-etiqueta={i === 0 ? undefined : col.etiqueta} className={`${col.alinear === 'right' ? 'text-right tnum' : col.alinear === 'center' ? 'text-center' : 'text-left'} ${col.texto ? 'is-texto' : ''}`}>
                       {celda(col, fila)}
                       {i === 0 && fila.alerta && (
                         <Tono tono="negative" className="ml-2 align-middle">
-                          Fuera de umbral
+                          Se pasa del límite
                         </Tono>
                       )}
                     </Tag>
@@ -234,7 +240,7 @@ function BloqueTabla({ b }) {
                 {b.columnas.map((col, i) => {
                   const Tag = i === 0 ? 'th' : 'td'
                   return (
-                    <Tag key={col.id} scope={i === 0 ? 'row' : undefined} className={col.alinear === 'right' ? 'text-right tnum' : 'text-left'}>
+                    <Tag key={col.id} scope={i === 0 ? 'row' : undefined} data-etiqueta={i === 0 || b.total[col.id] === undefined ? undefined : col.etiqueta} className={`${col.alinear === 'right' ? 'text-right tnum' : 'text-left'} ${i > 0 && b.total[col.id] === undefined ? 'is-vacia' : ''}`}>
                       {b.total[col.id] !== undefined ? fmt(b.total[col.id], col.formato) : ''}
                     </Tag>
                   )
@@ -244,6 +250,25 @@ function BloqueTabla({ b }) {
           )}
         </table>
       </div>
+  )
+  // Plegada: el título y una línea de resumen («Ver el equipo», «6 alternativas · 2 descartadas»).
+  if (b.plegado) {
+    return (
+      <div className="ag-panel ag-panel--plegable">
+        <Desplegable titulo={b.titulo} resumen={b.resumen ?? `${b.filas.length} filas`} nivel={4}>
+          {tabla}
+        </Desplegable>
+      </div>
+    )
+  }
+  return (
+    <div className="ag-panel ag-panel--flush">
+      {b.titulo && (
+        <div className="ag-panel-cab">
+          <Titulo>{b.titulo}</Titulo>
+        </div>
+      )}
+      {tabla}
       {b.visibles && b.filas.length > b.visibles && (
         <button type="button" className="ag-mas" onClick={() => setTodas((v) => !v)} aria-expanded={todas}>
           {todas ? 'Ver menos' : `Ver las ${b.filas.length} filas`}
@@ -257,8 +282,8 @@ function BloqueTabla({ b }) {
 // ── Desviaciones ─────────────────────────────────────────────────────────────
 
 function chipDesviacion(x, umbral) {
-  if (x.fueraRango) return <Tono tono="negative">Fuera de umbral</Tono>
-  if (x.desviacionPct > 0 && x.desviacionPct > umbral * 0.75) return <Tono tono="warning">Cerca del umbral</Tono>
+  if (x.fueraRango) return <Tono tono="negative">Se pasa del límite</Tono>
+  if (x.desviacionPct > 0 && x.desviacionPct > umbral * 0.75) return <Tono tono="warning">Cerca del límite</Tono>
   if (x.desviacionPct > 0) return <Tono tono="neutral">Vigilar</Tono>
   return <Tono tono="positive">Por debajo</Tono>
 }
@@ -295,7 +320,7 @@ function BloqueDesviaciones({ b }) {
                         <span className="tnum text-flp-muted">{p.codigo}</span> {p.nombre}
                       </span>
                       <span className="tnum font-semibold text-flp-ink">{formatear(p.desviacion, 'eurSigned')}</span>
-                      {p.desviacion > 0 && <Tono tono={p.consolidada ? 'neutral' : 'info'}>{p.consolidada ? 'Consolidada' : `Prevista · quedan ${formatear(p.pendiente, 'eur')}`}</Tono>}
+                      {p.desviacion > 0 && <Tono tono={p.consolidada ? 'neutral' : 'info'}>{p.consolidada ? 'Firme' : `Prevista · quedan ${formatear(p.pendiente, 'eur')}`}</Tono>}
                     </li>
                   ))}
                 </ul>
@@ -321,7 +346,7 @@ function BloqueDesviaciones({ b }) {
     const fuera = b.items.filter((x) => x.fueraRango).length
     return (
       <div className="ag-panel ag-panel--plegable">
-        <Desplegable titulo="Detalle por capítulo" resumen={`${fuera ? `${fuera} fuera del umbral del ${formatear(b.umbral, 'pct0')}` : `Umbral del ${formatear(b.umbral, 'pct0')}`} · causas y partidas`} nivel={4}>
+        <Desplegable titulo="Detalle por capítulo" resumen={`${fuera ? `${fuera} ${fuera === 1 ? 'se pasa' : 'se pasan'} del límite del ${formatear(b.umbral, 'pct0')}` : `Límite del ${formatear(b.umbral, 'pct0')}`} · causas y partidas`} nivel={4}>
           {contenido}
         </Desplegable>
       </div>
@@ -329,7 +354,7 @@ function BloqueDesviaciones({ b }) {
   }
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Umbral {formatear(b.umbral, 'pct0')}</span>}>Desviación por capítulo</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Límite {formatear(b.umbral, 'pct0')}</span>}>Desviación por capítulo</Titulo>
       {contenido}
     </div>
   )
@@ -414,7 +439,7 @@ function BloqueDocumento({ b }) {
           {conc.resultado === 'ok' && (
             <Tono tono="positive">
               <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />
-              Casa con {conc.oc}
+              Cuadra con {conc.oc}
             </Tono>
           )}
           {conc.resultado === 'sin_oc' && <Tono tono="warning">Sin pedido{d.contrato ? ' · contrato marco' : ''}</Tono>}
@@ -464,7 +489,12 @@ const MOTIVO_INFORME = {
   caja: 'Ha cambiado la previsión de caja desde esta edición',
 }
 
-export function BloqueAprobacion({ b }) {
+/**
+ * Tarjeta de lo que espera una decisión. Sin decidir: «Por revisar» arriba y borde carbón;
+ * decidida, borde gris. Solo la primera tarjeta abierta de una respuesta (principal) lleva
+ * el botón amarillo; las demás, carbón.
+ */
+export function BloqueAprobacion({ b, principal = true }) {
   const { mundo, persona, decidir, ocupado, enviar, despachar } = useCtx()
   const ed = c.estadoDecision(mundo, b.ref)
   const decidida = ESTADO_DECISION[ed.estado]
@@ -474,15 +504,15 @@ export function BloqueAprobacion({ b }) {
   const visibles = b.acciones.filter((a) => (a.soloSinPermiso ? sinPermiso && !yaPedida : true))
   const etiquetaRef = renderTexto(b.titulo)
   const informeViejo = b.ref?.tipo === 'informe' ? c.motivoInformeDesactualizado(mundo, b.ref.id) : null
-  // Quién decide: «Decides tú», «Decide: X» o, si las acciones son de dos roles, «Deciden: X y Y».
+  // Quién decide: «Decides tú (rol)», «Decide: rol» o, si las acciones son de dos roles, «Deciden: rol y rol».
   const rolesAcciones = [...new Set(visibles.filter((a) => !a.soloSinPermiso && a.rol).map((a) => a.rol))]
   const quienDecide =
     rolesAcciones.length > 1
-      ? `Deciden: ${rolesAcciones.map((r, i) => (i ? r.toLowerCase() : r)).join(' y ')}`
+      ? `Deciden: ${rolesAcciones.map((r) => r.toLowerCase()).join(' y ')}`
       : b.rol && puedeDecidir(persona.rol, b.rol)
-        ? 'Decides tú'
+        ? `Decides tú (${b.rol.toLowerCase()})`
         : b.rol
-          ? `Decide: ${b.rol}`
+          ? `Decide: ${b.rol.toLowerCase()}`
           : null
   // Si otra persona de la demo puede decidir lo que esta no, se ofrece verla como ella.
   const otraPersona = Object.values(PERSONAS).find((p) => p.id !== persona.id && visibles.some((a) => !a.soloSinPermiso && a.rol && !tieneRolPropio(a) && puedeDecidir(p.rol, a.rol)))
@@ -490,13 +520,14 @@ export function BloqueAprobacion({ b }) {
 
   return (
     <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`} data-ref={b.ref ? `${b.ref.tipo}-${b.ref.id}` : undefined}>
+      {!decidida && <StatusChip estado="pendiente" className="mb-3" />}
       <div className="flex flex-wrap items-center gap-2">
         <AgentAvatar id={b.agente} size={28} />
-        <span className="text-xs font-semibold text-flp-muted">{AGENTES[b.agente]?.nombre}</span>
+        <span className="text-sm font-medium text-flp-ink">{AGENTES[b.agente]?.nombre}</span>
         {b.nivel !== 'aprueba' && <AutonomyBadge nivel={b.nivel} />}
-        {quienDecide && !decidida && <Tono tono="neutral">{quienDecide}</Tono>}
       </div>
-      <h4 tabIndex={-1} className="mt-3 text-base font-semibold leading-snug text-flp-ink focus:outline-none">
+      {quienDecide && !decidida && <p className="ag-aprobacion-quien">{quienDecide}</p>}
+      <h4 tabIndex={-1} className="mt-3 text-base font-medium leading-snug text-flp-ink focus:outline-none">
         <Tx value={b.titulo} />
       </h4>
       {b.subtitulo && <p className="mt-0.5 text-xs text-flp-muted">{b.subtitulo}</p>}
@@ -532,7 +563,7 @@ export function BloqueAprobacion({ b }) {
               </span>
               <span role="cell" className={`tnum text-right font-semibold ${f.alerta ? 'text-flp-error' : 'text-flp-ink'}`}>
                 {formatear(f.despues, f.formato)}
-                {f.alerta && <span className="sr-only"> (supera el umbral)</span>}
+                {f.alerta && <span className="sr-only"> (se pasa del límite)</span>}
               </span>
             </div>
           ))}
@@ -591,10 +622,10 @@ export function BloqueAprobacion({ b }) {
               return (
                 <FilmpilotButton
                   key={a.id}
-                  variant={a.variante === 'primary' && permitido ? 'primary' : 'secondary'}
+                  variant={a.variante === 'primary' && permitido ? (principal ? 'primary' : 'carbon') : 'secondary'}
                   size="md"
                   disabled={!permitido || ocupado}
-                  onClick={() => decidir(a.accion, `${etiquetaRef} → ${a.etiqueta}`)}
+                  onClick={() => decidir(a.accion, a.burbuja ? renderTexto(a.burbuja) : a.etiqueta)}
                   title={a.detalle ? renderTexto(a.detalle) : undefined}
                 >
                   {a.etiqueta}
@@ -641,7 +672,8 @@ export function BloqueAprobacion({ b }) {
 
 export { decisionesAbiertas }
 
-const CAPACIDAD_DECISION = { riesgo: 'Exploratorio', propuesta: 'Sin validar' }
+// Lo que aún está en exploración lleva su etiqueta también en la cola.
+const EN_EXPLORACION = new Set(['riesgo', 'propuesta'])
 
 /** Si la tarjeta ya está en la conversación y sigue abierta, «Revisar» lleva a ella en vez de repetir el trabajo. */
 export function irATarjeta(ref) {
@@ -670,10 +702,10 @@ export function ListaDecisiones({ filtro, onElegir }) {
             <div className="text-sm font-medium text-flp-ink">{e.titulo}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-flp-muted">
               <span>
-                {AUTONOMIA[e.nivel]?.etiqueta} · Decide: {e.rol.toLowerCase()}
+                {AUTONOMIA[e.nivel]?.etiqueta} · decide {e.rol.toLowerCase()}
                 {e.aplazado ? ' · en revisión' : ''}
               </span>
-              {CAPACIDAD_DECISION[e.tipo] && <span className="ag-etiqueta-capacidad">{CAPACIDAD_DECISION[e.tipo]}</span>}
+              {EN_EXPLORACION.has(e.tipo) && <EtiquetaCapacidad />}
             </div>
             {e.importe > 0 && <div className="tnum text-xs text-flp-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Reserva propuesta ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
           </div>
@@ -700,7 +732,7 @@ function BloqueDecisiones() {
   const n = decisionesAbiertas(mundo).length
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Excepciones · en directo</span>}>{n ? `Por revisar (${n})` : 'Por revisar'}</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Se actualiza cuando decides</span>}>{n ? `Por revisar (${n})` : 'Por revisar'}</Titulo>
       <ListaDecisiones />
     </div>
   )
@@ -709,7 +741,7 @@ function BloqueDecisiones() {
 // ── Informe ──────────────────────────────────────────────────────────────────
 
 function BloqueInforme({ b }) {
-  const { mundo, avisar, onNavigate, enviar } = useCtx()
+  const { mundo, enviar } = useCtx()
   const inf = mundo.informes[b.id]
   if (!inf) return null
   const desact = c.informeDesactualizado(mundo, b.id)
@@ -778,7 +810,7 @@ function BloqueInforme({ b }) {
           <h5>Para decidir esta semana</h5>
           <ul>
             <li>
-              <span>Decisiones de coste por revisar (sin riesgos de rodaje)</span>
+              <span>Decisiones de coste pendientes</span>
               <span className="tnum">{formatear(r.decisiones, 'num')}</span>
             </li>
             <li>
@@ -795,14 +827,16 @@ function BloqueInforme({ b }) {
             </li>
             {r.reservas > 0 && (
               <li>
-                <span>Reservas de riesgos (exploratorio)</span>
+                <span>
+                  Reservas de riesgos <EtiquetaCapacidad className="ml-1" />
+                </span>
                 <span className="tnum">{formatear(r.reservas, 'eur')}</span>
               </li>
             )}
-            {r.riesgosAltos?.map((x) => (
+            {r.riesgosAltos?.map((x, i) => (
               <li key={x.id}>
                 <span>
-                  Riesgo alto (exploratorio, datos de ejemplo): <Tx value={x.titulo} />
+                  Riesgo alto: <Tx value={x.titulo} /> {i === 0 && !(r.reservas > 0) && <EtiquetaCapacidad className="ml-1" />}
                 </span>
                 <span>abierto</span>
               </li>
@@ -820,13 +854,9 @@ function BloqueInforme({ b }) {
       )}
       <footer className="ag-informe-pie">
         <span>
-          Redactado por Informes · edición {inf.edicion} · corte {fechaLarga(mundo.corte.fecha)}
+          Redactado por Informes · edición {inf.edicion} · datos a {fechaLarga(mundo.corte.fecha)}
         </span>
-        <div className="flex flex-wrap gap-2">
-          <FilmpilotButton size="md" variant="secondary" icon={IconDownload} onClick={() => avisar('Demo: la descarga del informe no está disponible.')}>
-            Descargar (no disponible en la demo)
-          </FilmpilotButton>
-        </div>
+        <span>PDF y envío, en el producto</span>
       </footer>
     </article>
   )
@@ -834,7 +864,7 @@ function BloqueInforme({ b }) {
 
 // ── Borrador ─────────────────────────────────────────────────────────────────
 
-function BloqueBorrador({ b }) {
+function BloqueBorrador({ b, principal = true }) {
   const { mundo, decidir, avisar, ocupado, despachar } = useCtx()
   const uid = useId()
   const bor = mundo.borradores[b.id]
@@ -886,7 +916,7 @@ function BloqueBorrador({ b }) {
       </p>
       {!cerrado && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <FilmpilotButton variant="primary" disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id, asunto, cuerpo }, `Marcar como revisado · ${bor.para}`)}>
+          <FilmpilotButton variant={principal ? 'primary' : 'carbon'} disabled={ocupado} onClick={() => decidir({ tipo: 'borrador/marcarListo', id: b.id, asunto, cuerpo }, `Marcar como revisado · ${bor.para}`)}>
             Marcar como revisado
           </FilmpilotButton>
           <FilmpilotButton variant="secondary" onClick={copiar}>
@@ -966,9 +996,9 @@ function BloqueCaja({ b }) {
                   <th scope="row" className="text-left">
                     {s.semana} <span className="font-normal text-flp-muted">{s.fechas}</span>
                   </th>
-                  <td className="tnum text-right">{formatear(s.cobros, 'eur')}</td>
-                  <td className="tnum text-right">{formatear(s.pagos, 'eur')}</td>
-                  <td className={`tnum text-right font-semibold ${s.saldo < 0 ? 'text-flp-error' : 'text-flp-ink'}`}>{formatear(s.saldo, 'eur')}</td>
+                  <td data-etiqueta="Cobros" className="tnum text-right">{formatear(s.cobros, 'eur')}</td>
+                  <td data-etiqueta="Pagos" className="tnum text-right">{formatear(s.pagos, 'eur')}</td>
+                  <td data-etiqueta="Saldo" className={`tnum text-right font-semibold ${s.saldo < 0 ? 'text-flp-error' : 'text-flp-ink'}`}>{formatear(s.saldo, 'eur')}</td>
                 </tr>
               ))}
             </tbody>
@@ -1001,16 +1031,21 @@ function BloqueCaja({ b }) {
 
 // ── Acciones ───────────────────────────────────────────────────────
 
-function BloqueAcciones({ b }) {
-  const { enviarEntrada, ocupado } = useCtx()
+// Una acción que trae una novedad deja de ofrecerse cuando la novedad ya ha llegado.
+const accionViva = (mundo, a) => a.entrada?.tipo !== 'evento' || mundo.entrantes.includes(a.entrada.eventoId)
+
+function BloqueAcciones({ b, principal = true }) {
+  const { enviarEntrada, ocupado, mundo } = useCtx()
+  const acciones = b.acciones.filter((a) => accionViva(mundo, a))
+  if (!acciones.length) return null
   return (
     <div className="ag-panel flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-flp-muted">
         <Tx value={b.texto} />
       </p>
       <div className="flex flex-wrap gap-2">
-        {b.acciones.map((a) => (
-          <FilmpilotButton key={a.id} variant="secondary" icon={IconPlay} disabled={ocupado} onClick={() => enviarEntrada(a.entrada)}>
+        {acciones.map((a) => (
+          <FilmpilotButton key={a.id} variant={a.variante === 'primary' && principal ? 'primary' : 'secondary'} icon={IconPlay} disabled={ocupado} onClick={() => enviarEntrada(a.entrada)}>
             {a.etiqueta}
           </FilmpilotButton>
         ))}
@@ -1346,7 +1381,7 @@ export function RadarRiesgos({ compacto = false }) {
 function BloqueRiesgos() {
   return (
     <div className="ag-panel">
-      <Titulo extra={<span className="text-xs text-flp-muted">Riesgos de producción · en directo</span>}>Riesgos de las próximas jornadas</Titulo>
+      <Titulo extra={<span className="text-xs text-flp-muted">Se actualiza cuando decides</span>}>Riesgos de las próximas jornadas</Titulo>
       <RadarRiesgos />
     </div>
   )
@@ -1420,14 +1455,31 @@ const REGISTRO = {
   plan: BloquePlan,
 }
 
-export function Bloque({ b, mensajeId }) {
+// `principal`: este bloque lleva el único botón amarillo de la respuesta (ver bloquePrincipal).
+export function Bloque({ b, mensajeId, principal = true }) {
   // Los bloques del parte (y del índice de historias) viven en Parte.jsx y se registran allí,
   // en BLOQUES_PARTE. Se leen al pintar, no al cargar el módulo: Parte.jsx también importa de aquí.
   const C = REGISTRO[b.tipo] ?? BLOQUES_PARTE[b.tipo]
-  return C ? <C b={b} mensajeId={mensajeId} /> : null
+  return C ? <C b={b} mensajeId={mensajeId} principal={principal} /> : null
 }
 
 /** Una tarjeta de aprobación sigue esperando decisión. */
 export function aprobacionPendiente(mundo, b) {
   return b.tipo === 'aprobacion' && !ESTADO_DECISION[c.estadoDecision(mundo, b.ref).estado]
+}
+
+/**
+ * Clave del bloque que lleva el amarillo en una respuesta: la bienvenida, la primera
+ * tarjeta abierta, el primer borrador por revisar o una acción marcada como principal.
+ * Como mucho uno por respuesta.
+ */
+export function bloquePrincipal(mundo, bloques) {
+  const b = bloques.find(
+    (x) =>
+      x.tipo === 'bienvenida' ||
+      aprobacionPendiente(mundo, x) ||
+      (x.tipo === 'borrador' && mundo.borradores[x.id]?.estado === 'borrador') ||
+      (x.tipo === 'acciones' && x.acciones.some((a) => a.variante === 'primary' && accionViva(mundo, a))),
+  )
+  return b?.clave ?? null
 }

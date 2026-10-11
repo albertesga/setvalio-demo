@@ -1,0 +1,118 @@
+/* Parte de la mañana y apertura: saludo, bienvenida, «Ya hecho», «Para hoy», tira
+   del rodaje e índice de historias. Lo importa Parte.jsx. Solo tokens --flp-*. */
+
+/* Variantes por ancho: la corta en móvil, la completa desde 640 px. */
+.ag-solo-ancho { display: none; }
+@media (min-width: 640px) {
+  .ag-solo-movil { display: none; }
+  .ag-solo-ancho { display: revert; }
+}
+
+/* ── Saludo ───────────────────────────────────────────────────────────────── */
+/* El saludo sale al instante; más bajo que antes para que «Para hoy» quepa en la primera pantalla. */
+.ag-saludo-titulo { margin-top: 6px; color: var(--flp-carbon); font-size: clamp(1.5rem, 2.8vw, 2rem); font-weight: 400; line-height: 1.08; letter-spacing: -0.04em; text-wrap: balance; }
+.ag-saludo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--flp-border); }
+.ag-prosa--lead { max-width: 680px; font-size: 15px; line-height: 1.55; }
+@media (min-width: 640px) { .ag-prosa--lead { font-size: 16px; line-height: 1.6; } }
+
+/* ── Bienvenida: qué es Filmpilot y el recorrido ──────────────────────────── */
+.ag-bienvenida { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
+.ag-bienvenida-texto { max-width: 640px; color: var(--flp-carbon); font-size: 15px; line-height: 1.5; }
+@media (min-width: 640px) { .ag-bienvenida-texto { font-size: 16px; } }
+.ag-bienvenida-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 2px; }
+.ag-bienvenida-niveles { display: flex; flex-wrap: wrap; gap: 8px 10px; line-height: 1.2; }
+@media (min-width: 640px) { .ag-bienvenida-niveles { gap: 8px 14px; } }
+.ag-bienvenida-accion { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+
+/* ── Ya hecho, sin pedírtelo ─────────────────────────────────────────────── */
+.ag-hecho { padding: 12px 16px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
+.ag-hecho-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-bottom: 8px; }
+.ag-hecho-lista { display: grid; gap: 6px; }
+.ag-hecho-item { display: flex; align-items: flex-start; gap: 10px; color: var(--flp-muted); font-size: 14px; line-height: 1.5; }
+.ag-hecho-item .ag-avatar { margin-top: -1px; }
+
+/* ── Tira del rodaje: una fila de 20 jornadas, agrupadas por semana ───────────
+   En móvil las celdas no caben con su número: quedan la marca de hoy y los riesgos
+   (cada celda lleva su texto para lectores de pantalla y en el title). */
+.ag-tira-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-bottom: 10px; }
+.ag-tira-semanas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 640px) { .ag-tira-semanas { gap: 10px; } }
+.ag-tira-sem { display: block; margin-bottom: 4px; overflow: hidden; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.ag-tira-sem-nombre { display: none; }
+.ag-tira-dias { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding-bottom: 8px; }
+.ag-tira-dia { position: relative; display: flex; height: 22px; align-items: center; justify-content: center; border: 1px solid var(--flp-border); border-radius: 3px; background: var(--flp-surface); }
+.ag-tira-n { display: none; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+@media (min-width: 640px) {
+  .ag-tira-sem-nombre { display: inline; }
+  .ag-tira-dias { gap: 3px; }
+  .ag-tira-dia { height: 28px; border-radius: 4px; }
+  .ag-tira-n { display: inline; }
+}
+.ag-tira-dia.is-hecha { border-color: var(--flp-carbon); background: var(--flp-carbon); }
+.ag-tira-dia.is-hecha .ag-tira-n { color: var(--flp-chalk); }
+.ag-tira-dia.is-hoy { border: 2px solid var(--flp-carbon); }
+.ag-tira-dia.is-hoy .ag-tira-n { color: var(--flp-carbon); font-weight: 600; }
+.ag-tira-dia.is-hoy::after { content: ''; position: absolute; bottom: -7px; left: 50%; width: 6px; height: 6px; transform: translateX(-50%) rotate(45deg); background: var(--flp-carbon); }
+/* Riesgo alto: barra superior roja; riesgo medio: discontinua, para que no se confunda con «Rodada».
+   Los trazos van con un degradado: un borde dashed en una celda de 14 px se ve como una raya entera. */
+.ag-tira-dia.con-alta { box-shadow: inset 0 4px 0 var(--flp-error); }
+.ag-tira-dia.con-media::before,
+.ag-tira-leyenda i.con-media::before { content: ''; position: absolute; top: 0; right: 2px; left: 2px; height: 3px; background: repeating-linear-gradient(90deg, var(--flp-carbon) 0 3px, transparent 3px 5px); }
+.ag-tira-leyenda { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; color: var(--flp-muted); font-size: 12px; }
+@media (min-width: 640px) { .ag-tira-leyenda { gap: 4px 14px; margin-top: 8px; } }
+.ag-tira-leyenda li { display: inline-flex; align-items: center; gap: 5px; }
+.ag-tira-leyenda li.ag-solo-ancho { display: none; }
+@media (min-width: 640px) { .ag-tira-leyenda li.ag-solo-ancho { display: inline-flex; } }
+.ag-tira-leyenda i { position: relative; display: inline-block; width: 14px; height: 14px; overflow: hidden; border: 1px solid var(--flp-border); border-radius: 3px; background: var(--flp-surface); }
+.ag-tira-leyenda i.is-hecha { border-color: var(--flp-carbon); background: var(--flp-carbon); }
+.ag-tira-leyenda i.is-hoy { border: 2px solid var(--flp-carbon); }
+.ag-tira-leyenda i.con-alta { box-shadow: inset 0 4px 0 var(--flp-error); }
+.ag-tira-leyenda i.con-media::before { right: 0; left: 0; }
+
+/* ── Para hoy: tres puntos por urgencia; lo decidido se tacha ─────────────── */
+.ag-agenda-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-bottom: 8px; }
+.ag-agenda-lista { display: grid; }
+.ag-agenda-item { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--flp-border); }
+.ag-agenda-item:first-child { padding-top: 2px; border-top: 0; }
+.ag-agenda-n { display: inline-flex; width: 24px; height: 24px; flex: none; align-items: center; justify-content: center; border-radius: 50%; background: var(--flp-carbon); color: var(--flp-chalk); font-family: var(--flp-font-mono); font-size: 12px; }
+.ag-agenda-n.is-hecho { background: var(--flp-success); }
+.ag-agenda-titulo { color: var(--flp-carbon); font-size: 16px; font-weight: 500; line-height: 1.3; }
+.ag-agenda-item.is-hecho .ag-agenda-titulo { color: var(--flp-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.ag-agenda-detalle { margin-top: 4px; color: var(--flp-muted); font-size: 14px; line-height: 1.5; }
+.ag-agenda-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-top: 4px; }
+.ag-agenda-meta { display: block; min-width: 0; flex: 1 1 240px; color: var(--flp-muted); font-size: 13px; line-height: 1.5; }
+.ag-agenda-meta > svg { display: inline-block; margin-right: 4px; vertical-align: -2px; }
+.ag-agenda-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Lo plegado entra en la fila del pie: el enlace a la derecha y el detalle, al abrir, en una línea propia. */
+.ag-agenda-plegado { display: contents; }
+.ag-agenda-plegado-cuerpo { flex-basis: 100%; }
+/* «2 compras ›» / «3 avisos ›»: enlace que despliega; el chevron gira al abrir. */
+.ag-agenda-plegar { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; color: var(--flp-carbon); font-size: 14px; font-weight: 500; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.ag-agenda-plegar svg { flex: none; transition: transform var(--flp-duration) var(--flp-ease); }
+.ag-agenda-plegar[aria-expanded='true'] svg { transform: rotate(90deg); }
+.ag-agenda-sub { display: grid; gap: 6px; margin-top: 6px; }
+.ag-agenda-sub-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 8px 8px 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-bg); }
+.ag-agenda-sub-item.is-hecho .text-flp-ink { color: var(--flp-muted); }
+/* Si no cabe al lado, el botón baja: el texto nunca se queda en una columna estrecha. */
+.ag-agenda-sub-texto { min-width: 0; flex: 1 1 220px; }
+.ag-agenda-resto { display: grid; margin-top: 2px; padding-top: 2px; border-top: 1px solid var(--flp-border); color: var(--flp-muted); font-size: 13px; }
+.ag-agenda-resto-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+.ag-agenda-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+
+/* ── Historias: el índice de lo que enseña la demo ────────────────────────── */
+.ag-historias-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-bottom: 8px; }
+.ag-historias-lista { display: grid; gap: 8px; }
+@media (min-width: 640px) { .ag-historias-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ag-historia { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
+.ag-historia-arco { color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+.ag-historia-titulo { color: var(--flp-carbon); font-size: 16px; font-weight: 500; line-height: 1.3; }
+.ag-historia.is-vista .ag-historia-titulo { color: var(--flp-muted); }
+.ag-historia-linea { color: var(--flp-muted); font-size: 14px; line-height: 1.5; }
+.ag-historia-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 2px; }
+.ag-historia-boton { align-self: flex-start; justify-content: space-between; max-width: 100%; margin-top: auto; padding-block: 8px; white-space: normal; text-align: left; }
+.ag-historia-boton svg { flex: none; }
+.ag-historias-epilogo { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; margin-top: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-agenda-plegar svg { transition: none; }
+}

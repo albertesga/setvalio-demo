@@ -18,125 +18,18 @@
 .ag-skip { position: absolute; z-index: 80; top: -80px; left: 12px; padding: 10px 16px; border-radius: 999px; background: var(--flp-signal); color: var(--flp-carbon); font-weight: 500; }
 .ag-skip:focus { top: 8px; }
 
-/* ── Cabecera ─────────────────────────────────────────────────────────────── */
-.ag-header {
-  display: flex;
-  min-height: 60px;
-  flex: none;
-  align-items: center;
-  gap: 10px;
-  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--flp-border);
-  background: var(--flp-chalk);
-}
-/* Con la columna derecha a la vista (≥ 1024 px) la campana sobra. */
+/* Cabecera, carril, recorrido y redactor: src/agentes/ui/pantalla.css. Parte de la mañana: src/agentes/ui/parte.css. */
 
-.ag-header-marca { display: inline-flex; min-height: 44px; flex: none; align-items: center; border-radius: 6px; color: var(--flp-carbon); }
-.ag-header-sep { width: 1px; height: 28px; flex: none; background: var(--flp-border); }
-/* En móvil el carril de agentes no cabe: un botón lo abre en una hoja. */
-.ag-agentes-boton {
-  display: inline-flex; min-height: 44px; flex: none; align-items: center; gap: 6px; padding: 0 12px;
-  border: 1px solid var(--flp-border); border-radius: 999px; color: var(--flp-carbon); font-size: 14px; font-weight: 500;
-}
-.ag-agentes-boton:hover { border-color: var(--flp-carbon); }
-@media (min-width: 1024px) { .ag-agentes-boton { display: none; } }
-/* Un solo botón para todo lo que no es conversación. */
-.ag-demo-boton {
-  display: inline-flex; min-height: 44px; max-width: 320px; flex: none; align-items: center; gap: 10px; padding: 4px 14px 4px 6px;
-  border: 1px solid var(--flp-control-border); border-radius: 999px; background: var(--flp-surface);
-  color: var(--flp-carbon); font-size: 14px; white-space: nowrap;
-  transition: border-color var(--flp-duration) var(--flp-ease);
-}
-.ag-demo-boton:hover { border-color: var(--flp-carbon); }
-.ag-demo-etiqueta {
-  padding: 3px 9px; border-radius: 999px; background: var(--flp-carbon); color: var(--flp-chalk);
-  font-family: var(--flp-font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
-}
-.ag-menu-item { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 8px; padding: 0 12px; border-radius: 6px; color: var(--flp-carbon); font-size: 14px; font-weight: 500; text-align: left; }
-.ag-menu-item:hover { background: rgb(20 20 20 / 0.05); }
-.ag-menu-item--peligro { color: var(--flp-error); }
 .ag-icon-button { display: inline-flex; width: 44px; height: 44px; flex: none; align-items: center; justify-content: center; border-radius: 999px; color: var(--flp-carbon); }
 .ag-icon-button:hover { background: rgb(20 20 20 / 0.06); }
 
-/* Novedades sin leer: un punto carbón aparte, sin número, para no cambiar el significado de la insignia. */
-
-.ag-confirmar { padding: 12px 14px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-sm); background: var(--flp-surface); }
-
-/* Opciones de la demo: radios en filas y un control segmentado. */
-.ag-opciones { display: grid; gap: 6px; }
-.ag-opcion-radio {
-  display: flex; min-height: 52px; align-items: center; gap: 12px; padding: 8px 12px; cursor: pointer;
-  border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-surface);
-}
-.ag-opcion-radio:has(input:checked) { border-color: var(--flp-carbon); box-shadow: inset 0 0 0 1px var(--flp-carbon); }
-.ag-opcion-radio input { width: 18px; height: 18px; flex: none; accent-color: var(--flp-carbon); }
-.ag-segmentado { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; padding: 3px; border: 1px solid var(--flp-control-border); border-radius: 999px; background: var(--flp-surface); }
-.ag-segmentado label { position: relative; display: flex; min-height: 44px; align-items: center; justify-content: center; cursor: pointer; }
-.ag-segmentado input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
-.ag-segmentado span { width: 100%; padding: 8px 6px; border-radius: 999px; color: var(--flp-muted); font-size: 14px; text-align: center; }
-.ag-segmentado input:checked + span { background: var(--flp-carbon); color: var(--flp-chalk); }
-.ag-segmentado input:focus-visible + span { outline: 2px solid var(--flp-carbon); outline-offset: 2px; }
-
-/* ── Cuerpo en columnas ───────────────────────────────────────────────────── */
-.ag-cuerpo { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
-/* Dos columnas: el carril de agentes a la izquierda (desde 1024 px) y la conversación. */
-.ag-col-izq { display: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--flp-border); background: var(--flp-chalk); }
-@media (min-width: 1024px) {
-  .ag-cuerpo { grid-template-columns: 280px minmax(0, 1fr); }
-  .ag-col-izq { display: flex; }
-}
-@media (min-width: 1536px) {
-  .ag-cuerpo { grid-template-columns: 300px minmax(0, 1fr); }
-}
-.ag-panel-scroll { min-height: 0; flex: 1; overflow-y: auto; padding: 16px; overscroll-behavior: contain; }
-
+/* Hilo de la conversación. */
 .ag-centro { position: relative; display: flex; min-height: 0; min-width: 0; flex-direction: column; }
 .ag-scroll { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .ag-hilo { width: 100%; max-width: 800px; margin-inline: auto; padding: 24px 16px 16px; }
 @media (min-width: 768px) { .ag-hilo { padding: 36px 28px 20px; } }
 
-.ag-pie {
-  position: relative; flex: none; width: 100%; max-width: 800px; margin-inline: auto;
-  padding: 8px 16px max(12px, env(safe-area-inset-bottom));
-}
-@media (min-width: 768px) { .ag-pie { padding-inline: 28px; } }
-.ag-pie-nota { margin-top: 6px; color: var(--flp-muted); font-size: 12px; text-align: center; }
-.ag-nuevos {
-  position: absolute; z-index: 5; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--flp-carbon); color: var(--flp-chalk);
-  font-size: 14px; font-weight: 500; box-shadow: var(--flp-shadow);
-}
-
-/* ── Redactor y sugerencias ───────────────────────────────────────────────── */
-.ag-redactor {
-  display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 16px;
-  border: 1px solid var(--flp-control-border); border-radius: 24px; background: var(--flp-surface);
-}
-.ag-redactor:focus-within { border-color: var(--flp-carbon); box-shadow: 0 0 0 1px var(--flp-carbon); }
-.ag-redactor-campo {
-  min-height: 44px; flex: 1; resize: none; padding: 11px 0; border: 0; background: transparent;
-  color: var(--flp-carbon); font-size: 16px; line-height: 1.4; outline: none;
-}
-.ag-redactor-campo::placeholder { color: var(--flp-muted); }
-.ag-redactor-campo:focus-visible { outline: none; }
-.ag-redactor-boton {
-  display: inline-flex; width: 44px; height: 44px; flex: none; align-items: center; justify-content: center;
-  border-radius: 999px; background: var(--flp-signal); color: var(--flp-carbon);
-  transition: background-color var(--flp-duration) var(--flp-ease);
-}
-.ag-redactor-boton:hover:not(:disabled) { background: var(--flp-signal-hover); }
-.ag-redactor-boton:disabled { background: var(--flp-chalk); color: var(--flp-control-border); cursor: not-allowed; }
-/* Sugerencias al final de la última respuesta («Para seguir»), dentro del hilo. */
-.ag-sugerencias-hilo { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--flp-border); }
-.ag-sugerencias { display: flex; flex-wrap: wrap; gap: 8px; }
-.ag-sugerencia {
-  display: inline-flex; min-height: 44px; max-width: 100%; align-items: center; padding: 8px 16px;
-  border: 1px solid var(--flp-control-border); border-radius: 22px; background: var(--flp-surface);
-  color: var(--flp-carbon); font-size: 14px; line-height: 1.3; text-align: left;
-}
-.ag-sugerencia:hover:not(:disabled) { border-color: var(--flp-carbon); }
-.ag-sugerencia:disabled { opacity: .5; cursor: not-allowed; }
-.ag-trabajando-linea { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+/* Puntos de «escribiendo» (llamada y agentes trabajando). */
 .ag-puntos { display: inline-flex; gap: 3px; }
 .ag-puntos i { width: 5px; height: 5px; border-radius: 50%; background: var(--flp-carbon); animation: ag-punto 1s ease-in-out infinite; }
 .ag-puntos i:nth-child(2) { animation-delay: .15s; }
@@ -162,30 +55,18 @@
   border-radius: 50%; background: var(--flp-silver); color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px;
 }
 
-/* Carril: el Orquestador y las tres familias. */
-.ag-familias { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.ag-familia { min-width: 0; padding-top: 12px; border-top: 1px solid var(--flp-border); }
-.ag-familia-cab { display: flex; align-items: center; gap: 8px; padding-inline: 8px; color: var(--flp-carbon); }
-.ag-familia-desc { margin: 2px 0 4px; padding-inline: 8px; color: var(--flp-muted); font-size: 12px; line-height: 1.45; }
-.ag-agente {
-  display: flex; width: 100%; min-height: 52px; align-items: center; gap: 10px; padding: 8px; border-radius: var(--flp-radius-sm);
-  text-align: left; transition: background-color var(--flp-duration) var(--flp-ease);
-}
-.ag-agente:hover { background: rgb(20 20 20 / 0.05); }
-
-/* Autonomía: medidor de tres segmentos + texto. No es un estado. */
+/* Autonomía: medidor de tres segmentos + texto, sin marco. No es un estado. */
 .ag-autonomia {
-  display: inline-flex; min-height: 24px; align-items: center; gap: 6px; padding: 2px 9px;
-  border: 1px solid var(--flp-border); border-radius: 999px; background: var(--flp-surface);
-  color: var(--flp-carbon); font-size: 12px; font-weight: 500; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--flp-muted); font-family: var(--flp-font-sans); font-size: 12px; font-weight: 400; white-space: nowrap;
 }
 .ag-autonomia-meter { display: inline-flex; gap: 2px; }
-.ag-autonomia-meter i { width: 4px; height: 10px; border-radius: 1px; background: rgb(20 20 20 / 0.16); }
-.ag-autonomia-meter i.is-on { background: var(--flp-carbon); }
+.ag-autonomia-meter i { width: 4px; height: 10px; border-radius: 1px; background: var(--flp-border); }
+.ag-autonomia-meter i.is-on { background: var(--flp-muted); }
 
 /* Etiquetas y estados (sobre .flp-state). */
 .ag-chip { max-width: 100%; }
-/* Atención sin amarillo: «Riesgo medio», «Cerca del umbral», «No cumple»… El amarillo queda para lo «Por revisar». */
+/* Atención sin amarillo: «Riesgo medio», «Cerca del límite», «No cumple»… El amarillo queda para lo «Por revisar». */
 .ag-chip--atencion { border-color: var(--flp-text); font-weight: 500; }
 .ag-chip svg { flex: none; }
 .ag-spinner { width: 11px; height: 11px; flex: none; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: ag-spin .8s linear infinite; }
@@ -194,16 +75,6 @@
   display: inline-flex; flex: none; align-items: center; padding: 1px 8px; border: 1px dashed var(--flp-control-border);
   border-radius: 999px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; white-space: nowrap;
 }
-/* Cifra que pide una revisión: carbón sobre señal. */
-.ag-resalte { padding: 0 4px; border-radius: 4px; background: var(--flp-signal); color: var(--flp-carbon); }
-
-/* Plegable accesible (Desplegable). */
-.ag-desplegable { border-bottom: 1px solid var(--flp-border); }
-.ag-desplegable-boton { display: flex; width: 100%; min-height: 56px; align-items: center; gap: 12px; padding: 10px 2px; color: var(--flp-carbon); }
-.ag-desplegable .ag-plegable.is-open .ag-plegable-dentro { padding: 2px 0 16px; }
-.ag-col-izq .ag-desplegable { border-bottom: 0; }
-
-/* ── Inicio ───────────────────────────────────────────────────────────────── */
 
 /* ── Mensajes ─────────────────────────────────────────────────────────────── */
 .ag-msg-usuario {
@@ -222,14 +93,47 @@
   border: 1px solid var(--flp-border); border-left: 3px solid var(--flp-carbon); border-radius: 6px; background: var(--flp-surface); color: var(--flp-carbon); font-size: 14px;
 }
 .ag-msg-novedad-icono { display: inline-flex; color: var(--flp-carbon); }
-.ag-msg-guia { padding: 12px 16px; border: 1px dashed var(--flp-control-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
+/* Inicio de un paso del recorrido: una línea fina con el paso y el arco. */
+.ag-msg-guia { display: flex; align-items: center; gap: 12px; color: var(--flp-muted); }
+.ag-msg-guia::before, .ag-msg-guia::after { content: ''; height: 1px; flex: 1; background: var(--flp-border); }
+.ag-msg-guia > span { flex: none; max-width: 80%; text-align: center; }
 .ag-msg-nota { color: var(--flp-muted); font-size: 13px; text-align: center; }
 
 .ag-msg-agentes { animation: ag-entra .24s var(--flp-ease) both; }
-.ag-msg-agentes.is-deshecho .ag-bloques { padding-left: 12px; border-left: 3px solid var(--flp-control-border); }
+/* Cabecera de la respuesta: título a 20 px; Saltar y Detener bajan bajo el título en móvil. */
+.ag-msg-cab { display: flex; align-items: flex-start; gap: 10px; }
+.ag-msg-titulo { color: var(--flp-carbon); font-size: 20px; font-weight: 400; line-height: 1.25; letter-spacing: -0.02em; text-wrap: balance; }
+.ag-msg-controles { display: flex; flex: none; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 639px) {
+  .ag-msg-cab { flex-wrap: wrap; }
+  .ag-msg-cab > .ag-msg-controles { flex-basis: 100%; padding-left: 42px; }
+  .ag-saludo-meta > .ag-msg-controles { flex-basis: 100%; }
+}
+/* «1 decisión aquí ↓»: el chip «Por revisar» es el botón; la zona táctil, 44 px. */
+.ag-salto-decision { display: inline-flex; min-height: 44px; align-items: center; border-radius: 999px; }
+.ag-salto-decision .flp-state { gap: 4px; }
+.ag-salto-decision:hover .flp-state { background: var(--flp-signal-hover); border-color: var(--flp-signal-hover); }
+/* Novedad que llega sola y no pide nada: una línea. La línea «Novedad» de antes sobra. */
+.ag-msg-plegado {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; padding: 0 12px;
+  border: 1px solid var(--flp-border); border-left: 3px solid var(--flp-carbon); border-radius: 6px; background: var(--flp-surface);
+}
+.ag-msg-plegado-texto { min-width: 0; flex: 1 1 260px; padding: 10px 0; color: var(--flp-carbon); font-size: 14px; font-weight: 400; line-height: 1.45; }
+.ag-msg-plegado-acciones { display: inline-flex; flex-wrap: wrap; gap: 0 14px; }
+.ag-msg-plegado.is-deshecho .ag-msg-plegado-texto { color: var(--flp-muted); }
+/* Con o sin envoltorio por mensaje en el hilo. */
+.ag-msg-novedad:has(+ .ag-msg-plegado), .ag-hilo :has(> .ag-msg-novedad):has(+ * > .ag-msg-plegado) { display: none; }
+/* Un mensaje que no pinta nada (el paso 1 del recorrido) no deja hueco en el hilo. */
+.ag-hilo [data-msg]:empty { display: none; }
+/* Deshacer: lo que hicieron los agentes o tu decisión. Lo deshecho queda atenuado. */
+.ag-deshacer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: var(--flp-muted); font-size: 14px; }
+.ag-msg-agentes.is-deshecho .ag-bloques { padding-left: 12px; border-left: 3px solid var(--flp-border); opacity: .62; }
+.ag-msg-agentes.is-deshecho .ag-msg-titulo { color: var(--flp-muted); }
 @keyframes ag-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .ag-bloques { display: grid; gap: 12px; margin-top: 12px; }
 .ag-bloque-entrada { min-width: 0; animation: ag-entra .24s var(--flp-ease) both; }
+/* Un bloque que ya no tiene nada que ofrecer (una acción usada) no deja hueco. */
+.ag-bloque-entrada:empty { display: none; }
 .ag-prosa { color: var(--flp-carbon); font-size: 15px; line-height: 1.65; }
 
 /* Línea de trabajo */
@@ -238,13 +142,7 @@
 .ag-linea-paso.is-en_curso { background: rgb(20 20 20 / 0.04); box-shadow: inset 2px 0 0 var(--flp-carbon); }
 .ag-linea-paso.is-en_cola .ag-avatar, .ag-linea-paso.is-detenido .ag-avatar { opacity: .55; }
 .ag-linea-paso.is-en_cola .text-flp-ink, .ag-linea-paso.is-detenido .text-flp-ink { color: var(--flp-muted); }
-.ag-linea-paso > .ag-chip { margin-top: 2px; }
 .ag-linea-salida { margin-top: 2px; color: var(--flp-carbon); font-size: 13px; }
-.ag-paralelo { padding: 0 8px; border: 1px dashed var(--flp-control-border); border-radius: 999px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
-@media (max-width: 520px) {
-  .ag-linea-paso { flex-wrap: wrap; }
-  .ag-linea-paso > .ag-chip { margin-left: 38px; }
-}
 
 .ag-traza { border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
 .ag-traza-boton { display: flex; width: 100%; min-height: 52px; align-items: center; gap: 12px; padding: 8px 14px; border-radius: var(--flp-radius-md); font-size: 14px; }
@@ -265,6 +163,10 @@
   min-width: 0; padding: 16px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface);
 }
 .ag-panel--flush { padding: 0; overflow: hidden; }
+/* Un solo título de panel: antetítulo en muted; a la derecha, un dato corto. */
+.ag-panel-titulo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-bottom: 12px; }
+.ag-panel-cab { padding: 12px 16px 0; }
+.ag-panel-cab .ag-panel-titulo { margin-bottom: 10px; }
 .ag-link { display: inline-flex; min-height: 44px; align-items: center; color: var(--flp-carbon); font-size: 14px; font-weight: 500; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .ag-link:disabled { opacity: .5; cursor: not-allowed; }
 .ag-boton-fila {
@@ -276,9 +178,12 @@
 .ag-boton-fila:disabled { opacity: .5; cursor: not-allowed; }
 .ag-boton-fila[aria-pressed='true'] { background: var(--flp-carbon); color: var(--flp-chalk); border-color: var(--flp-carbon); }
 
+/* Cifras: cada celda dibuja una línea de 1 px a la derecha y abajo; el panel recorta las
+   del borde. Sin bordes dobles y sin huecos grises cuando la última fila no se llena. */
 .ag-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (min-width: 640px) { .ag-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
-.ag-kpi { min-width: 0; padding: 12px 16px; border-right: 1px solid var(--flp-border); border-bottom: 1px solid var(--flp-border); }
+.ag-panel-cab + .ag-kpis { border-top: 1px solid var(--flp-border); }
+.ag-kpi { min-width: 0; padding: 12px 16px; box-shadow: 1px 0 0 var(--flp-border), 0 1px 0 var(--flp-border); }
 .ag-kpi dt { color: var(--flp-muted); font-size: 12px; font-weight: 500; }
 .ag-kpi dd { margin-top: 4px; font-family: var(--flp-font-mono); font-size: 18px; font-weight: 400; line-height: 1.2; letter-spacing: -0.01em; white-space: nowrap; }
 .ag-kpi-sub, .ag-kpi-antes { display: block; margin-top: 2px; color: var(--flp-muted); font-size: 12px; line-height: 1.4; }
@@ -295,6 +200,20 @@
 @media (min-width: 640px) { .ag-tabla tbody th { min-width: 180px; } }
 .ag-tabla tfoot th, .ag-tabla tfoot td { border-bottom: 0; background: var(--flp-chalk); font-weight: 600; }
 .ag-tabla tr.is-alerta th:first-child { box-shadow: inset 3px 0 0 var(--flp-error); }
+/* En móvil, cada fila es una ficha: la cabecera arriba y cada dato con su etiqueta. */
+@media (max-width: 639px) {
+  .ag-tabla, .ag-tabla tbody, .ag-tabla tfoot { display: block; }
+  .ag-tabla thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ag-tabla tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; border-bottom: 1px solid var(--flp-border); }
+  .ag-tabla th, .ag-tabla td { padding: 0; border-bottom: 0; }
+  .ag-tabla tbody th, .ag-tabla tfoot th { grid-column: 1 / -1; min-width: 0; text-align: left; white-space: normal; }
+  .ag-tabla tbody td, .ag-tabla tfoot td { display: grid; grid-column: 1 / -1; grid-template-columns: 104px minmax(0, 1fr); align-items: baseline; gap: 12px; min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+  .ag-tabla tbody td.text-right, .ag-tabla tfoot td.text-right { text-align: right; }
+  .ag-tabla td::before { content: attr(data-etiqueta); color: var(--flp-muted); font-size: 12px; font-weight: 400; text-align: left; }
+  .ag-tabla tfoot td.is-vacia { display: none; }
+  .ag-tabla tr.is-alerta { box-shadow: inset 3px 0 0 var(--flp-error); }
+  .ag-tabla tr.is-alerta th:first-child { box-shadow: none; }
+}
 .ag-mas { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border-top: 1px solid var(--flp-border); color: var(--flp-carbon); font-size: 13px; font-weight: 500; }
 .ag-check { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 50%; flex: none; }
 .ag-check--ok { border: 1px solid currentColor; color: var(--flp-success); }
@@ -328,11 +247,9 @@
 .ag-meter span { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--flp-carbon); }
 .ag-meter span.is-baja { background: var(--flp-error); }
 
-.ag-aprobacion {
-  padding: 18px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-md); background: var(--flp-surface);
-  box-shadow: inset 4px 0 0 var(--flp-signal), var(--flp-shadow);
-}
-.ag-aprobacion.is-decidida { border-color: var(--flp-border); box-shadow: inset 4px 0 0 var(--flp-control-border); }
+.ag-aprobacion { padding: 18px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
+.ag-aprobacion.is-decidida { border-color: var(--flp-border); }
+.ag-aprobacion-quien { margin-top: 6px; color: var(--flp-muted); font-family: var(--flp-font-sans); font-size: 13px; line-height: 1.4; }
 .ag-aprobacion .ag-chip { max-width: 100%; white-space: normal; }
 .ag-impacto { margin-top: 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); overflow: hidden; font-size: 13px; }
 .ag-impacto > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--flp-border); }
@@ -345,7 +262,7 @@
 .ag-decisiones li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-surface); }
 
 .ag-aviso { padding: 12px 16px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
-.ag-aviso--exploratorio, .ag-aviso--porvalidar, .ag-aviso--fase { border-style: dashed; border-color: var(--flp-control-border); background: transparent; }
+.ag-aviso--exploratorio { border-style: dashed; border-color: var(--flp-control-border); background: transparent; }
 .ag-aviso--aviso { box-shadow: inset 3px 0 0 var(--flp-carbon); }
 .ag-aviso--info { background: var(--flp-surface); }
 
@@ -390,26 +307,6 @@
 @media (max-width: 560px) {
   .ag-caja { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 14px; }
   .ag-caja-zona { height: 90px; }
-}
-
-/* ── Paneles laterales ────────────────────────────────────────────────────── */
-
-.ag-progreso { height: 6px; overflow: hidden; border-radius: 3px; background: var(--flp-border); }
-.ag-progreso span { display: block; height: 100%; border-radius: 3px; background: var(--flp-carbon); transition: width .3s var(--flp-ease); }
-.ag-caso-fila { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; color: var(--flp-carbon); font-size: 13px; font-weight: 500; }
-.ag-caso-fila:hover:not(:disabled) { background: rgb(20 20 20 / 0.05); }
-.ag-caso-fila:disabled { opacity: .55; cursor: not-allowed; }
-.ag-caso-check { display: inline-flex; width: 18px; height: 18px; flex: none; align-items: center; justify-content: center; border: 1.5px solid var(--flp-control-border); border-radius: 4px; }
-.ag-caso-check.is-visto { border-color: var(--flp-carbon); background: var(--flp-carbon); color: var(--flp-chalk); }
-
-/* Recorrido */
-.ag-tourbar-nota { display: -webkit-box; margin-top: 2px; overflow: hidden; color: var(--flp-muted); font-size: 13px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.ag-tourbar:focus-visible { outline: 2px solid var(--flp-signal); outline-offset: -4px; }
-.flp-button.is-bloqueado { cursor: not-allowed; opacity: .45; }
-.ag-link--salto { min-height: 32px; gap: 4px; font-size: 13px; }
-.ag-tourbar {
-  display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px;
-  background: var(--flp-carbon); color: var(--flp-chalk);
 }
 
 /* Hojas (móvil y tableta) */
@@ -515,64 +412,6 @@
 /* Bloques plegados dentro de una respuesta (detalle por capítulo, calendario, cómo será la llamada). */
 .ag-panel--plegable { padding: 0 16px; }
 .ag-panel--plegable .ag-desplegable { border-bottom: 0; }
-/* Aviso de alcance repetido: solo la etiqueta. */
-.ag-aviso-breve { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.ag-aviso-breve .ag-link { min-height: 32px; font-size: 13px; }
-/* Botones del pie del informe y chips de la hoja de un agente: que partan línea en móvil. */
-.ag-informe-pie .flp-button, .ag-hoja .ag-sugerencia { white-space: normal; }
 
-/* ── Parte de la mañana ───────────────────────────────────────────────────── */
-/* El saludo sale al instante; el parte lo van montando los agentes debajo. */
-.ag-saludo-titulo { margin-top: 10px; color: var(--flp-carbon); font-size: clamp(2rem, 4.4vw, 3rem); font-weight: 400; line-height: 1.04; letter-spacing: -0.045em; text-wrap: balance; }
-.ag-saludo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--flp-border); }
+/* ── Parte de la mañana (el resto, en parte.css) ──────────────────────────── */
 .ag-msg-saludo > .mt-3:first-of-type { margin-top: 14px; }
-.ag-prosa--lead { max-width: 680px; font-size: 17px; line-height: 1.6; }
-
-/* Tira del rodaje: rodadas en carbón, hoy con borde y marca, riesgos como barra superior. */
-.ag-tira-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
-.ag-tira-progreso { height: 4px; margin: 12px 0 14px; overflow: hidden; border-radius: 999px; background: var(--flp-border); }
-.ag-tira-progreso span { display: block; height: 100%; border-radius: inherit; background: var(--flp-carbon); }
-.ag-tira-semanas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
-@media (min-width: 640px) { .ag-tira-semanas { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.ag-tira-sem { display: block; min-height: 36px; margin-bottom: 6px; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; line-height: 1.5; }
-.ag-tira-dias { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding-bottom: 8px; }
-.ag-tira-dia { position: relative; display: flex; height: 34px; align-items: center; justify-content: center; border: 1px solid var(--flp-border); border-radius: 4px; background: var(--flp-surface); }
-.ag-tira-n { color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
-.ag-tira-dia.is-hecha { border-color: var(--flp-carbon); background: var(--flp-carbon); }
-.ag-tira-dia.is-hecha .ag-tira-n { color: var(--flp-chalk); }
-.ag-tira-dia.is-hoy { border: 2px solid var(--flp-carbon); }
-.ag-tira-dia.is-hoy .ag-tira-n { color: var(--flp-carbon); font-weight: 600; }
-.ag-tira-dia.is-hoy::after { content: ''; position: absolute; bottom: -8px; left: 50%; width: 7px; height: 7px; transform: translateX(-50%) rotate(45deg); background: var(--flp-carbon); }
-.ag-tira-dia.con-alta { box-shadow: inset 0 4px 0 var(--flp-error); }
-.ag-tira-dia.con-media { box-shadow: inset 0 4px 0 var(--flp-carbon); }
-.ag-tira-leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; color: var(--flp-muted); font-size: 12px; }
-.ag-tira-leyenda li { display: inline-flex; align-items: center; gap: 6px; }
-.ag-tira-leyenda i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--flp-border); border-radius: 3px; background: var(--flp-surface); }
-.ag-tira-leyenda i.is-hecha { border-color: var(--flp-carbon); background: var(--flp-carbon); }
-.ag-tira-leyenda i.is-hoy { border: 2px solid var(--flp-carbon); }
-.ag-tira-leyenda i.con-alta { box-shadow: inset 0 4px 0 var(--flp-error); }
-.ag-tira-leyenda i.con-media { box-shadow: inset 0 4px 0 var(--flp-carbon); }
-
-/* Para hoy: numerado por urgencia; lo decidido se tacha. */
-.ag-agenda-lista { display: grid; }
-.ag-agenda-item { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--flp-border); }
-.ag-agenda-item:first-child { padding-top: 2px; border-top: 0; }
-.ag-agenda-n { display: inline-flex; width: 26px; height: 26px; flex: none; align-items: center; justify-content: center; border-radius: 50%; background: var(--flp-carbon); color: var(--flp-chalk); font-family: var(--flp-font-mono); font-size: 13px; }
-.ag-agenda-n.is-hecho { background: var(--flp-success); }
-.ag-agenda-titulo { color: var(--flp-carbon); font-size: 16px; font-weight: 500; line-height: 1.3; }
-.ag-agenda-item.is-hecho .ag-agenda-titulo { color: var(--flp-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
-.ag-agenda-detalle { margin-top: 4px; color: var(--flp-muted); font-size: 14px; line-height: 1.55; }
-.ag-agenda-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; color: var(--flp-muted); font-size: 13px; }
-.ag-agenda-sub { display: grid; gap: 6px; margin-top: 10px; }
-.ag-agenda-sub-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 8px 8px 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-bg); }
-.ag-agenda-sub-item.is-hecho .text-flp-ink { color: var(--flp-muted); }
-/* Si no cabe al lado, el botón baja: el texto nunca se queda en una columna estrecha. */
-.ag-agenda-sub-texto { min-width: 0; flex: 1 1 220px; }
-.ag-agenda-resto { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--flp-border); color: var(--flp-muted); font-size: 13px; }
-
-/* Esta semana: un día por fila; hoy, con barra carbón. */
-
-/* Lo que ha hecho cada agente. */
-.ag-equipo { display: grid; gap: 12px; }
-@media (min-width: 720px) { .ag-equipo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; } }
-.ag-equipo li { display: flex; align-items: flex-start; gap: 10px; }

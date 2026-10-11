@@ -4,10 +4,13 @@ import { reducir } from '../acciones.js'
 import { PERSONAS } from '../mundo.js'
 import { confianzaBaja, ROLES } from '../politicas.js'
 import { cuenta, fecha } from '../texto.js'
-import { t, v, c, POLITICAS, paso, sug, texto, aviso, kpisPartida, bloqueDocumento } from './comun.js'
+import { t, v, c, POLITICAS, paso, sug, texto, aviso, kpisPartida, bloqueDocumento, nombrePartida, minuscula, articulo } from './comun.js'
 
 const enBandeja = (m) => Object.values(m.documentos).filter((d) => d.estado === 'en_bandeja')
 const casable = (m, d) => !confianzaBaja(d) && d.impuesto?.tipo !== 'IGIC' && c.conciliar(m, d.id).resultado === 'ok'
+
+/** ['a', 'b', 'c'] → 'a, b y c'. */
+const enLista = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : xs[0] ?? '')
 
 function confianzaMinima(d) {
   return d.confianza ? Math.min(...Object.values(d.confianza)) : null
@@ -25,9 +28,11 @@ export function documentoObjetivo(m, det) {
 
 // ── Factura entrante ─────────────────────────────────────────────────────────
 
+const tituloDocumento = (id) => `${/^G-/.test(id) ? 'Ticket' : 'Factura'} ${id}`
+
 export const facturaNueva = {
   id: 'factura_nueva',
-  titulo: 'Factura entrante',
+  titulo: (det) => (det.eventoId === 'EV-01' ? 'Factura entrante' : det.entidades?.documento ? tituloDocumento(det.entidades.documento) : 'Bandeja de facturas'),
   ejemplos: ['¿Han llegado facturas nuevas?', 'Ha llegado una factura de Grúas y Cámaras del Sur', 'procesa la F-2026-078', 'nueva factura en el buzón', 'Procesa la factura F-2026-069'],
 
   planificar(m, det) {
@@ -36,10 +41,10 @@ export const facturaNueva = {
     const d0 = m.documentos[id]
 
     if (d0.estado === 'por_llegar' && det.eventoId !== 'EV-01') {
-      return [paso('facturas', t('Revisa la bandeja de entrada'), { tipo: 'lectura', salida: t('Nada nuevo desde el último corte') })]
+      return [paso('facturas', t('Revisa la bandeja de entrada'), { tipo: 'lectura', salida: t('Nada nuevo desde esta mañana') })]
     }
     if (d0.estado === 'contabilizada') {
-      return [paso('facturas', t('Busca {id}', { id: v(id, 'id') }), { tipo: 'lectura', salida: t('Ya estaba contabilizada') })]
+      return [paso('facturas', t('Busca {id}', { id: v(id, 'id') }), { tipo: 'lectura', salida: t('Ya está contabilizada') })]
     }
 
     const pasos = []
@@ -69,7 +74,7 @@ export const facturaNueva = {
         paso('conciliacion', t('Cuadra {id} con el pedido {oc}', { id: v(id, 'id'), oc: v(conc.oc, 'id') }), {
           tipo: 'conciliacion',
           acciones: [{ tipo: 'documento/contabilizar', docId: id, por: 'Conciliación' }],
-          salida: t('Importe igual al pedido: contabilizada'),
+          salida: t('Cuadra con su pedido: contabilizada'),
         }),
       )
       pasos.push(
@@ -90,26 +95,56 @@ export const facturaNueva = {
           salida: d0.contrato ? t('Sin pedido; el proveedor tiene contrato marco') : t('Sin pedido ni contrato'),
         }),
       )
-      pasos.push(paso('excepciones', t('Lo lleva a quien puede contabilizarla'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Decide: {rol}', { rol: v(ROLES.lineProducer) }) }))
+      pasos.push(paso('excepciones', t('Lo lleva a quien puede contabilizarla'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Decide: {rol}', { rol: v(minuscula(ROLES.lineProducer)) }) }))
     }
     return pasos
   },
 
   componer({ antes, despues, det }) {
     const id = documentoObjetivo(antes, det)
+    const reglas = [
+      t('Se contabiliza sola si la confianza de cada campo es de al menos {u} y cuadra con un pedido aprobado', { u: v(POLITICAS.umbralConfianza, 'pct0') }),
+      t('Tolerancia de conciliación: {tol}', { tol: v(POLITICAS.toleranciaConciliacion, 'pct0') }),
+    ]
+    // La que Conciliación contabilizó sola hoy se cuenta así, no como «ya estaba contabilizada».
+    const solaHoy = (d) => d.estado === 'contabilizada' && d.contabilizadaPor === 'Conciliación' && d.oc
+    const yaSola = (d) => ({
+      bloques: [
+        texto(
+          d.id === 'F-2026-078'
+            ? t('{id} de {prov} entró hoy y Conciliación la contabilizó sola: cuadra con {oc}.', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') })
+            : t('{id} de {prov} ya está contabilizada: Conciliación la contabilizó sola porque cuadra con {oc}.', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') }),
+        ),
+        bloqueDocumento(despues, d.id, { elegibilidad: true }),
+      ],
+      sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('Prepárame el informe semanal de coste')],
+      fuentes: ['Bandeja de documentos'],
+      reglas,
+      noHecho: [t('No ha cambiado nada.')],
+    })
+
     if (!id || (antes.documentos[id].estado === 'por_llegar' && det.eventoId !== 'EV-01')) {
-      const pend = enBandeja(despues)
-      const bloques = [texto(t('No ha llegado ninguna factura nueva desde el último corte. En la bandeja hay {n}; abajo, los que necesitan una decisión.', { n: cuenta(pend.length, 'documento', 'documentos') })), { tipo: 'decisiones' }]
-      if (despues.entrantes.includes('EV-01')) {
-        bloques.push({ tipo: 'acciones', texto: t('En la demo puedes simular que entra una factura ahora.'), acciones: [{ id: 'simular', etiqueta: 'Simular llegada de una factura', entrada: { tipo: 'evento', eventoId: 'EV-01' } }] })
+      const llegada = antes.documentos['F-2026-078']
+      if (!id && solaHoy(llegada)) return yaSola(llegada)
+      const pendiente = despues.entrantes.includes('EV-01')
+      const bloques = [
+        texto(
+          pendiente
+            ? t('Desde esta mañana no ha entrado ninguna factura. Cuando entra una que cuadra con su pedido, Conciliación la contabiliza sola.')
+            : t('Desde esta mañana no ha entrado ninguna factura nueva. En la bandeja quedan {n}.', { n: cuenta(enBandeja(despues).length, 'documento', 'documentos') }),
+        ),
+      ]
+      if (pendiente) {
+        bloques.push({ tipo: 'acciones', texto: t('En la demo puedes hacer que entre una ahora.'), acciones: [{ id: 'ver', etiqueta: 'Ver cómo se contabiliza una', variante: 'primary', entrada: { tipo: 'evento', eventoId: 'EV-01' } }] })
       }
       return { bloques, sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('Prepárame el informe semanal de coste')], fuentes: ['Bandeja de documentos'], reglas: [], noHecho: [t('No ha contabilizado nada.')] }
     }
 
     const d = despues.documentos[id]
     if (antes.documentos[id].estado === 'contabilizada') {
+      if (solaHoy(d)) return yaSola(d)
       return {
-        bloques: [texto(t('{id} de {prov} ya estaba contabilizada en {p}.', { id: v(id, 'id'), prov: v(d.proveedor), p: v(d.partida, 'id') })), bloqueDocumento(despues, id, { elegibilidad: true })],
+        bloques: [texto(t('{id} de {prov} ya está contabilizada en {p}.', { id: v(id, 'id'), prov: v(d.proveedor), p: v(nombrePartida(despues, d.partida)) })), bloqueDocumento(despues, id, { elegibilidad: true })],
         sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('¿Qué gastos tengo que revisar?')],
         fuentes: ['Bandeja de documentos'],
         reglas: [],
@@ -121,22 +156,22 @@ export const facturaNueva = {
       const pa = antes.partidas[d.partida]
       const pd = despues.partidas[d.partida]
       const cambiaCef = Math.abs(pa.cef - pd.cef) > 0.004
+      const partida = nombrePartida(despues, d.partida)
       return {
         bloques: [
           texto(
             cambiaCef
-              ? t('Contabilizada en {p} y casada con {oc}. Parte del importe no estaba previsto y sube el coste estimado final {dif}.', { p: v(d.partida, 'id'), oc: v(d.oc, 'id'), dif: v(pd.cef - pa.cef, 'eurSigned') })
-              : t('Contabilizada en {p} y casada con {oc}. No cambia la previsión: ese gasto ya estaba comprometido.', { p: v(d.partida, 'id'), oc: v(d.oc, 'id') }),
+              ? t('Cuadra con su pedido ({oc}) y queda contabilizada en {p}. Parte del importe no estaba previsto: el coste estimado final sube {dif}.', { p: v(partida), oc: v(d.oc, 'id'), dif: v(pd.cef - pa.cef, 'eurSigned') })
+              : t('Cuadra con su pedido ({oc}) y queda contabilizada en {p}. El coste final no cambia: ese gasto ya estaba previsto.', { p: v(partida), oc: v(d.oc, 'id') }),
           ),
           bloqueDocumento(despues, id, { elegibilidad: true }),
           kpisPartida(antes, despues, d.partida),
         ],
+        // Una línea para plegar la novedad cuando llega sola.
+        resumen: t('Conciliación contabilizó sola {id} · {total} · cuadra con {oc}', { id: v(id, 'id'), total: v(d.total, 'eur'), oc: v(d.oc, 'id') }),
         sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('¿Qué bloquea el dossier fiscal?'), sug('Prepárame el informe semanal de coste')],
         fuentes: ['Bandeja de documentos', 'Órdenes de compra', 'Presupuesto por partidas'],
-        reglas: [
-          t('Se contabiliza sola si la confianza de cada campo es de al menos {u} y casa con un pedido aprobado', { u: v(POLITICAS.umbralConfianza, 'pct0') }),
-          t('Tolerancia de conciliación: {tol}', { tol: v(POLITICAS.toleranciaConciliacion, 'pct0') }),
-        ],
+        reglas,
         noHecho: [t('No ha pagado la factura.'), t('No ha cambiado el pedido ni el presupuesto.')],
       }
     }
@@ -146,12 +181,12 @@ export const facturaNueva = {
     return {
       bloques: [
         texto(
-          t('{id} de {prov} ({base} sin IVA) no tiene pedido. {contrato} Contabilizarla sin pedido lo decide {rol}.', {
+          t(`{id} de {prov} ({base} sin IVA) no tiene pedido. {contrato} Contabilizarla sin pedido lo decide ${articulo(ROLES.lineProducer) ? 'el ' : ''}{rol}.`, {
             id: v(id, 'id'),
             prov: v(d.proveedor),
             base: v(d.base, 'eurCents'),
             contrato: v(d.contrato ? 'El proveedor tiene contrato marco, así que el gasto está respaldado.' : 'Tampoco hay contrato con el proveedor.'),
-            rol: v(ROLES.lineProducer),
+            rol: v(minuscula(ROLES.lineProducer)),
           }),
         ),
         bloqueDocumento(despues, id, { elegibilidad: true }),
@@ -165,12 +200,12 @@ export const facturaNueva = {
           titulo: t('Contabilizar {id} sin pedido', { id: v(id, 'id') }),
           resumen:
             imp.exceso > 0
-              ? t('Sube el coste estimado final de {p} en {exc}.', { p: v(d.partida, 'id'), exc: v(imp.exceso, 'eur') })
-              : t('Cabe en lo previsto para {p}: el coste estimado final no cambia.', { p: v(d.partida, 'id') }),
-          impacto: [{ etiqueta: `Partida ${d.partida} · gastado`, antes: imp.partida.antes.gastado, despues: imp.partida.despues.gastado, formato: 'eur' }],
+              ? t('Sube el coste estimado final de {p} en {exc}.', { p: v(nombrePartida(despues, d.partida)), exc: v(imp.exceso, 'eur') })
+              : t('Cabe en lo previsto para {p}: el coste estimado final no cambia.', { p: v(nombrePartida(despues, d.partida)) }),
+          impacto: [{ etiqueta: `${nombrePartida(despues, d.partida)} · gastado`, antes: imp.partida.antes.gastado, despues: imp.partida.despues.gastado, formato: 'eur' }],
           acciones: [
-            { id: 'aprobar', etiqueta: 'Contabilizar', variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: id }, rol: ROLES.lineProducer },
-            { id: 'aplazar', etiqueta: 'Dejar en la bandeja', variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: id }, rol: ROLES.lineProducer },
+            { id: 'aprobar', etiqueta: 'Contabilizar', burbuja: `Contabilizo ${id} sin pedido`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: id }, rol: ROLES.lineProducer },
+            { id: 'aplazar', etiqueta: 'Dejar en la bandeja', burbuja: `Dejo ${id} en la bandeja`, variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: id }, rol: ROLES.lineProducer },
           ],
         },
       ],
@@ -186,7 +221,7 @@ export const facturaNueva = {
 
 export const revisarGasto = {
   id: 'revisar_gasto',
-  titulo: 'Gasto dudoso',
+  titulo: 'Gastos por revisar',
   ejemplos: ['¿Qué gastos tengo que revisar?', 'revisa el ticket de la ferretería', 'gastos con baja confianza', 'bandeja de gastos'],
 
   planificar(m) {
@@ -200,7 +235,7 @@ export const revisarGasto = {
       }),
       paso('facturas', t('Compara las partidas posibles'), {
         autonomia: 'propone',
-        salida: t('{a} o {b}', { a: v(c.etiquetaPartida(m, d.partida)), b: v(c.etiquetaPartida(m, d.alternativa)) }),
+        salida: t('{a} o {b}', { a: v(nombrePartida(m, d.partida)), b: v(nombrePartida(m, d.alternativa)) }),
       }),
       paso('excepciones', t('Te lo trae para decidir'), { tipo: 'revision', autonomia: 'propone', salida: t('No se contabiliza sin tu confirmación') }),
     ]
@@ -210,7 +245,7 @@ export const revisarGasto = {
     const dudosos = enBandeja(m).filter((d) => confianzaBaja(d))
     if (!dudosos.length) {
       return {
-        bloques: [texto(t('No queda ningún gasto con confianza baja. Estas son las decisiones abiertas:')), { tipo: 'decisiones' }],
+        bloques: [texto(t('No queda ningún gasto por clasificar. Estas son las decisiones abiertas:')), { tipo: 'decisiones' }],
         sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('Prepárame el informe semanal de coste')],
         fuentes: ['Bandeja de documentos'],
         reglas: [],
@@ -220,13 +255,26 @@ export const revisarGasto = {
     const d = dudosos[0]
     const a = c.impactoNuevoCoste(m, d.partida, d.base, 'gastado')
     const b = c.impactoNuevoCoste(m, d.alternativa, d.base, 'gastado')
+    const pa = nombrePartida(m, d.partida)
+    const pb = nombrePartida(m, d.alternativa)
+    const acciones = [
+      { id: 'confirmar', etiqueta: `Imputar a ${pa}`, burbuja: `Lo imputo a ${pa}`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.partida }, rol: ROLES.revisionHumana },
+      { id: 'alternativa', etiqueta: `Imputar a ${pb}`, burbuja: `Lo imputo a ${pb}`, variante: 'secondary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.alternativa }, rol: ROLES.revisionHumana },
+      { id: 'aplazar', etiqueta: 'Dejar en revisión', burbuja: 'Lo dejo en revisión', variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: d.id }, rol: ROLES.revisionHumana },
+    ]
+    // Sin factura completa no vale para el dossier: se pide desde la misma tarjeta (guion pedir_documentacion).
+    // Esta acción no decide nada: lleva `entrada` en lugar de `accion`.
+    if (faltaDocumentacion(d)) {
+      acciones.push({ id: 'pedir', etiqueta: d.tipo === 'ticket' ? 'Pedir la factura completa' : 'Pedir la documentación', variante: 'secondary', entrada: { tipo: 'texto', texto: d.tipo === 'ticket' ? `Pide a ${d.proveedor} la factura completa` : `Pide a ${d.proveedor} la documentación que falta` }, rol: ROLES.revisionHumana })
+    }
     const bloques = [
       texto(
-        t('No estoy seguro de la partida ({conf}). Las líneas hablan de «{lineas}»: encaja en {pa}, pero también podría ir a {pb}.', {
+        t('No lo tenemos claro: confianza del {conf}, por debajo del {u} que hace falta para decidir solos. Sus líneas dicen {lineas}: encaja en {pa}, pero también podría ir a {pb}.', {
           conf: v(confianzaMinima(d), 'pct0'),
-          lineas: v(d.lineas.join('», «')),
-          pa: v(c.etiquetaPartida(m, d.partida)),
-          pb: v(c.etiquetaPartida(m, d.alternativa)),
+          u: v(POLITICAS.umbralConfianza, 'pct0'),
+          lineas: v(enLista(d.lineas.map((l) => `«${l}»`))),
+          pa: v(pa),
+          pb: v(pb),
         }),
       ),
       bloqueDocumento(m, d.id, { conciliacion: false }),
@@ -240,26 +288,23 @@ export const revisarGasto = {
         titulo: t('¿En qué partida va el gasto de {prov}?', { prov: v(d.proveedor) }),
         resumen:
           a.exceso > 0 && b.exceso === 0
-            ? t('{pa} ya no tiene pendiente: ahí sube el coste estimado final {exc}. En {pb} cabe en lo previsto.', { pa: v(d.partida, 'id'), exc: v(a.exceso, 'eurCents'), pb: v(d.alternativa, 'id') })
+            ? t('{pa} ya no tiene nada por gastar: ahí el coste estimado final sube {exc}. En {pb} cabe en lo previsto.', { pa: v(pa), exc: v(a.exceso, 'eurCents'), pb: v(pb) })
             : t('Elige la partida; el coste se recalcula al confirmar.'),
-        impactoTitulo: 'Según la partida',
+        // Filas cortas: en móvil la etiqueta comparte ancho con dos cifras.
+        impactoTitulo: 'Coste estimado final si va a…',
         impacto: [
-          { etiqueta: `Si va a ${d.partida} · coste estimado final`, antes: a.partida.antes.cef, despues: a.partida.despues.cef, formato: 'eurCents' },
-          { etiqueta: `Si va a ${d.alternativa} · coste estimado final`, antes: b.partida.antes.cef, despues: b.partida.despues.cef, formato: 'eurCents' },
+          { etiqueta: pa, antes: a.partida.antes.cef, despues: a.partida.despues.cef, formato: 'eurCents' },
+          { etiqueta: pb, antes: b.partida.antes.cef, despues: b.partida.despues.cef, formato: 'eurCents' },
         ],
-        acciones: [
-          { id: 'confirmar', etiqueta: `Confirmar ${d.partida}`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.partida }, rol: ROLES.revisionHumana },
-          { id: 'alternativa', etiqueta: `Usar ${d.alternativa}`, variante: 'secondary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.alternativa }, rol: ROLES.revisionHumana },
-          { id: 'aplazar', etiqueta: 'Dejar en revisión', variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: d.id }, rol: ROLES.revisionHumana },
-        ],
+        acciones,
+        nota: d.tipo === 'ticket' ? 'Es un ticket simplificado: para el dossier fiscal hace falta una factura a nombre de la productora.' : undefined,
       },
     ]
-    if (d.tipo === 'ticket') bloques.push(aviso('info', 'Falta la factura completa', t('Es un ticket simplificado: para el dossier fiscal hace falta una factura a nombre de la productora.')))
     return {
       bloques,
-      sugerencias: [sug(`Pide a ${d.proveedor} la factura completa`), sug('¿Han llegado facturas nuevas?'), sug('¿Qué bloquea el dossier fiscal?')],
+      sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('¿Qué bloquea el dossier fiscal?')],
       fuentes: ['Bandeja de documentos', 'Presupuesto por partidas'],
-      reglas: [t('Por debajo del {u} de confianza, el agente propone y una persona confirma', { u: v(POLITICAS.umbralConfianza, 'pct0') })],
+      reglas: [t('Por debajo del {u} de confianza, Facturas propone y una persona confirma', { u: v(POLITICAS.umbralConfianza, 'pct0') })],
       noHecho: [t('No ha contabilizado el gasto.'), t('No ha pedido nada al proveedor.')],
     }
   },
@@ -350,7 +395,7 @@ export const pedirDocumentacion = {
       const candidatos = Object.values(m.documentos).filter(faltaDocumentacion)
       return {
         bloques: [
-          texto(t('¿A qué proveedor escribo? Estos tienen documentación pendiente.')),
+          texto(t('¿A qué proveedor escribimos? Estos tienen documentación pendiente.')),
           { tipo: 'lista', titulo: 'Proveedores con documentación pendiente', items: candidatos.slice(0, 4).map((d) => ({ texto: t('{prov} · {id}', { prov: v(d.proveedor), id: v(d.id, 'id') }), entrada: `Pide a ${d.proveedor} la documentación que falta` })) },
         ],
         sugerencias: candidatos.slice(0, 3).map((d) => sug(`Pide a ${d.proveedor} la documentación que falta`)),
@@ -362,15 +407,15 @@ export const pedirDocumentacion = {
     const d = m.documentos[id]
     if (!faltaDocumentacion(d)) {
       return {
-        bloques: [texto(d.oc ? t('A {id} de {prov} no le falta documentación: casa con el pedido {oc}. No preparo ningún correo.', { id: v(id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') }) : t('A {id} de {prov} no le falta documentación: el proveedor tiene contrato marco. No preparo ningún correo.', { id: v(id, 'id'), prov: v(d.proveedor) }))],
+        bloques: [texto(d.oc ? t('A {id} de {prov} no le falta documentación: cuadra con el pedido {oc}. No preparamos ningún correo.', { id: v(id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') }) : t('A {id} de {prov} no le falta documentación: el proveedor tiene contrato marco. No preparamos ningún correo.', { id: v(id, 'id'), prov: v(d.proveedor) }))],
         sugerencias: [sug('¿Qué bloquea el dossier fiscal?')],
         fuentes: ['Bandeja de documentos', 'Órdenes de compra'],
         reglas: [],
         noHecho: [t('No ha redactado ningún correo.')],
       }
     }
-    const bloques = [aviso('exploratorio', 'Exploratorio', t('Pedir documentación a proveedores es una capacidad posible, sin validar. El agente redacta; el correo lo envías tú.'))]
-    if (det.entidades?.quiereEnviar) bloques.push(texto(t('No envío correos: te dejo el borrador para que lo revises, lo copies y lo envíes tú desde tu correo.')))
+    const bloques = [aviso('exploratorio', 'En exploración', t('En exploración: pedir documentación a proveedores aún no está en Filmpilot. Redactamos el correo; lo envías tú.'))]
+    if (det.entidades?.quiereEnviar) bloques.push(texto(t('No enviamos correos: te dejamos el borrador para que lo revises, lo copies y lo envíes tú desde tu correo.')))
     else bloques.push(texto(t('Borrador para {prov}. Revísalo antes de enviarlo: los campos entre corchetes los tienes que completar.', { prov: v(d.proveedor) })))
     bloques.push({ tipo: 'borrador', id: `BOR-${id}` })
     return {
@@ -378,7 +423,7 @@ export const pedirDocumentacion = {
       sugerencias: [sug('¿Qué bloquea el dossier fiscal?'), sug('¿Qué gastos tengo que revisar?')],
       fuentes: ['Bandeja de documentos', 'Criterios de elegibilidad'],
       reglas: [t('Las comunicaciones externas siempre las confirma una persona')],
-      noHecho: [t('No ha enviado ningún correo.'), t('No ha usado direcciones de correo: el destinatario va por su rol.')],
+      noHecho: [t('No ha enviado ningún correo.')],
     }
   },
 }

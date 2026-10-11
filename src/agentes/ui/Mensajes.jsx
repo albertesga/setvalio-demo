@@ -5,13 +5,44 @@ import { IconChevronDown, IconBell, IconStop, IconArrowDown } from '../../compon
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { AGENTES } from '../agentes.js'
 import { PERSONAS } from '../mundo.js'
+import { RECORRIDO } from '../casos.js'
 import { fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, StatusChip, nombresCortos } from './Piezas.jsx'
-import { Bloque, aprobacionPendiente } from './Bloques.jsx'
+import { Bloque, aprobacionPendiente, bloquePrincipal } from './Bloques.jsx'
 
 function nombresAgentes(ids) {
   return ids.filter((a) => a !== 'orquestador').map((a) => AGENTES[a].nombre)
+}
+
+// Acciones que no cambian nada que deshacer: recibir una novedad o redactar un borrador.
+const SIN_EFECTO = new Set(['evento/recibir', 'borrador/crear'])
+
+/** Quién hizo lo que se puede deshacer en un turno automático (p. ej. Conciliación al contabilizar). */
+function agenteQueActuo(turno) {
+  const pasos = turno.pasos.filter((p) => p.agente !== 'orquestador' && p.muta)
+  const p = [...pasos].reverse().find((x) => x.acciones?.some((a) => !SIN_EFECTO.has(a.tipo))) ?? pasos[pasos.length - 1]
+  return p ? AGENTES[p.agente].nombre : 'los agentes'
+}
+
+const reducido = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/** Deja el inicio de la respuesta arriba del hilo y le pasa el foco sin otro desplazamiento. */
+function mostrarTitulo(tituloId, { desplazar = true } = {}) {
+  // Dos fotogramas: el primero pinta los bloques que acaban de salir; el segundo ya los mide.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const h = document.getElementById(tituloId)
+      if (!h) return
+      const art = h.closest('article')
+      const hilo = art?.closest('.ag-scroll')
+      if (desplazar && art && hilo) {
+        const top = art.getBoundingClientRect().top - hilo.getBoundingClientRect().top + hilo.scrollTop - 12
+        hilo.scrollTo({ top, behavior: 'auto' })
+      }
+      h.focus({ preventScroll: true })
+    }),
+  )
 }
 
 /** Línea de trabajo: cada paso con su agente, autonomía y estado. */
@@ -27,12 +58,16 @@ function LineaTrabajo({ msg }) {
           <li key={p.id} className={`ag-linea-paso is-${estado}`}>
             <AgentAvatar id={p.agente} size={28} trabajando={estado === 'en_curso'} />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm font-medium text-flp-ink">{a.nombre}</span>
-                {conPrevio && <span className="ag-paralelo">a la vez</span>}
-                {p.autonomia !== 'ejecuta' && <AutonomyBadge nivel={p.autonomia} />}
+              <div className="flex items-center gap-x-2">
+                <span className="min-w-0 truncate text-sm font-medium text-flp-ink">{a.nombre}</span>
+                {conPrevio && <span className="flex-none text-xs text-flp-muted">· a la vez</span>}
+                <StatusChip estado={estado} className="ml-auto flex-none" />
               </div>
               <div className="text-sm text-flp-muted">
+                <span className="mr-1.5 inline-flex align-middle">
+                  <AutonomyBadge nivel={p.autonomia} compacto />
+                </span>
+                <span aria-hidden="true">· </span>
                 <Tx value={p.titulo} />
               </div>
               {estado === 'hecho' && p.salida && (
@@ -41,7 +76,6 @@ function LineaTrabajo({ msg }) {
                 </div>
               )}
             </div>
-            <StatusChip estado={estado} />
           </li>
         )
       })}
@@ -143,7 +177,7 @@ function CabeceraSaludo({ msg, tituloId, enCurso, onSaltar, onDetener }) {
           )}
         </p>
         {enCurso ? (
-          <div className="flex flex-none gap-2">
+          <div className="ag-msg-controles">
             <button type="button" className="ag-boton-fila" onClick={onSaltar}>
               Saltar al resultado
             </button>
@@ -160,104 +194,167 @@ function CabeceraSaludo({ msg, tituloId, enCurso, onSaltar, onDetener }) {
 }
 
 function MensajeAgentes({ msg, ultimo }) {
-  const { despachar, deshacible, ocupado, mundo } = useCtx()
+  const { despachar, deshacible, ocupado, mundo, enRecorrido } = useCtx()
+  const [detalle, setDetalle] = useState(false)
   const t = msg.turno
   const enCurso = msg.estado === 'en_curso'
   const bloques = t.bloques.slice(0, msg.bloquesVisibles)
   const tituloId = `${msg.id}-titulo`
-  const enfocarTitulo = () => requestAnimationFrame(() => document.getElementById(tituloId)?.focus())
   // Al terminar: cuántas decisiones de esta respuesta siguen esperando a una persona.
   const porDecidir = !enCurso && msg.estado === 'hecho' ? t.bloques.filter((b) => aprobacionPendiente(mundo, b)).length : 0
+  // El amarillo, en un solo bloque de la respuesta.
+  const principal = bloquePrincipal(mundo, bloques)
+  const automatico = msg.origen === 'evento'
+  const puedeDeshacer = !enCurso && deshacible === msg.id && !msg.deshecho
+  const quien = automatico ? agenteQueActuo(t) : null
+  // Una novedad que llega sola y no pide nada cabe en una línea: lo hecho y «Ver detalle».
+  // En el recorrido se enseña entera, porque es lo que el paso quiere enseñar.
+  // Se decide al llegar: lo que llegó en el recorrido no se pliega al salir de él.
+  const [llegoEnRecorrido] = useState(enRecorrido)
+  const plegado = automatico && !!t.resumen && msg.estado === 'hecho' && porDecidir === 0 && !detalle && !llegoEnRecorrido
+
   const irADecision = () => {
     const tarjeta = document.querySelector(`#msg-${msg.id} .ag-aprobacion:not(.is-decidida)`)
     if (!tarjeta) return
-    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    tarjeta.scrollIntoView({ block: 'start', behavior: reducido ? 'auto' : 'smooth' })
+    tarjeta.scrollIntoView({ block: 'start', behavior: reducido() ? 'auto' : 'smooth' })
+    tarjeta.querySelector('h4')?.focus({ preventScroll: true })
+  }
+  // Tras deshacer, la tarjeta que se decidió vuelve a estar abierta más arriba.
+  const volverADecidir = () => {
+    const art = document.getElementById(`msg-${msg.id}`)
+    if (!art) return
+    const antes = [...document.querySelectorAll('.ag-aprobacion:not(.is-decidida)')].filter((x) => x.compareDocumentPosition(art) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const tarjeta = antes[antes.length - 1]
+    if (!tarjeta) return
+    tarjeta.scrollIntoView({ block: 'center', behavior: reducido() ? 'auto' : 'smooth' })
     tarjeta.querySelector('h4')?.focus({ preventScroll: true })
   }
   const saltar = () => {
     despachar({ tipo: 'saltar' })
-    enfocarTitulo()
+    mostrarTitulo(tituloId)
   }
   const detener = () => {
     despachar({ tipo: 'detener' })
-    enfocarTitulo()
+    mostrarTitulo(tituloId)
   }
+  const deshacer = () => {
+    despachar({ tipo: 'deshacer', mensajeId: msg.id })
+    mostrarTitulo(tituloId, { desplazar: false })
+  }
+  // Al desplegar, el foco pasa al título de la respuesta entera (el botón deja de existir).
+  const verDetalle = () => {
+    setDetalle(true)
+    mostrarTitulo(tituloId, { desplazar: false })
+  }
+
+  if (plegado) {
+    return (
+      <article id={`msg-${msg.id}`} className={`ag-msg-agentes ag-msg-plegado ${msg.deshecho ? 'is-deshecho' : ''}`} aria-labelledby={tituloId}>
+        <span className="ag-msg-novedad-icono" aria-hidden="true">
+          <IconBell size={15} />
+        </span>
+        <h3 id={tituloId} tabIndex={-1} className="ag-msg-plegado-texto focus:outline-none">
+          {msg.deshecho ? <strong className="font-medium">Deshecho: </strong> : <span className="sr-only">Novedad de las {msg.hora}: </span>}
+          <Tx value={t.resumen} />
+        </h3>
+        <span className="ag-msg-plegado-acciones">
+          <button type="button" className="ag-link" aria-expanded={false} onClick={verDetalle}>
+            Ver detalle
+          </button>
+          {puedeDeshacer && (
+            <button type="button" className="ag-link" disabled={ocupado} onClick={deshacer}>
+              Deshacer<span className="sr-only"> lo que hizo {quien}</span>
+            </button>
+          )}
+        </span>
+      </article>
+    )
+  }
+
   return (
     <article id={`msg-${msg.id}`} className={`ag-msg-agentes ${msg.origen === 'saludo' ? 'ag-msg-saludo' : ''} ${msg.deshecho ? 'is-deshecho' : ''}`} aria-labelledby={tituloId} aria-busy={enCurso || undefined}>
       {msg.origen === 'saludo' ? (
         <CabeceraSaludo msg={msg} tituloId={tituloId} enCurso={enCurso} onSaltar={saltar} onDetener={detener} />
       ) : (
-      <header className="flex items-center gap-2.5">
-        <AgentAvatar id="orquestador" size={32} trabajando={enCurso} />
-        <div className="min-w-0 flex-1">
-          <h3 id={tituloId} tabIndex={-1} className="text-base font-medium leading-snug text-flp-ink focus:outline-none">
-            {t.titulo}
-          </h3>
-          <p className="text-xs text-flp-muted">
-            <span className="tnum">{msg.hora}</span> · {msg.origen === 'evento' ? 'Novedad que llega sola' : msg.origen === 'accion' ? 'Los agentes aplican tu decisión' : 'Orquestador'}
-            {msg.deshecho && <strong className="font-semibold text-flp-ink"> · Deshecho</strong>}
-          </p>
-          {ultimo && msg.estado === 'hecho' && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <StatusChip estado="hecho" />
-              {porDecidir > 0 && (
-                <button type="button" className="ag-link ag-link--salto" onClick={irADecision}>
-                  {porDecidir === 1 ? '1 decisión para ti' : `${porDecidir} decisiones para ti`} <IconArrowDown size={14} aria-hidden="true" />
-                </button>
-              )}
+        <header className="ag-msg-cab">
+          <AgentAvatar id="orquestador" size={32} trabajando={enCurso} />
+          <div className="min-w-0 flex-1">
+            {t.proyecto && (
+              <p className="flp-kicker text-flp-muted">
+                Otro proyecto · {t.proyecto.titulo}
+                {t.proyecto.productora ? ` (${t.proyecto.productora})` : ''}
+                {t.proyecto.estado ? ` · ${t.proyecto.estado}` : ''}
+              </p>
+            )}
+            <h3 id={tituloId} tabIndex={-1} className="ag-msg-titulo focus:outline-none">
+              {msg.deshecho ? `Deshecho: ${t.titulo}` : t.titulo}
+            </h3>
+            <p className="text-xs text-flp-muted">
+              <span className="tnum">{msg.hora}</span> · {automatico ? 'Novedad que llega sola' : msg.origen === 'accion' ? 'Los agentes aplican tu decisión' : 'Orquestador'}
+            </p>
+            {ultimo && msg.estado === 'hecho' && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <StatusChip estado="hecho" />
+                {porDecidir > 0 && !enRecorrido && (
+                  <button type="button" className="ag-salto-decision" onClick={irADecision}>
+                    <span className="flp-state flp-state--review">
+                      {porDecidir === 1 ? '1 decisión aquí' : `${porDecidir} decisiones aquí`} <IconArrowDown size={13} aria-hidden="true" />
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {enCurso && (
+            <div className="ag-msg-controles">
+              <button type="button" className="ag-boton-fila" onClick={saltar}>
+                Saltar al resultado
+              </button>
+              <button type="button" className="ag-boton-fila" onClick={detener}>
+                <IconStop size={14} aria-hidden="true" /> Detener
+              </button>
             </div>
           )}
-        </div>
-        {enCurso && (
-          <div className="flex flex-none gap-2">
-            <button type="button" className="ag-boton-fila" onClick={saltar}>
-              Saltar al resultado
-            </button>
-            <button type="button" className="ag-boton-fila" onClick={detener}>
-              <IconStop size={14} aria-hidden="true" /> Detener
-            </button>
-          </div>
-        )}
-      </header>
+        </header>
       )}
 
-      {enCurso ? (
+      {enCurso && (
         <div className="mt-3">
           <LineaTrabajo msg={msg} />
-        </div>
-      ) : (
-        <div className="mt-3">
-          <Traza msg={msg} />
         </div>
       )}
 
       {msg.estado === 'detenido' && <p className="mt-3 text-sm text-flp-muted">Detenido. Los pasos completados quedan registrados; el resto no se ha hecho.</p>}
 
+      {msg.deshecho && msg.origen === 'accion' && (
+        <button type="button" className="ag-link ag-volver" onClick={volverADecidir}>
+          Volver a decidir&nbsp;<span aria-hidden="true">↑</span>
+        </button>
+      )}
+
       {bloques.length > 0 && (
         <div className="ag-bloques">
           {bloques.map((b) => (
             <div key={b.clave} className="ag-bloque-entrada">
-              <Bloque b={b} mensajeId={msg.id} />
+              <Bloque b={b} mensajeId={msg.id} principal={b.clave === principal} />
             </div>
           ))}
         </div>
       )}
 
-      {!enCurso && deshacible === msg.id && !msg.deshecho && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-flp-muted">
-          <span>¿No era esto?</span>
-          <FilmpilotButton
-            size="sm"
-            variant="secondary"
-            disabled={ocupado}
-            onClick={() => {
-              despachar({ tipo: 'deshacer', mensajeId: msg.id })
-              enfocarTitulo()
-            }}
-          >
-            Deshacer esta decisión
+      {puedeDeshacer && (
+        <div className="ag-deshacer">
+          <span>{automatico ? '¿Prefieres revisarla tú?' : '¿No era esto?'}</span>
+          <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={deshacer}>
+            {automatico ? `Deshacer lo que hizo ${quien}` : 'Deshacer esta decisión'}
           </FilmpilotButton>
+        </div>
+      )}
+
+      {/* Cómo lo han hecho: al final, tras la respuesta. Mientras trabajan, la línea va arriba. */}
+      {!enCurso && (
+        <div className="mt-3">
+          <Traza msg={msg} />
         </div>
       )}
     </article>
@@ -310,15 +407,16 @@ function MensajeNovedad({ msg, ultimaNovedad }) {
   )
 }
 
+/** Inicio de un paso del recorrido: un separador fino. La nota vive en la barra del recorrido. */
 function MensajeGuia({ msg }) {
+  // El paso sin entrada (el parte) ya está arriba: un separador debajo señalaría a nada.
+  if (RECORRIDO[msg.indice]?.entrada === null) return null
   return (
-    <div className="ag-msg-guia" role="note">
-      <span className="flp-kicker text-flp-muted">
-        Recorrido guiado · paso {msg.indice + 1} de {msg.total}
+    <p className="ag-msg-guia flp-kicker">
+      <span>
+        Paso <span className="tnum">{msg.indice + 1}</span> de <span className="tnum">{msg.total}</span> · {msg.arco ?? msg.titulo}
       </span>
-      <strong className="mt-0.5 block text-sm text-flp-ink">{msg.titulo}</strong>
-      <p className="mt-1 text-sm leading-relaxed text-flp-muted">{msg.nota}</p>
-    </div>
+    </p>
   )
 }
 

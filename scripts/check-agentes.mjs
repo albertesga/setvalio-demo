@@ -28,6 +28,7 @@ import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/pro
 import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, SENALES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
 import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER } from '../src/screens/portada/datos.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
+import { REGLA_COMUN } from '../src/agentes/escenarios/conversacion.js'
 import { CASHFLOW } from '../src/lib/data.js'
 import { diasEntre } from '../src/agentes/texto.js'
 import { eur } from '../src/lib/format.js'
@@ -242,8 +243,17 @@ test('el informe semanal cuenta lo que dice data.js', () => {
   cerca(t.cef, TOTALES.cef)
   cerca(t.gastado, TOTALES.gastado + mundoBase.documentos['F-2026-067'].base)
   assert.ok(r.mundo.informes.R1, 'genera el informe')
-  const kpis = r.turno.bloques.find((b) => b.tipo === 'kpis')
-  cerca(kpis.items.find((k) => k.id === 'cef').valor, TOTALES.cef)
+  assert.ok(!r.turno.bloques.some((b) => b.tipo === 'kpis'), 'la hoja del informe ya lleva las cifras')
+  cerca(r.mundo.informes.R1.totales.cef, TOTALES.cef)
+  const doc = responder(r.mundo, { tipo: 'texto', texto: 'Procesa la factura F-2026-067' }).turno.bloques.find((b) => b.tipo === 'documento')
+  assert.equal(doc.conciliacion.resultado, 'ok', 'la factura del informe cuadra con su pedido')
+})
+test('la factura que llega sola (EV-01) cuadra con su pedido y el turno trae resumen', () => {
+  const r = responder(mundoBase, { tipo: 'evento', eventoId: 'EV-01' })
+  const doc = r.turno.bloques.find((b) => b.tipo === 'documento' && b.docId === 'F-2026-078')
+  assert.equal(doc.conciliacion.resultado, 'ok')
+  assert.equal(doc.conciliacion.diferencia, 0)
+  assert.ok(r.turno.resumen, 'resumen para la línea plegada')
 })
 
 // ── 4. Transiciones ──────────────────────────────────────────────────────────
@@ -378,6 +388,11 @@ test('las decisiones de cada tarjeta producen un turno válido', () => {
     for (const b of r.turno.bloques.filter((x) => x.tipo === 'aprobacion')) {
       for (const a of b.acciones) {
         const base = r.mundo
+        if (a.entrada) {
+          assert.notEqual(responder(base, a.entrada).turno.intencion, 'no_entendido', `${b.id}/${a.id}`)
+          continue
+        }
+        if (!a.accion) continue
         const res = responder(base, { tipo: 'accion', accion: { ...a.accion, por: 'Prueba' } })
         revisarTurno(res.turno, `${b.id}/${a.id}`)
       }
@@ -711,7 +726,7 @@ test('acciones de riesgo que no proceden devuelven el mismo mundo', () => {
   assert.equal(reducir(frio, { tipo: 'riesgo/mitigar', riesgoId: 'RG-3' }), frio)
   assert.equal(reducir(frio, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 0 }), frio)
 })
-test('borradores y radar sin cifras escritas a mano; turnos con «Exploratorio» y sin envíos', () => {
+test('borradores y radar sin cifras escritas a mano; turnos «En exploración» y sin envíos', () => {
   const mundos = [mundoBase]
   let m = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-LLUVIA' })
   m = reducir(m, { tipo: 'evento/recibir', eventoId: 'EV-CITACION' })
@@ -724,6 +739,7 @@ test('borradores y radar sin cifras escritas a mano; turnos con «Exploratorio»
     revisarTurno(r.turno, texto)
     assert.equal(r.turno.bloques[0].tipo, 'aviso', `${texto}: empieza con el aviso`)
     assert.equal(r.turno.bloques[0].tono, 'exploratorio')
+    assert.match(renderTexto(r.turno.bloques[0].texto), /^En exploración/)
     assert.ok(r.turno.noHecho.some((n) => /No ha enviado/.test(renderTexto(n))))
     for (const b of Object.values(r.mundo.borradores)) for (const p of plantillas(b)) assert.ok(!/\d/.test(p.plantilla), `borrador: «${p.plantilla}»`)
   }
@@ -760,9 +776,11 @@ test('con una reserva aprobada, la tarjeta nueva enseña el coste final que de v
   const tj = r.turno.bloques.find((b) => b.tipo === 'aprobacion')
   const fila = (txt) => tj.impacto.find((f) => f.etiqueta.startsWith(txt))
   const tras = (accion) => c.totales(reducir(m, accion)).cef
-  cerca(fila('Reservar').despues, tras(tj.acciones.find((a) => a.id === 'reservar').accion))
+  cerca(fila('Apartar').despues, tras(tj.acciones.find((a) => a.id === 'reservar').accion))
   cerca(fila('Cambiar').despues, tras(tj.acciones.find((a) => a.id === 'aprobar').accion))
   cerca(fila('Asumir').despues, tras(tj.acciones.find((a) => a.id === 'rechazar').accion))
+  for (const f of tj.impacto) cerca(c.totales(m).cef + f.cambio, f.despues, f.etiqueta)
+  assert.ok(tj.acciones.every((a) => a.burbuja), 'cada botón dice qué contesta')
 })
 test('la tarjeta del parte caduca cuando cambia la previsión y no deja volver a un importe antiguo', () => {
   const parte = responder(mundoBase, { tipo: 'texto', texto: '¿Qué riesgos hay para las próximas jornadas?' })
@@ -814,7 +832,7 @@ test('el informe se desactualiza con reservas o riesgos altos nuevos, y las desv
 })
 test('preguntas por jornadas: la que tiene riesgo, una sin riesgo, una ya rodada y una fuera del plan', () => {
   const sin = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 19?' })
-  assert.match(renderTexto(sin.turno.bloques.find((b) => b.tipo === 'texto').texto), /Jornada 19.*No veo riesgos/)
+  assert.match(renderTexto(sin.turno.bloques.find((b) => b.tipo === 'texto').texto), /Jornada 19.*No vemos riesgos/)
   const hecha = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 4?' }, { ultimaIntencion: 'riesgos' })
   assert.match(renderTexto(hecha.turno.bloques.find((b) => b.tipo === 'texto').texto), /ya se rodó/)
   const fuera = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 25?' }, { ultimaIntencion: 'riesgos' })
@@ -927,32 +945,39 @@ test('el parte cuenta el día 7 de 20 con las cifras del mundo', () => {
   revisarTurno(r.turno, 'parte de la mañana')
   const lead = r.turno.bloques.find((b) => b.tipo === 'texto' && b.destacado)
   const txt = textoDe(lead)
-  assert.match(txt, /jornada 7 en Madrid centro/)
-  assert.match(txt, /van 6 de 20/)
+  assert.match(txt, /Hoy se rueda en Madrid centro/)
   assert.match(txt, /viernes 19 de junio/)
   assert.ok(txt.includes(eur(TOTALES.cef)), 'coste estimado final')
-  assert.match(txt, /solo Escenografía pasa del umbral/)
+  assert.match(txt, /solo Escenografía se pasa del límite/)
   assert.match(txt, /jornada 8 de mañana, un exterior con un 80\s%/)
-  const kpis = Object.fromEntries(r.turno.bloques.find((b) => b.tipo === 'kpis').items.map((k) => [k.id, k.valor]))
-  cerca(kpis.cef, TOTALES.cef)
-  cerca(kpis.gastado, TOTALES.gastado)
-  cerca(kpis.caja, SALDO_HOY)
-  assert.equal(kpis.revisar, 8)
-  for (const tipo of ['tira', 'agenda', 'equipo']) assert.ok(r.turno.bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
-  assert.ok(!r.turno.bloques.some((b) => b.tipo === 'semana'), 'sin la semana: la tira ya la enseña')
+  const bloques = r.turno.bloques
+  const kpis = bloques.find((b) => b.tipo === 'kpis')
+  assert.deepEqual(kpis.items.map((k) => k.id), ['cef', 'caja'], 'dos cifras: coste final y caja')
+  cerca(kpis.items[0].valor, TOTALES.cef)
+  cerca(kpis.items[1].valor, SALDO_HOY)
+  assert.equal(bloques[0].tipo, 'bienvenida', 'el parte abre con la bienvenida')
+  for (const tipo of ['bienvenida', 'hecho', 'agenda', 'tira']) assert.ok(bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
+  for (const tipo of ['equipo', 'semana']) assert.ok(!bloques.some((b) => b.tipo === tipo), `sin bloque ${tipo}`)
+  const hecho = bloques.find((b) => b.tipo === 'hecho')
+  assert.ok(hecho.items.length <= 3)
+  assert.match(renderTexto(hecho.items[0].texto), /contabilizó 5 facturas que cuadran con su pedido · 76\.958\s€/)
+  assert.deepEqual(r.turno.sugerencias, [], 'el parte no lleva preguntas de cierre')
+  assert.ok(!responder(mundoBase, { tipo: 'texto', texto: 'Ponme al día' }).turno.bloques.some((b) => b.tipo === 'bienvenida'), 'la bienvenida solo al abrir')
+  const vistos = JSON.stringify(bloques.map((b) => (b.tipo === 'agenda' ? b.items.map((i) => i.capacidad) : b)))
+  assert.equal((vistos.match(/exploratoria|En exploración/g) ?? []).length, 1, '«En exploración» una sola vez, en la lluvia')
 })
-test('«Para hoy»: lluvia de mañana, avisos, compras y certificado, en ese orden', () => {
+test('«Para hoy»: lluvia de mañana, compras y certificado; los avisos, aparte', () => {
   const ag = agendaDelDia(mundoBase)
-  assert.deepEqual(ag.items.map((i) => i.id), ['riesgo-RG-1', 'avisos', 'compras', 'dossier-DOS-01'])
-  assert.deepEqual(ag.items[1].subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
-  assert.deepEqual(ag.items[2].subitems.map((s) => s.id), ['OC-105', 'OC-106'])
-  assert.match(renderTexto(ag.items[0].cuando), /antes de publicar su orden del día/)
-  assert.match(renderTexto(ag.items[3].detalle), /620\.000\s€/)
-  assert.equal(ag.resto, 5)
+  assert.deepEqual(ag.items.map((i) => i.id), ['riesgo-RG-1', 'compras', 'dossier-DOS-01'])
+  assert.deepEqual(ag.items[1].subitems.map((s) => s.id), ['OC-105', 'OC-106'])
+  assert.deepEqual(ag.avisos.subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
+  assert.match(renderTexto(ag.items[0].cuando), /antes de publicar la orden del día de mañana/)
+  assert.match(renderTexto(ag.items[2].detalle), /620\.000\s€/)
+  assert.equal(ag.resto, 5, 'decisiones que no caben en «Para hoy»; los avisos no cuentan')
 })
 test('cada botón del parte lleva a un guion que lo resuelve', () => {
   const ag = agendaDelDia(mundoBase)
-  const entradas = ag.items.flatMap((i) => [...(i.acciones ?? []).map((a) => a.entrada), ...(i.subitems ?? []).map((s) => s.entrada), i.entrada])
+  const entradas = [...ag.items.flatMap((i) => [...(i.acciones ?? []).map((a) => a.entrada), ...(i.subitems ?? []).map((s) => s.entrada), i.entrada]), ...(ag.avisos?.subitems ?? []).map((s) => s.entrada)].filter(Boolean)
   for (const e of [...new Set(entradas), ...Object.values(PREGUNTAS_PARTE), '¿Qué tengo que revisar?']) {
     const r = responder(mundoBase, { tipo: 'texto', texto: e })
     assert.ok(!['no_entendido', 'desambiguar'].includes(r.turno.intencion), `${e} → ${r.turno.intencion}`)
@@ -966,12 +991,73 @@ test('lo decidido sale de «Para hoy» y el parte se rehace con lo que queda', (
   m = reducir(m, { tipo: 'orden/rechazar', ocId: 'OC-106', por: 'Marta Cobo' })
   const ag = agendaDelDia(m)
   assert.ok(!ag.items.some((i) => i.id === 'riesgo-RG-1' || i.id === 'compras'))
-  assert.equal(ag.items[0].id, 'avisos')
+  assert.deepEqual(ag.items.map((i) => i.id), ['dossier-DOS-01'])
+  assert.ok(ag.avisos, 'los avisos siguen aparte')
   const r = responder(m, { tipo: 'texto', texto: 'Ponme al día' })
   revisarTurno(r.turno, 'parte pedido')
   assert.equal(r.turno.intencion, 'saludo')
   assert.match(textoDe(r.turno.bloques[0]), /El parte del día 7 de rodaje/)
-  assert.match(textoDe(r.turno.bloques.find((b) => b.destacado)), /Lo primero hoy: preparar 3 avisos/)
+  assert.match(textoDe(r.turno.bloques.find((b) => b.destacado)), /Lo primero hoy: tener listo el certificado cultural ICAA, que vence el viernes 5 de junio/)
+})
+
+// ── 12. Vocabulario y casos simplificados ────────────────────────────────────
+console.log('Vocabulario y casos')
+function textosVisibles(x, out = []) {
+  if (Array.isArray(x)) x.forEach((y) => textosVisibles(y, out))
+  else if (esPlantilla(x)) out.push(renderTexto(x))
+  else if (typeof x === 'string') out.push(x)
+  else if (x && typeof x === 'object') Object.values(x).forEach((y) => textosVisibles(y, out))
+  return out
+}
+// Valores internos que no se enseñan (tono del aviso, id del estado del informe).
+const INTERNOS = new Set(['exploratorio', 'exploratoria', 'consolidado'])
+const PALABRAS_VIEJAS = /umbral|consolidad|Exploratorio|Sin validar|Fase posterior/i
+test('ningún turno enseña «umbral», «consolidado», «Exploratorio», «Sin validar» ni «Fase posterior»', () => {
+  let avanzado = mundoBase
+  for (const a of [{ tipo: 'evento/recibir', eventoId: 'EV-01' }, { tipo: 'evento/recibir', eventoId: 'EV-02' }, { tipo: 'documento/contabilizar', docId: 'G-004' }, { tipo: 'informe/generar' }]) avanzado = reducir(avanzado, a)
+  const malos = []
+  const revisar = (tu, origen) => {
+    for (const s of textosVisibles([tu.titulo, tu.pasos.map((p) => [p.titulo, p.salida]), tu.bloques, tu.reglas, tu.noHecho, tu.sugerencias, tu.resumen])) {
+      if (!INTERNOS.has(s) && PALABRAS_VIEJAS.test(s)) malos.push(`${origen}: ${s}`)
+    }
+  }
+  for (const m of [mundoBase, avanzado]) {
+    for (const [id, esc] of Object.entries(ESCENARIOS)) for (const texto of esc.ejemplos ?? []) revisar(responder(m, { tipo: 'texto', texto }).turno, `${id} · ${texto}`)
+  }
+  for (const e of ['EV-01', 'EV-02', 'EV-03', 'EV-LLUVIA', 'EV-CITACION']) revisar(responder(mundoBase, { tipo: 'evento', eventoId: e }).turno, e)
+  revisar(responder(mundoBase, { tipo: 'saludo', persona: 'marta' }).turno, 'parte')
+  assert.deepEqual([...new Set(malos)], [])
+})
+test('compras: la prosa nombra el cargo con artículo, sin tabla y cada botón dice qué contesta', () => {
+  const m = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-02' })
+  for (const texto of ['Revisa la orden de compra OC-104', 'Revisa la orden de compra OC-105', '¿Qué órdenes de compra tengo pendientes?']) {
+    const r = responder(m, { tipo: 'texto', texto })
+    const prosa = r.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' ')
+    assert.ok(!/(la aprueba|visto bueno de) (Producción|Line)|de line producer/.test(prosa), `${texto}: ${prosa}`)
+    assert.ok(!r.turno.bloques.some((b) => b.tipo === 'tabla'), `${texto}: sin tabla`)
+    for (const tj of r.turno.bloques.filter((b) => b.tipo === 'aprobacion')) {
+      assert.ok(tj.acciones.filter((a) => a.accion).every((a) => a.burbuja), `${tj.id}: burbuja`)
+      if (texto.startsWith('Revisa')) assert.equal(tj.motivos?.length ?? 0, 0, `${tj.id}: la frase de encima ya da los motivos`)
+    }
+  }
+})
+test('Itsasoa es otro proyecto: el turno lo nombra y ofrece volver a La última función', () => {
+  for (const texto of ['Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa', 'Optimiza los proveedores de la propuesta', 'Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €']) {
+    const r = responder(mundoBase, { tipo: 'texto', texto })
+    assert.equal(r.turno.proyecto?.titulo, 'Itsasoa', texto)
+    assert.ok(r.turno.sugerencias.some((s) => s.etiqueta === 'Volver a La última función'), `${texto}: volver`)
+  }
+  const o = responder(mundoBase, { tipo: 'texto', texto: 'Optimiza los proveedores de la propuesta' })
+  const ap = o.turno.bloques.find((b) => b.tipo === 'aprobacion')
+  assert.ok(textosVisibles(ap).some((s) => s.includes(REGLA_COMUN)), 'la tarjeta de llamadas recuerda la regla común')
+})
+test('la interfaz no enseña el vocabulario retirado', () => {
+  const dir = new URL('../src/agentes/ui/', import.meta.url)
+  const VIEJOS = ['Fuera de umbral', 'Cerca del umbral', 'Consolidada', 'Exploratorio', 'Sin validar', 'Fase posterior', 'Descargar (no disponible', 'como se explica más arriba']
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.jsx'))) {
+    const src = readFileSync(new URL(f, dir), 'utf8')
+    for (const v of VIEJOS) assert.ok(!src.includes(v), `${f}: «${v}»`)
+  }
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

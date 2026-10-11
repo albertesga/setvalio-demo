@@ -2,9 +2,12 @@
 
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconArrowUp, IconClock } from '../../components/icons.jsx'
+import { IconArrowUp, IconChevronDown } from '../../components/icons.jsx'
 
-/** Sugerencias para seguir: van al final de la última respuesta, no en el pie fijo. */
+/**
+ * Sugerencias para seguir: van al final de la última respuesta, no en el pie fijo.
+ * items = sugerenciasDe(s); onElegir recibe la sugerencia entera (envía `entrada` si la trae).
+ */
 export function Sugerencias({ items, onElegir, deshabilitado }) {
   if (!items.length) return null
   return (
@@ -14,7 +17,7 @@ export function Sugerencias({ items, onElegir, deshabilitado }) {
       </h3>
       <div className="ag-sugerencias">
         {items.map((x) => (
-          <button key={x.texto} type="button" className="ag-sugerencia" onClick={() => onElegir(x.texto)} disabled={deshabilitado}>
+          <button key={x.texto} type="button" className="ag-sugerencia" onClick={() => onElegir(x)} disabled={deshabilitado} title={x.etiqueta !== x.texto ? x.texto : undefined}>
             {x.etiqueta}
           </button>
         ))}
@@ -61,7 +64,7 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
       }}
     >
       <label htmlFor="ag-entrada" className="sr-only">
-        Pregunta a los agentes
+        Pide algo a los agentes
       </label>
       <textarea
         id="ag-entrada"
@@ -74,7 +77,7 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
         }}
         onFocus={() => onEscribir?.()}
         onKeyDown={onKeyDown}
-        placeholder="Pregunta a los agentes… por ejemplo, ¿por qué se desvía Viajes?"
+        placeholder="Pide algo a los agentes…"
         className="ag-redactor-campo"
         autoComplete="off"
         enterKeyHint="send"
@@ -86,39 +89,79 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
   )
 }
 
-/** Barra fija del recorrido: dice en qué paso estás y qué mirar, sin tener que subir a buscarlo. */
-export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, onSiguiente, onSalir }, ref) {
+/** Lleva a la tarjeta que espera la decisión del paso y le pasa el foco. */
+function irALaTarjeta(espera) {
+  const abiertas = [...document.querySelectorAll(`.ag-aprobacion[data-ref="${espera.tipo}-${espera.id}"]:not(.is-decidida)`)]
+  const t = abiertas[abiertas.length - 1] ?? [...document.querySelectorAll('.ag-aprobacion:not(.is-decidida)')].pop()
+  if (!t) return
+  const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  // Con un poco de aire arriba: la tarjeta no queda pegada a la barra del recorrido.
+  const hilo = t.closest('.ag-scroll')
+  if (hilo) hilo.scrollTo({ top: t.getBoundingClientRect().top - hilo.getBoundingClientRect().top + hilo.scrollTop - 16, behavior: reducido ? 'auto' : 'smooth' })
+  else t.scrollIntoView({ block: 'start', behavior: reducido ? 'auto' : 'smooth' })
+  const foco = t.querySelector('h4') ?? t
+  if (!foco.hasAttribute('tabindex') && foco.tabIndex < 0) foco.setAttribute('tabindex', '-1')
+  foco.focus({ preventScroll: true })
+}
+
+/**
+ * Barra fija del recorrido: en qué paso estás y qué mirar, sin subir a buscarlo.
+ * En móvil ocupa una línea («2/6 · Lo hace solo») y la nota se abre al tocarla;
+ * en escritorio, la nota va entera.
+ */
+export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, ocupado, onSiguiente, onSalir }, ref) {
+  const [nota, setNota] = useState(false)
+  // Cada paso empieza con la nota plegada en móvil.
+  const indice = tour?.indice
+  useEffect(() => setNota(false), [indice])
   if (!tour) return null
+  const { paso } = tour
   const bloqueado = !tour.puedeAvanzar
-  const esperaDecision = bloqueado && tour.paso.espera
+  // Si espera una decisión y los agentes ya han terminado, el botón lleva a la tarjeta.
+  const esperaDecision = bloqueado && !ocupado && !!paso.espera
+  const n = tour.indice + 1
   return (
-    <div ref={ref} tabIndex={-1} className="ag-tourbar flp-dark" role="region" aria-label="Recorrido guiado">
-      <div className="min-w-0 flex-1">
-        <span className="flp-kicker text-flp-muted">
-          Recorrido guiado · paso <span className="tnum">{tour.indice + 1}</span> de <span className="tnum">{tour.total}</span>
-        </span>
-        <span className="block text-sm font-medium text-flp-ink">{tour.paso.titulo}</span>
-        <span className="ag-tourbar-nota">{tour.paso.nota}</span>
-        {esperaDecision && (
-          <span id="ag-tour-espera" className="mt-1 flex items-center gap-1 text-xs font-medium text-flp-ink">
-            <IconClock size={13} aria-hidden="true" /> Decide en la tarjeta para continuar.
+    <div ref={ref} tabIndex={-1} className={`ag-tourbar flp-dark ${nota ? 'is-nota' : ''}`} role="region" aria-label={`Recorrido guiado, paso ${n} de ${tour.total}`}>
+      <div className="ag-tourbar-texto">
+        {/* Móvil: una línea que abre la nota. */}
+        <button type="button" className="ag-tourbar-linea" aria-expanded={nota} aria-controls="ag-tourbar-nota" onClick={() => setNota((v) => !v)}>
+          <span className="tnum">
+            {n}/{tour.total}
           </span>
-        )}
+          <span aria-hidden="true">·</span>
+          <span className="min-w-0 truncate">{paso.arco}</span>
+          <IconChevronDown size={16} className={`flex-none transition-transform motion-reduce:transition-none ${nota ? 'rotate-180' : ''}`} aria-hidden="true" />
+          <span className="sr-only">{nota ? 'Ocultar la explicación' : 'Ver la explicación'}</span>
+        </button>
+        {/* Escritorio: paso, título y nota entera. */}
+        <span className="ag-tourbar-kicker flp-kicker">
+          Recorrido · paso <span className="tnum">{n}</span> de <span className="tnum">{tour.total}</span> · {paso.arco}
+        </span>
+        <span className="ag-tourbar-titulo">{paso.titulo}</span>
+        <span id="ag-tourbar-nota" className="ag-tourbar-nota">
+          {paso.nota}
+        </span>
       </div>
-      <div className="flex flex-none gap-2">
-        <FilmpilotButton variant="ghost" onClick={onSalir}>
+      <div className="ag-tourbar-botones">
+        <FilmpilotButton variant="ghost" onClick={onSalir} aria-label="Salir del recorrido">
           Salir
         </FilmpilotButton>
-        {/* aria-disabled y no disabled: el foco se queda en el botón mientras los agentes terminan. */}
-        <FilmpilotButton
-          variant="primary"
-          aria-disabled={bloqueado || undefined}
-          aria-describedby={esperaDecision ? 'ag-tour-espera' : undefined}
-          className={bloqueado ? 'is-bloqueado' : ''}
-          onClick={() => !bloqueado && onSiguiente()}
-        >
-          {tour.ultimo ? 'Terminar' : 'Siguiente'}
-        </FilmpilotButton>
+        {esperaDecision ? (
+          <FilmpilotButton variant="secondary" onClick={() => irALaTarjeta(paso.espera)} aria-label="Decide en la tarjeta para seguir: ir a la tarjeta">
+            <span className="hidden sm:inline">Decide en la tarjeta</span>
+            <span className="sm:hidden">Decide</span>
+            <span aria-hidden="true">↓</span>
+          </FilmpilotButton>
+        ) : bloqueado ? (
+          // aria-disabled y no disabled: el foco se queda en el botón mientras los agentes terminan.
+          <FilmpilotButton variant="secondary" aria-disabled="true" className="is-bloqueado" title="Espera a que terminen los agentes">
+            {tour.ultimo ? 'Terminar' : 'Siguiente'}
+          </FilmpilotButton>
+        ) : (
+          <FilmpilotButton variant="primary" onClick={onSiguiente}>
+            {tour.ultimo ? 'Terminar' : 'Siguiente'}
+          </FilmpilotButton>
+        )}
       </div>
     </div>
   )
