@@ -1,12 +1,9 @@
-/* Parte de la mañana y apertura: saludo, bienvenida, «Ya hecho», «Para hoy», tira
-   del rodaje e índice de historias. Lo importa Parte.jsx. Solo tokens --flp-*. */
+/* Parte de la mañana: saludo, «Ya hecho», «Para hoy», tira del rodaje e índice de
+   historias. Lo importa Parte.jsx. Solo tokens --flp-*. */
 
-/* Variantes por ancho: la corta en móvil, la completa desde 640 px. */
+/* Lo que solo cabe desde 640 px. */
 .ag-solo-ancho { display: none; }
-@media (min-width: 640px) {
-  .ag-solo-movil { display: none; }
-  .ag-solo-ancho { display: revert; }
-}
+@media (min-width: 640px) { .ag-solo-ancho { display: revert; } }
 
 /* ── Saludo ───────────────────────────────────────────────────────────────── */
 /* El saludo sale al instante; más bajo que antes para que «Para hoy» quepa en la primera pantalla. */
@@ -14,15 +11,6 @@
 .ag-saludo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--flp-border); }
 .ag-prosa--lead { max-width: 680px; font-size: 15px; line-height: 1.55; }
 @media (min-width: 640px) { .ag-prosa--lead { font-size: 16px; line-height: 1.6; } }
-
-/* ── Bienvenida: qué es Filmpilot y el recorrido ──────────────────────────── */
-.ag-bienvenida { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--flp-carbon); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
-.ag-bienvenida-texto { max-width: 640px; color: var(--flp-carbon); font-size: 15px; line-height: 1.5; }
-@media (min-width: 640px) { .ag-bienvenida-texto { font-size: 16px; } }
-.ag-bienvenida-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 2px; }
-.ag-bienvenida-niveles { display: flex; flex-wrap: wrap; gap: 8px 10px; line-height: 1.2; }
-@media (min-width: 640px) { .ag-bienvenida-niveles { gap: 8px 14px; } }
-.ag-bienvenida-accion { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 
 /* ── Ya hecho, sin pedírtelo ─────────────────────────────────────────────── */
 .ag-hecho { padding: 12px 16px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }

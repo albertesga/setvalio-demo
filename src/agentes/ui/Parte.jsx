@@ -1,14 +1,13 @@
-// Bloques del parte de la mañana y de la apertura: qué es Filmpilot (bienvenida), lo
-// que han hecho solos (hecho), «Para hoy», la tira del rodaje y el índice de historias.
+// Bloques del parte de la mañana: lo que han hecho solos (hecho), «Para hoy», la tira
+// del rodaje y el índice de historias.
 // La tira y «Para hoy» leen el mundo actual: lo que decides en la conversación se
 // tacha aquí también.
 
 import { useId, useState } from 'react'
-import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconChevronRight, IconClock } from '../../components/icons.jsx'
 import * as c from '../calculos.js'
 import { AGENTES } from '../agentes.js'
-import { HISTORIAS, EPILOGO, RECORRIDO, ETIQUETA_CAPACIDAD, entradaDeHistoria } from '../casos.js'
+import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD, entradaDeHistoria } from '../casos.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, riesgo as riesgoDe, HECHAS } from '../rodaje.js'
 import { renderTexto, fechaDia } from '../texto.js'
@@ -50,53 +49,6 @@ function riesgoPorJornada(riesgos) {
 }
 
 const tipo = (j) => `${j.tipo === 'EXT' ? 'Exterior' : 'Interior'} · ${j.franja.toLowerCase()}`
-
-// ── Bienvenida ───────────────────────────────────────────────────────────────
-
-/**
- * Qué es Filmpilot, en la primera pantalla: la frase de marca, los tres niveles de
- * autonomía y el recorrido. Lleva el amarillo de la respuesta; durante el recorrido
- * el botón se oculta (la barra ya lo guía).
- */
-export function BloqueBienvenida({ b, principal }) {
-  const ctx = useCtx()
-  const id = useId().replace(/:/g, '')
-  const enRecorrido = !!ctx.enRecorrido
-  const iniciar = () => (ctx.iniciarRecorrido ? ctx.iniciarRecorrido() : ctx.despachar?.({ tipo: 'tour/iniciar' }))
-  return (
-    <section className="ag-bienvenida" aria-labelledby={`${id}-t`}>
-      <h4 id={`${id}-t`} className="flp-kicker text-flp-muted">
-        Qué es Filmpilot
-      </h4>
-      <p className="ag-bienvenida-texto">
-        <Tx value={b.texto} />
-      </p>
-      <div className="ag-bienvenida-pie">
-        <ul className="ag-bienvenida-niveles" aria-label="Cómo actúan los agentes">
-          {/* En móvil, la forma corta («Tu aprobación»): las tres caben en una línea. */}
-          {(b.niveles ?? ['ejecuta', 'propone', 'aprueba']).map((n) => (
-            <li key={n}>
-              <span className="ag-solo-movil">
-                <AutonomyBadge nivel={n} compacto />
-              </span>
-              <span className="ag-solo-ancho">
-                <AutonomyBadge nivel={n} />
-              </span>
-            </li>
-          ))}
-        </ul>
-        {!enRecorrido && (
-          <div className="ag-bienvenida-accion">
-            <FilmpilotButton variant={principal === false ? 'carbon' : 'primary'} iconAfter={IconChevronRight} disabled={ctx.ocupado} onClick={iniciar}>
-              {/* Un solo nodo de texto: el botón es flex y separaría las piezas. */}
-              <span>{`Ver el recorrido · ${RECORRIDO.length} pasos`}</span>
-            </FilmpilotButton>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
 
 // ── Ya hecho, sin pedírtelo ──────────────────────────────────────────────────
 
@@ -488,4 +440,4 @@ export function BloqueHistorias({ b }) {
 }
 
 // Registro de los bloques de este archivo: Bloques.jsx los busca aquí por tipo al pintar.
-export const BLOQUES_PARTE = { bienvenida: BloqueBienvenida, hecho: BloqueHecho, agenda: BloqueAgenda, tira: BloqueTira, historias: BloqueHistorias }
+export const BLOQUES_PARTE = { hecho: BloqueHecho, agenda: BloqueAgenda, tira: BloqueTira, historias: BloqueHistorias }

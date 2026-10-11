@@ -265,15 +265,6 @@ function hecho(m) {
   return { tipo: 'hecho', titulo: 'Ya hecho, sin pedírtelo', nivel: 'ejecuta', items: items.slice(0, 3) }
 }
 
-/** Qué es Filmpilot, en una frase: solo en el parte con el que se abre la demo. */
-function bienvenida(m) {
-  return {
-    tipo: 'bienvenida',
-    texto: t('Un equipo de agentes lleva el control de coste de {p}. Hacen solos lo rutinario, te proponen lo dudoso y te piden aprobación cuando hay dinero o riesgo.', { p: v(m.proyecto.titulo) }),
-    niveles: ['ejecuta', 'propone', 'aprueba'],
-  }
-}
-
 export const saludo = {
   id: 'saludo',
   titulo: 'Parte de la mañana',
@@ -313,11 +304,11 @@ export const saludo = {
 
   componer({ despues: m, det }) {
     const agenda = agendaDelDia(m)
-    // Pedido con palabras («ponme al día»): sin la bienvenida, una línea de entrada.
+    // Pedido con palabras («ponme al día»): una línea de entrada que dice que está rehecho.
     const pedido = det?.entidades?.dia == null
     return {
       bloques: [
-        ...(pedido ? [texto(t('El parte del día {n} de rodaje, rehecho con lo que ya has decidido hoy.', { n: v(m.proyecto.diaActual, 'num') }))] : [bienvenida(m)]),
+        ...(pedido ? [texto(t('El parte del día {n} de rodaje, rehecho con lo que ya has decidido hoy.', { n: v(m.proyecto.diaActual, 'num') }))] : []),
         entradilla(m, agenda),
         hecho(m),
         { tipo: 'agenda', titulo: 'Para hoy', items: agenda.items, avisos: agenda.avisos, resto: agenda.resto, restoAprobacion: agenda.restoAprobacion },

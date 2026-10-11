@@ -1537,14 +1537,12 @@ export function aprobacionPendiente(mundo, b) {
 }
 
 /**
- * Clave del bloque que lleva el amarillo en una respuesta: la bienvenida, la primera
- * tarjeta abierta, el primer borrador por revisar o una acción marcada como principal.
- * Como mucho uno por respuesta.
+ * Clave del bloque que lleva el amarillo en una respuesta: la primera tarjeta abierta,
+ * el primer borrador por revisar o una acción marcada como principal. Como mucho uno por respuesta.
  */
 export function bloquePrincipal(mundo, bloques) {
   const b = bloques.find(
     (x) =>
-      x.tipo === 'bienvenida' ||
       aprobacionPendiente(mundo, x) ||
       (x.tipo === 'borrador' && mundo.borradores[x.id]?.estado === 'borrador') ||
       (x.tipo === 'acciones' && x.acciones.some((a) => a.variante === 'primary' && accionViva(mundo, a))),
