@@ -191,13 +191,13 @@ export function crearMundo() {
     borradores: {},
     revisiones: {},
     ajustesCef: {},
-    // Novedades que llegan solas, en este orden (sesion.js).
+    // Novedades por llegar. Cuáles llegan solas y en qué orden lo decide EVENTOS (sesion.js).
     entrantes: ['EV-RIESGOS', 'EV-01', 'EV-CITACION', 'EV-02', 'EV-LLUVIA', 'EV-03'],
     // Plan de rodaje y señales que vigila el agente de riesgos (exploratorio).
     rodaje: crearRodaje(),
     decisionesRiesgo: {},
     reservas: {},
-    // Primera propuesta de presupuesto de Itsasoa (caso por validar).
+    // Primera propuesta de presupuesto de Itsasoa (epílogo de la demo, en exploración).
     propuesta: crearPropuesta(),
     avisos: [],
     historial: [],

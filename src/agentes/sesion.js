@@ -5,21 +5,23 @@
 // así que se prueba en Node con un reloj falso.
 
 import { crearMundo, PERSONAS } from './mundo.js'
-import { responder } from './orquestador.js'
+import { responder, interpretar } from './orquestador.js'
 import { reducirVarias } from './acciones.js'
-import { RECORRIDO } from './casos.js'
+import { RECORRIDO, HISTORIAS, EPILOGO, entradaDeHistoria } from './casos.js'
 import { DURACIONES } from './agentes.js'
 import { estadoDecision } from './calculos.js'
-import { t, v } from './texto.js'
 
-// Llegan en este orden y solo cuando la conversación está parada (retrasoMs de inactividad).
+// Contrato EVENTOS: novedades del mundo. { id, retrasoMs, agente, titulo, automatico, historia }.
+// Solo las automáticas (EV-01 y EV-02) llegan solas, en este orden, con la conversación
+// parada (retrasoMs de inactividad) y solo si su historia aún no se ha visto. Las demás
+// las piden los guiones (la tarjeta, el parte) y las pruebas.
 export const EVENTOS = [
-  { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas' },
-  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur' },
-  { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar' },
-  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado una solicitud de compra' },
-  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana' },
-  { id: 'EV-03', retrasoMs: 30_000, agente: 'cumplimiento', titulo: 'Un documento del dossier vence esta semana' },
+  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur', automatico: true, historia: 'solo' },
+  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado una solicitud de compra', automatico: true, historia: 'aprueba' },
+  { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas', automatico: false, historia: 'adelanta' },
+  { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar', automatico: false, historia: 'adelanta' },
+  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana', automatico: false, historia: 'adelanta' },
+  { id: 'EV-03', retrasoMs: 30_000, agente: 'cumplimiento', titulo: 'Un documento del dossier vence esta semana', automatico: false, historia: 'equipo' },
 ]
 
 const EVENTOS_POR_ID = Object.fromEntries(EVENTOS.map((e) => [e.id, e]))
@@ -33,24 +35,9 @@ export function horaDe(relojMs) {
   return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
 }
 
-function actividadInicial(mundo) {
-  return Object.values(mundo.documentos)
-    .filter((d) => d.estado === 'contabilizada')
-    .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
-    .map((d) => ({
-      id: `prev-${d.id}`,
-      previa: true,
-      fecha: d.fecha,
-      agente: 'conciliacion',
-      autonomia: 'ejecuta',
-      texto: t('Contabilizó {id} de {prov}, casada con {oc}', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') }),
-    }))
-}
-
 export function crearSesion({ persona = 'marta' } = {}) {
-  const mundo = crearMundo()
   return {
-    mundo,
+    mundo: crearMundo(),
     contexto: {},
     mensajes: [],
     seq: 0,
@@ -61,8 +48,6 @@ export function crearSesion({ persona = 'marta' } = {}) {
     eventosPausados: false,
     persona,
     casosVistos: [],
-    actividad: actividadInicial(mundo),
-    novedades: 0,
     tour: null,
     snapshots: {},
     ultimaMutacion: null,
@@ -79,7 +64,7 @@ function nuevoId(s, pref) {
 }
 
 function iniciar(s0, entrada) {
-  const s = { ...s0, mensajes: [...s0.mensajes], actividad: [...s0.actividad], snapshots: { ...s0.snapshots } }
+  const s = { ...s0, mensajes: [...s0.mensajes], snapshots: { ...s0.snapshots } }
   const hora = horaDe(s.reloj)
   const persona = personaDe(s)
   let ent = entrada
@@ -89,16 +74,14 @@ function iniciar(s0, entrada) {
   } else if (entrada.tipo === 'accion') {
     ent = { ...entrada, accion: { ...entrada.accion, por: persona.nombre } }
     s.mensajes.push({ id: nuevoId(s, 'd'), rol: 'decision', texto: entrada.etiqueta ?? 'Decisión', por: persona.nombre, rolPersona: persona.rol, hora })
-    s.actividad.unshift({ id: nuevoId(s, 'act'), hora, persona: persona.nombre, autonomia: null, texto: t('{por} decide: {que}', { por: v(persona.nombre), que: v(entrada.etiqueta ?? 'decisión') }) })
   } else if (entrada.tipo === 'saludo') {
     // El parte de la mañana no lo pide nadie: lo traen los agentes al abrir.
     ent = { ...entrada, persona: s.persona }
   } else if (entrada.tipo === 'evento') {
     const ev = EVENTOS_POR_ID[entrada.eventoId]
     s.mensajes.push({ id: nuevoId(s, 's'), rol: 'novedad', eventoId: entrada.eventoId, agente: ev?.agente, titulo: ev?.titulo ?? 'Novedad', hora })
-    s.actividad.unshift({ id: nuevoId(s, 'act'), hora, agente: ev?.agente, autonomia: null, evento: true, texto: t('{titulo}', { titulo: v(ev?.titulo ?? 'Novedad') }) })
-    s.novedades = s.novedades + 1
   }
+  // { tipo: 'cierreRecorrido' }: el resumen final lo trae el Orquestador, sin mensaje de la persona.
 
   const r = responder(s.mundo, ent, s.contexto)
   const id = nuevoId(s, 'a')
@@ -122,7 +105,7 @@ function iniciar(s0, entrada) {
 
 function progresar(s0, ms) {
   if (!s0.activo) return s0
-  const s = { ...s0, mensajes: [...s0.mensajes], actividad: [...s0.actividad] }
+  const s = { ...s0, mensajes: [...s0.mensajes] }
   const idx = s.mensajes.findIndex((m) => m.id === s.activo.id)
   if (idx < 0) return { ...s, activo: null }
   const msg = { ...s.mensajes[idx], estadoPasos: [...s.mensajes[idx].estadoPasos] }
@@ -130,14 +113,12 @@ function progresar(s0, ms) {
   const totalBloques = turno.bloques.length
   const fin = turno.duracionMs + totalBloques * DURACIONES.bloque
   const tr = Math.min(s.activo.transcurrido + ms, fin)
-  const hora = horaDe(s.reloj)
 
   turno.pasos.forEach((p, i) => {
     if (msg.estadoPasos[i] === 'hecho') return
     if (tr >= p.finMs) {
       s.mundo = reducirVarias(s.mundo, p.acciones)
       msg.estadoPasos[i] = 'hecho'
-      if (p.muta) s.actividad.unshift({ id: `act-${msg.id}-${i}`, hora, agente: p.agente, autonomia: p.autonomia, texto: p.titulo, salida: p.salida, mensajeId: msg.id })
     } else if (tr >= p.inicioMs) {
       msg.estadoPasos[i] = 'en_curso'
     }
@@ -183,11 +164,30 @@ export function estadoTour(s) {
   return { indice: s.tour.paso, total: RECORRIDO.length, paso, puedeAvanzar: puedeAvanzarTour(s), ultimo: s.tour.paso === RECORRIDO.length - 1 }
 }
 
+/**
+ * Un paso del recorrido. Contrato del mensaje rol 'guia': { indice, total, titulo, arco,
+ * historia }; la nota vive en la barra del recorrido (estadoTour(s).paso.nota).
+ * Un paso con entrada null (el parte, que ya está en pantalla) no encola nada.
+ */
 function pasoTour(s0, indice) {
   const paso = RECORRIDO[indice]
   const s = { ...s0, tour: { paso: indice }, mensajes: [...s0.mensajes] }
-  s.mensajes.push({ id: nuevoId(s, 'g'), rol: 'guia', indice, total: RECORRIDO.length, titulo: paso.titulo, nota: paso.nota, hora: horaDe(s.reloj) })
-  return encolar(s, paso.entrada)
+  s.mensajes.push({
+    id: nuevoId(s, 'g'),
+    rol: 'guia',
+    indice,
+    total: RECORRIDO.length,
+    titulo: paso.titulo,
+    arco: paso.arco,
+    historia: paso.historia,
+    // Compatibilidad: lo quita P5/P6. MensajeGuia aún pinta la nota en el hilo.
+    nota: paso.nota,
+    hora: horaDe(s.reloj),
+  })
+  if (!paso.entrada) return s
+  // Si la novedad ya llegó, el paso pregunta con el texto de su historia.
+  const h = HISTORIAS.find((x) => x.id === paso.historia)
+  return encolar(s, entradaDeHistoria({ ...h, entrada: paso.entrada }, s.mundo))
 }
 
 function encolar(s, entrada) {
@@ -198,6 +198,68 @@ function encolar(s, entrada) {
 /** ¿Ha pedido o decidido algo la persona? El parte de la mañana llega solo y no cuenta. */
 export function conversacionIniciada(s) {
   return s.mensajes.some((m) => m.rol === 'agentes' && m.origen !== 'saludo')
+}
+
+/** Contrato: ids de HISTORIAS vistas, en el orden del arco (el epílogo no cuenta: ver epilogoVisto). */
+export function vistosDe(s) {
+  return HISTORIAS.filter((h) => s.casosVistos.includes(h.id)).map((h) => h.id)
+}
+
+export function epilogoVisto(s) {
+  return s.casosVistos.includes(EPILOGO.id)
+}
+
+/** Contrato: la primera historia del arco sin ver, o null. Nunca el epílogo. */
+export function siguienteHistoria(s) {
+  return HISTORIAS.find((h) => !s.casosVistos.includes(h.id)) ?? null
+}
+
+/** La próxima novedad que llegaría sola: automática, aún por llegar y con su historia sin ver. */
+export function proximaNovedad(s) {
+  return EVENTOS.find((e) => e.automatico && s.mundo.entrantes.includes(e.id) && !s.casosVistos.includes(e.historia)) ?? null
+}
+
+// Entidades que distinguen dos sugerencias de la misma intención («¿Va a llover…?» y «¿Tiene billete…?»).
+const CLAVES_SUGERENCIA = ['oc', 'documento', 'riesgo', 'jornada', 'capitulo', 'partida', 'territorio']
+const INTENCIONES_EPILOGO = new Set(EPILOGO.intenciones)
+
+// Dos sugerencias se repiten si piden lo mismo: misma intención y, si las dos nombran una
+// entidad, la misma. Una genérica («¿Qué órdenes tengo pendientes?») repite a una concreta (OC-104).
+function repiten(a, b) {
+  if (a.intencion !== b.intencion) return false
+  if (!a.entidad || !b.entidad) return true
+  return a.entidad === b.entidad
+}
+
+/**
+ * Contrato: sugerencias del pie tras el último turno, tres como mucho.
+ * [{ etiqueta, texto, entrada?, historia? }]: si trae `entrada`, la pantalla la envía tal
+ * cual (puede ser una novedad); si no, envía `texto`.
+ * Primero la siguiente historia sin ver («Siguiente: Te lo propone»; no durante el
+ * recorrido, que ya tiene su barra); después, las del turno. Sin dos que pidan lo mismo
+ * (ver repiten) y nunca a otro proyecto desde «La última función».
+ */
+export function sugerenciasDe(s) {
+  const ultimo = [...s.mensajes].reverse().find((m) => m.rol === 'agentes')
+  if (!ultimo || ultimo.estado === 'en_curso') return []
+  const enEpilogo = ultimo.turno.caso === EPILOGO.id
+  const clave = (texto) => {
+    const det = interpretar(s.mundo, { tipo: 'texto', texto }, s.contexto)
+    return { intencion: det.intencion, entidad: CLAVES_SUGERENCIA.map((k) => det.entidades?.[k] ?? '').join('|').replace(/^\|+$/, '') }
+  }
+  const out = []
+  const vistas = []
+  const anadir = (sg) => {
+    const k = clave(sg.texto)
+    if (vistas.some((x) => repiten(x, k))) return
+    if (!enEpilogo && INTENCIONES_EPILOGO.has(k.intencion)) return
+    vistas.push(k)
+    out.push(sg)
+  }
+  const sig = s.tour ? null : siguienteHistoria(s)
+  if (sig) anadir({ etiqueta: `Siguiente: ${sig.arco}`, texto: sig.prompt, entrada: entradaDeHistoria(sig, s.mundo), historia: sig.id })
+  for (const sg of ultimo.turno.sugerencias ?? []) anadir(sg)
+  return out.slice(0, 3)
 }
 
 /** El parte de la mañana abre la conversación una sola vez; instantáneo, sin reproducir los pasos. */
@@ -211,8 +273,9 @@ export function reducirSesion(s, a) {
   switch (a.tipo) {
     case 'enviar':
       if (a.entrada.tipo === 'texto' && !String(a.entrada.texto ?? '').trim()) return s
-      // Una novedad solo llega una vez.
-      if (a.entrada.tipo === 'evento' && (!s.mundo.entrantes.includes(a.entrada.eventoId) || s.cola.some((e) => e.eventoId === a.entrada.eventoId))) return s
+      // Una novedad solo llega una vez: ni si ya llegó, ni si está en la cola, ni si se está
+      // reproduciendo (la recibe un paso del turno, así que sigue en mundo.entrantes un rato).
+      if (a.entrada.tipo === 'evento' && (!s.mundo.entrantes.includes(a.entrada.eventoId) || s.cola.some((e) => e.eventoId === a.entrada.eventoId) || s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === a.entrada.eventoId))) return s
       // Una misma petición no se encola dos veces.
       if (s.cola.some((e) => JSON.stringify(e) === JSON.stringify(a.entrada))) return s
       return encolar({ ...s, inactivo: 0 }, a.entrada)
@@ -233,11 +296,10 @@ export function reducirSesion(s, a) {
         const [sig, ...resto] = n.cola
         return iniciar({ ...n, cola: resto }, sig)
       }
-      // Novedades: solo con la conversación empezada (el parte de la mañana no cuenta),
-      // sin recorrido y sin pausa.
-      const conversacionEmpezada = conversacionIniciada(n)
-      const evento = EVENTOS.find((e) => n.mundo.entrantes.includes(e.id))
-      if (!evento || n.tour || n.eventosPausados || !conversacionEmpezada) return n
+      // Novedades: solo las automáticas con su historia sin ver, con la conversación
+      // empezada (el parte de la mañana no cuenta), sin recorrido y sin pausa.
+      const evento = proximaNovedad(n)
+      if (!evento || n.tour || n.eventosPausados || !conversacionIniciada(n)) return n
       n = { ...n, inactivo: n.inactivo + ms }
       if (n.inactivo >= evento.retrasoMs) return iniciar(n, { tipo: 'evento', eventoId: evento.id })
       return n
@@ -252,11 +314,6 @@ export function reducirSesion(s, a) {
         m.id === s.activo.id ? { ...m, estado: 'detenido', estadoPasos: m.estadoPasos.map((e) => (e === 'hecho' ? e : 'detenido')) } : m,
       )
       return { ...s, mensajes, activo: null, cola: [] }
-    }
-
-    case 'simularEvento': {
-      const evento = EVENTOS.find((e) => s.mundo.entrantes.includes(e.id))
-      return evento ? encolar({ ...s, inactivo: 0 }, { tipo: 'evento', eventoId: evento.id }) : s
     }
 
     case 'deshacer': {
@@ -278,9 +335,8 @@ export function reducirSesion(s, a) {
       const persona = personaDe(s)
       const decision = [...s.mensajes.slice(0, idx)].reverse().find((m) => m.rol === 'decision' || m.rol === 'novedad')
       const que = decision?.rol === 'decision' ? decision.texto : msg.turno.titulo
-      const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true } : m)), actividad: [...s.actividad] }
+      const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true } : m)) }
       n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: `${persona.nombre} ha deshecho «${que}». Todo vuelve a como estaba.`, hora: horaDe(n.reloj) })
-      n.actividad.unshift({ id: nuevoId(n, 'act'), hora: horaDe(n.reloj), persona: persona.nombre, texto: t('{por} deshace: {que}', { por: v(persona.nombre), que: v(que) }) })
       return n
     }
 
@@ -295,17 +351,14 @@ export function reducirSesion(s, a) {
     case 'pausarEventos':
       return { ...s, eventosPausados: !!a.valor, inactivo: 0 }
 
-    case 'leerNovedades':
-      return s.novedades ? { ...s, novedades: 0 } : s
-
     case 'saludar':
       return saludar(s, { instantaneo: !!a.instantaneo })
 
     case 'tour/iniciar': {
       // El recorrido parte de la demo recién abierta (con su parte de la mañana ya
-      // leído) para que cada paso cuente lo que pasa.
+      // leído) para que cada paso cuente lo que pasa. Solo avisa si había algo que cerrar.
       const limpia = saludar(crearSesion({ persona: s.persona }), { instantaneo: true })
-      if (s.mensajes.length) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: se han cerrado la conversación y las decisiones anteriores.', hora: horaDe(0) })
+      if (conversacionIniciada(s)) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: se han cerrado la conversación y las decisiones anteriores.', hora: horaDe(0) })
       return pasoTour(limpia, 0)
     }
 
@@ -319,7 +372,9 @@ export function reducirSesion(s, a) {
     case 'tour/salir': {
       if (!s.tour) return s
       const n = { ...s, tour: null, mensajes: [...s.mensajes], inactivo: 0 }
-      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: a.completo ? 'Recorrido terminado. Puedes seguir preguntando con tus palabras.' : 'Has salido del recorrido guiado.', hora: horaDe(n.reloj) })
+      // Al terminar, el Orquestador resume lo visto (contrato: entrada { tipo: 'cierreRecorrido' }).
+      if (a.completo) return encolar(n, { tipo: 'cierreRecorrido' })
+      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: 'Has salido del recorrido guiado.', hora: horaDe(n.reloj) })
       return n
     }
 

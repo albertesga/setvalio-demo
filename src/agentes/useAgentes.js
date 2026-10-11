@@ -3,10 +3,11 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { obtener, suscribir, despachar } from './store.js'
-import { conversacionIniciada } from './sesion.js'
+import { conversacionIniciada, proximaNovedad } from './sesion.js'
 
+// Velocidad de reproducción de los pasos (Opciones de la demo).
 export const RITMOS = {
-  pausado: { etiqueta: 'Lento', factor: 0.6 },
+  lento: { etiqueta: 'Lento', factor: 0.6 },
   normal: { etiqueta: 'Normal', factor: 1 },
   rapido: { etiqueta: 'Rápido', factor: 2.5 },
 }
@@ -31,7 +32,7 @@ export function useAgentes({ ritmo = 'normal' } = {}) {
   const activo = !!s.activo
   const activoId = s.activo?.id ?? null
   const hayCola = s.cola.length > 0
-  const esperaEventos = !s.tour && !s.eventosPausados && s.mundo.entrantes.length > 0 && conversacionIniciada(s)
+  const esperaEventos = !s.tour && !s.eventosPausados && !!proximaNovedad(s) && conversacionIniciada(s)
 
   useEffect(() => {
     if (activo && reducido) {

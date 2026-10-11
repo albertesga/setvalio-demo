@@ -19,10 +19,15 @@ const EVENTOS = {
   'EV-LLUVIA': 'riesgos',
 }
 
-/** Entrada → detección: { intencion, entidades, eventoId?, accion?, texto? }. */
+/**
+ * Entrada → detección: { intencion, entidades, eventoId?, accion?, texto? }.
+ * Entradas: { tipo: 'texto' | 'evento' | 'accion' | 'saludo' | 'cierreRecorrido' }.
+ */
 export function interpretar(mundo, entrada, contexto = {}) {
   if (entrada.tipo === 'evento') return { intencion: EVENTOS[entrada.eventoId] ?? 'no_entendido', entidades: {}, eventoId: entrada.eventoId }
   if (entrada.tipo === 'accion') return { intencion: 'accion', entidades: {}, accion: entrada.accion }
+  // Fin del recorrido guiado (sesion.js, 'tour/salir' completo): el Orquestador resume lo visto.
+  if (entrada.tipo === 'cierreRecorrido') return { intencion: 'cierre_recorrido', entidades: {} }
   // El parte de la mañana: la cabecera del saludo lee el día y la persona de aquí.
   if (entrada.tipo === 'saludo') {
     const { diaActual, diasRodaje, titulo } = mundo.proyecto

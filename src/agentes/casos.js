@@ -1,187 +1,179 @@
-// Casos de uso que muestra el prototipo. Cada uno tiene una petición de ejemplo
-// que el motor resuelve (lo comprueba scripts/check-agentes.mjs).
+// Historias de la demo: una sola fuente para la lista de historias, el recorrido
+// guiado, las sugerencias y lo que cuenta como visto. La demo cuenta una idea,
+// «los agentes preparan, tú decides», en seis historias cortas; cada una enseña un
+// solo nivel de autonomía. Lo que no está aquí sigue respondiendo por texto (dossier,
+// incentivo, caja, desviación…), pero no se ofrece en el camino principal.
 //
-// capacidad: 'decidida' (alcance del MVP), 'exploratoria' (se exploró, sin
-// validar), 'propuesta' (caso nuevo por validar) o 'posterior' (fase posterior).
+// Que cada entrada y cada pregunta resuelvan a su intención lo comprueba
+// scripts/check-agentes.mjs.
 
-// Etiquetas de lo que aún no es producto. «Sin validar» y no «Por validar»: no se
-// confunde con «Por revisar», que es el estado de lo que espera una decisión.
-export const ETIQUETA_CAPACIDAD = { exploratoria: 'Exploratorio', posterior: 'Fase posterior', propuesta: 'Sin validar' }
-export const LEYENDA_CAPACIDAD = 'Exploratorio, Sin validar y Fase posterior marcan ideas que aún no están en Filmpilot; se enseñan con datos de ejemplo.'
+import { crearMundo } from './mundo.js'
+import { AUTONOMIA } from './agentes.js'
+import { PREGUNTA } from './rodaje.js'
+import { formatear } from './texto.js'
 
-export const GRUPOS_CASOS = [
-  { id: 'prepara', titulo: 'Antes del rodaje · Itsasoa' },
-  { id: 'semana', titulo: 'Cerrar la semana' },
-  { id: 'entra', titulo: 'Lo que entra' },
-  { id: 'anticipa', titulo: 'Cumplir y anticipar' },
-]
+// Etiqueta única de lo que aún no es producto. No «En estudio»: en cine, un estudio es un plató.
+// Contrato: ETIQUETA_CAPACIDAD[capacidad] → etiqueta visible; 'decidida' no lleva etiqueta.
+export const ETIQUETA_CAPACIDAD = { exploratoria: 'En exploración' }
+export const LEYENDA_CAPACIDAD = 'En exploración: ideas que aún no están en Filmpilot. Te las enseñamos con datos de ejemplo para saber si te servirían.'
 
-export const CASOS = [
+// Contrato: nivel de una historia → etiqueta. 'lee' es solo del parte; los otros tres
+// salen de AUTONOMIA (agentes.js), que lleva también su descripción.
+export const ETIQUETA_NIVEL = { lee: 'Solo leen', ...Object.fromEntries(Object.values(AUTONOMIA).map((a) => [a.id, a.etiqueta])) }
+
+// Cifras de las notas: salen del mundo, no se escriben a mano.
+const MUNDO = crearMundo()
+const CONFIANZA_TICKET = formatear(Math.min(...Object.values(MUNDO.documentos['G-004'].confianza)), 'pct0')
+
+const texto = (tx) => ({ tipo: 'texto', texto: tx })
+const evento = (eventoId) => ({ tipo: 'evento', eventoId })
+
+/**
+ * Contrato HISTORIAS: seis, en el orden del arco.
+ * { id, arco, titulo, unaLinea, nivel ('lee'|'ejecuta'|'propone'|'aprueba'),
+ *   capacidad ('decidida'|'exploratoria'), autonomia (frase de cómo actúan),
+ *   agentes, prompt (la pregunta visible), entrada (texto o evento; la pantalla la
+ *   resuelve con entradaDeHistoria), entradaRecorrido? (si el recorrido usa otra;
+ *   null = el paso no envía nada), espera? (decisión que bloquea el recorrido),
+ *   decisionDePrueba? (id de la acción de la tarjeta que usan las pruebas),
+ *   nota (la de la barra del recorrido), intenciones (las que cuentan como vista) }
+ */
+export const HISTORIAS = [
   {
-    id: 'informe',
-    grupo: 'hero',
-    titulo: 'Informe semanal de coste',
-    descripcion: 'Facturas, conciliación, desviaciones, previsión y borrador para producción, con las decisiones que te tocan.',
-    prompt: 'Prepárame el informe semanal de coste',
-    agentes: ['facturas', 'conciliacion', 'costes', 'prevision', 'excepciones', 'cumplimiento', 'informes'],
-    nivel: 'aprueba',
+    id: 'parte',
+    arco: 'Cada mañana',
+    titulo: 'Lo que encuentras cada mañana',
+    unaLinea: 'Sin que pidas nada, los agentes han leído rodaje, coste, facturas, caja y dossier: te cuentan lo que ya han hecho y lo que te toca decidir hoy.',
+    nivel: 'lee',
     capacidad: 'decidida',
+    autonomia: 'Solo leen: no cambian nada.',
+    agentes: ['orquestador', 'riesgos', 'costes', 'conciliacion', 'facturas', 'prevision', 'cumplimiento', 'excepciones', 'informes'],
+    prompt: 'Ponme al día',
+    entrada: texto('Ponme al día'),
+    // El parte ya está en pantalla al empezar: el primer paso no envía nada.
+    entradaRecorrido: null,
+    nota: 'Antes de que llegues, ocho agentes han cruzado rodaje, coste, facturas y caja. Arriba, lo que ya han hecho solos; debajo, lo que te toca decidir hoy.',
+    intenciones: ['saludo'],
   },
   {
-    id: 'presupuesto',
-    grupo: 'prepara',
-    titulo: 'Primera propuesta de presupuesto',
-    descripcion: 'Aportas los costes que ya tienes hablados; los agentes estiman el resto por capítulo y lo comparan con el objetivo.',
-    prompt: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa',
-    agentes: ['presupuesto', 'prevision', 'costes'],
-    nivel: 'propone',
-    capacidad: 'propuesta',
-  },
-  {
-    id: 'proveedores',
-    grupo: 'prepara',
-    titulo: 'Optimizar proveedores con llamadas',
-    descripcion: 'Busca alternativas más baratas, descarta las que no cumplen y, con tu permiso, llama para confirmar el precio final. Eliges tú.',
-    prompt: 'Optimiza los proveedores de la propuesta',
-    agentes: ['proveedores', 'excepciones', 'presupuesto'],
-    nivel: 'aprueba',
-    capacidad: 'propuesta',
-  },
-  {
-    id: 'desviacion',
-    grupo: 'semana',
-    titulo: 'Explicar una desviación',
-    descripcion: 'Qué partidas empujan un capítulo y si ya está consolidado.',
-    prompt: '¿Por qué se desvía Escenografía?',
-    agentes: ['costes', 'prevision'],
-    nivel: 'propone',
+    id: 'solo',
+    arco: 'Lo hace solo',
+    titulo: 'Una factura que cuadra',
+    unaLinea: 'Entra una factura que cuadra con su pedido. Conciliación la contabiliza sin preguntar, porque es rutinario y reversible, y queda registrada.',
+    nivel: 'ejecuta',
     capacidad: 'decidida',
-  },
-  {
-    id: 'compra',
-    grupo: 'semana',
-    titulo: 'Aprobar una compra',
-    descripcion: 'Impacto en el capítulo, en el cierre y en la caja antes de decidir.',
-    prompt: '¿Qué órdenes de compra tengo pendientes?',
-    agentes: ['costes', 'prevision', 'excepciones'],
-    nivel: 'aprueba',
-    capacidad: 'decidida',
-  },
-  {
-    id: 'caja',
-    grupo: 'semana',
-    titulo: 'Previsión de cierre y caja',
-    descripcion: 'Coste estimado final, semanas en negativo y ajustes de previsión.',
-    prompt: '¿Cómo cerraremos el proyecto y llegamos con la caja?',
-    agentes: ['prevision', 'costes'],
-    nivel: 'propone',
-    capacidad: 'decidida',
-  },
-  {
-    id: 'factura',
-    grupo: 'entra',
-    titulo: 'Factura entrante',
-    descripcion: 'Se lee, se casa con su pedido y se contabiliza sola si todo cuadra.',
-    prompt: '¿Han llegado facturas nuevas?',
+    autonomia: 'Lo hace solo: es rutinario y reversible.',
     agentes: ['facturas', 'conciliacion', 'cumplimiento'],
-    nivel: 'ejecuta',
-    capacidad: 'decidida',
+    prompt: '¿Han llegado facturas nuevas?',
+    entrada: evento('EV-01'),
+    nota: 'Entra una factura que cuadra con su pedido: Conciliación la contabiliza sola. Queda registrada y se puede deshacer.',
+    intenciones: ['factura_nueva'],
   },
   {
-    id: 'ticket',
-    grupo: 'entra',
-    titulo: 'Gasto dudoso',
-    descripcion: 'Confianza baja: el agente propone la partida y espera tu confirmación.',
+    id: 'propone',
+    arco: 'Te lo propone',
+    titulo: 'Un ticket que no sabe dónde va',
+    unaLinea: 'Con un ticket dudoso, Facturas no decide: te propone dos partidas, con lo que cada una hace al coste, y espera tu sí.',
+    nivel: 'propone',
+    capacidad: 'decidida',
+    autonomia: 'Te lo propone: lo deja preparado y espera tu sí.',
+    agentes: ['facturas', 'excepciones', 'cumplimiento'],
     prompt: '¿Qué gastos tengo que revisar?',
-    agentes: ['facturas', 'excepciones'],
-    nivel: 'propone',
-    capacidad: 'decidida',
+    entrada: texto('¿Qué gastos tengo que revisar?'),
+    nota: `Con un ${CONFIANZA_TICKET} de confianza, Facturas no decide: te propone dos partidas y eliges tú.`,
+    intenciones: ['revisar_gasto', 'pedir_documentacion'],
   },
   {
-    id: 'documentacion',
-    grupo: 'entra',
-    titulo: 'Pedir documentación',
-    descripcion: 'Borrador para el proveedor con lo que falta. En la demo no se envía.',
-    prompt: 'Pide a Ferretería El Tornillo la factura completa',
-    agentes: ['cumplimiento', 'orquestador'],
-    nivel: 'propone',
-    capacidad: 'exploratoria',
-  },
-  {
-    id: 'cumplimiento',
-    grupo: 'anticipa',
-    titulo: 'Dossier fiscal e IGIC',
-    descripcion: 'Elegibilidad de los gastos y bloqueantes del dossier. El fiscalista revisa y firma.',
-    prompt: '¿Qué bloquea el dossier fiscal?',
-    agentes: ['cumplimiento', 'excepciones'],
+    id: 'aprueba',
+    arco: 'Te pide aprobación',
+    titulo: 'Una compra que ningún agente aprueba',
+    unaLinea: 'Llega una compra de hotel que deja Viajes por encima de su límite y baja la caja. Ningún agente puede aprobarla: te la traen con su impacto.',
     nivel: 'aprueba',
     capacidad: 'decidida',
+    autonomia: 'Pide tu aprobación: hay dinero en juego.',
+    agentes: ['costes', 'prevision', 'excepciones'],
+    prompt: 'Revisa la orden de compra OC-104',
+    entrada: evento('EV-02'),
+    espera: { tipo: 'orden', id: 'OC-104' },
+    decisionDePrueba: 'rechazar',
+    nota: 'Llega una compra de hotel que pasaría Viajes de su límite. Ningún agente puede aprobarla: te la traen con su impacto en el coste y la caja. Decide para seguir; después puedes deshacerlo.',
+    intenciones: ['aprobar_oc', 'prevision'],
   },
   {
-    id: 'incentivo',
-    grupo: 'anticipa',
-    titulo: 'Estimar el incentivo',
-    descripcion: 'Deducción orientativa por territorio con el motor de incentivos.',
-    prompt: '¿Cuánto supondría llegar al 50 % de gasto en Canarias?',
-    agentes: ['cumplimiento'],
+    id: 'adelanta',
+    arco: 'Se adelantan',
+    titulo: 'La lluvia de mañana',
+    unaLinea: 'Riesgos ve lluvia probable en el exterior de mañana. Propone cambiar el orden de jornadas, sin coste, o apartar dinero, y deja el aviso al equipo en borrador.',
     nivel: 'propone',
     capacidad: 'exploratoria',
-  },
-  {
-    id: 'riesgos',
-    grupo: 'anticipa',
-    titulo: 'Riesgos de rodaje',
-    descripcion: 'Lluvia en un exterior, una ausencia, un permiso pendiente o una orden del día sin publicar: avisa antes y propone qué hacer.',
-    prompt: '¿Qué riesgos hay para las próximas jornadas?',
+    autonomia: 'Te lo propone; apartar dinero pide tu aprobación.',
     agentes: ['riesgos', 'prevision', 'excepciones'],
-    nivel: 'aprueba',
-    capacidad: 'exploratoria',
+    prompt: PREGUNTA['RG-1'],
+    entrada: texto(PREGUNTA['RG-1']),
+    espera: { tipo: 'riesgo', id: 'RG-1' },
+    decisionDePrueba: 'aprobar',
+    nota: 'Lluvia mañana en un exterior: Riesgos propone cambiar el orden de jornadas, sin coste, o apartar dinero. Es una idea en exploración.',
+    intenciones: ['riesgos'],
   },
   {
-    id: 'alcance',
-    grupo: 'anticipa',
-    titulo: 'Lo que aún no hace',
-    descripcion: 'Production Rescue, pagos y envíos: el asistente lo dice claro.',
-    prompt: 'Activa el Production Rescue',
-    agentes: ['orquestador'],
-    nivel: 'ejecuta',
-    capacidad: 'posterior',
+    id: 'equipo',
+    arco: 'Todo el equipo',
+    titulo: 'El informe del viernes',
+    unaLinea: 'Pides una cosa y siete agentes trabajan a la vez. El borrador sale solo; compartirlo fuera de la productora necesita tu aprobación.',
+    nivel: 'aprueba',
+    capacidad: 'decidida',
+    autonomia: 'Lo preparan solos; compartirlo pide tu aprobación.',
+    agentes: ['orquestador', 'facturas', 'conciliacion', 'costes', 'prevision', 'excepciones', 'cumplimiento', 'informes'],
+    prompt: 'Prepárame el informe semanal de coste',
+    entrada: texto('Prepárame el informe semanal de coste'),
+    nota: 'Todo el equipo a la vez: siete agentes preparan el borrador. Compartirlo fuera de la productora necesita tu aprobación.',
+    intenciones: ['informe_semanal', 'explicar_desviacion', 'cumplimiento', 'incentivo'],
   },
 ]
 
-export const CASOS_POR_ID = Object.fromEntries(CASOS.map((c) => [c.id, c]))
-
-// Intención → caso de uso que cuenta como visto.
-export const CASO_DE_INTENCION = {
-  informe_semanal: 'informe',
-  explicar_desviacion: 'desviacion',
-  aprobar_oc: 'compra',
-  prevision: 'caja',
-  factura_nueva: 'factura',
-  revisar_gasto: 'ticket',
-  pedir_documentacion: 'documentacion',
-  cumplimiento: 'cumplimiento',
-  incentivo: 'incentivo',
-  fuera_alcance: 'alcance',
-  presupuesto_nuevo: 'presupuesto',
-  anadir_coste: 'presupuesto',
-  optimizar_proveedores: 'proveedores',
-  riesgos: 'riesgos',
+// Contrato EPILOGO: otro proyecto, antes del rodaje. Fuera del recorrido y de las
+// sugerencias de «La última función»; se ofrece bajo las historias y al final del recorrido.
+export const EPILOGO = {
+  id: 'itsasoa',
+  arco: 'Para después',
+  titulo: 'Antes del rodaje · Itsasoa',
+  unaLinea: 'Otro proyecto, en desarrollo: la primera propuesta de presupuesto y las llamadas a proveedores.',
+  capacidad: 'exploratoria',
+  agentes: ['presupuesto', 'proveedores', 'prevision', 'costes', 'excepciones'],
+  prompt: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa',
+  entrada: texto('Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa'),
+  intenciones: ['presupuesto_nuevo', 'anadir_coste', 'optimizar_proveedores'],
 }
 
-// Recorrido guiado: cada paso envía una entrada y explica qué mirar.
-export const RECORRIDO = [
-  { id: 'r1', titulo: 'Informe semanal', entrada: { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }, nota: 'El Orquestador reparte el trabajo. Mira cómo cada agente hace su parte y qué te deja para decidir.' },
-  { id: 'r2', titulo: 'Una compra que pide aprobación', entrada: { tipo: 'evento', eventoId: 'EV-02' }, nota: 'Llega una orden de compra que deja Viajes por encima del umbral del 8 %. Excepciones no la aprueba: te la trae. Decide tú para continuar; la aprueba producción ejecutiva.', espera: { tipo: 'orden', id: 'OC-104' } },
-  { id: 'r3', titulo: 'Factura entrante', entrada: { tipo: 'evento', eventoId: 'EV-01' }, nota: 'Confianza alta y casa con su pedido: se contabiliza sola y queda registrada.' },
-  { id: 'r4', titulo: 'Gasto dudoso', entrada: { tipo: 'texto', texto: '¿Qué gastos tengo que revisar?' }, nota: 'Con un 71 % de confianza el agente no decide: propone y espera.' },
-  { id: 'r5', titulo: 'Desviación', entrada: { tipo: 'texto', texto: '¿Por qué se desvía Escenografía?' }, nota: 'Pregunta con tus palabras. La respuesta lleva cifras y de dónde salen.' },
-  { id: 'r6', titulo: 'Cierre y caja', entrada: { tipo: 'texto', texto: '¿Cómo cerraremos el proyecto y llegamos con la caja?' }, nota: 'Previsión no mueve dinero: calcula, avisa y propone.' },
-  { id: 'r7', titulo: 'Dossier fiscal', entrada: { tipo: 'texto', texto: '¿Qué bloquea el dossier fiscal?' }, nota: 'Cumplimiento prepara; el fiscalista revisa y firma.' },
-  { id: 'r7b', titulo: 'Riesgos de rodaje (exploratorio)', entrada: { tipo: 'evento', eventoId: 'EV-RIESGOS' }, nota: 'Un agente proactivo: el parte de riesgos llega sin pedirlo. Avisa con antelación, propone una respuesta y, si hay dinero en juego, te deja decidir si se reserva.' },
-  { id: 'r8', titulo: 'Pedir documentación (exploratorio)', entrada: { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' }, nota: 'Un borrador listo para revisar. En la demo no sale ningún correo.' },
-  { id: 'r9', titulo: 'Incentivo (exploratorio)', entrada: { tipo: 'texto', texto: '¿Cuánto supondría llegar al 50 % de gasto en Canarias?' }, nota: 'Exploratorio: una estimación orientativa de algo que aún no está en el producto.' },
-  { id: 'r10', titulo: 'Primera propuesta de presupuesto (sin validar)', entrada: { tipo: 'texto', texto: 'Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa' }, nota: 'Otro proyecto, antes del rodaje: tus costes con proveedor más una estimación por capítulo, frente al objetivo.' },
-  { id: 'r11', titulo: 'Optimizar proveedores con llamadas', entrada: { tipo: 'texto', texto: 'Optimiza los proveedores de la propuesta' }, nota: 'Proveedores descarta lo que no cumple y te pide permiso antes de llamar. Autoriza o no para continuar; si autorizas, verás cada llamada.', espera: { tipo: 'llamadas', id: 'R1' } },
-  { id: 'r12', titulo: 'Fuera de alcance', entrada: { tipo: 'texto', texto: 'Activa el Production Rescue' }, nota: 'Cuando algo no está en el producto, lo dice.' },
-]
+export const HISTORIAS_POR_ID = Object.fromEntries([...HISTORIAS, EPILOGO].map((h) => [h.id, h]))
+
+// Contrato CASO_DE_INTENCION: intención → id de la historia (o 'itsasoa') que cuenta
+// como vista. Lo que no está (resumen, ayuda, fuera_alcance…) no cuenta.
+export const CASO_DE_INTENCION = Object.fromEntries([...HISTORIAS, EPILOGO].flatMap((h) => h.intenciones.map((i) => [i, h.id])))
+
+// Contrato RECORRIDO: seis pasos, uno por historia y en su orden; nunca el epílogo.
+// { id, historia, arco, titulo, nota, entrada (null = no envía nada), espera?, decisionDePrueba? }
+export const RECORRIDO = HISTORIAS.map((h) => ({
+  id: h.id,
+  historia: h.id,
+  arco: h.arco,
+  titulo: h.titulo,
+  nota: h.nota,
+  entrada: h.entradaRecorrido !== undefined ? h.entradaRecorrido : h.entrada,
+  ...(h.espera ? { espera: h.espera } : {}),
+  ...(h.decisionDePrueba ? { decisionDePrueba: h.decisionDePrueba } : {}),
+}))
+
+/**
+ * Contrato: la entrada que manda pulsar una historia. Si es una novedad que ya llegó
+ * (no está en mundo.entrantes), se pregunta con su texto. Vale también para el epílogo.
+ */
+export function entradaDeHistoria(h, mundo) {
+  const e = h.entrada
+  if (!e) return texto(h.prompt)
+  if (e.tipo === 'evento' && !mundo?.entrantes?.includes(e.eventoId)) return texto(h.prompt)
+  return e
+}
+
+// Compatibilidad: lo quita P5/P6. La UI actual aún pinta «Casos de uso» con CASOS.
+export const CASOS = HISTORIAS.map((h) => ({ ...h, descripcion: h.unaLinea }))
