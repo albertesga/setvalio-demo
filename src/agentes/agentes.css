@@ -254,6 +254,7 @@
 .ag-impacto { margin-top: 12px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); overflow: hidden; font-size: 13px; }
 .ag-impacto > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--flp-border); }
 .ag-impacto > div > span:nth-child(2), .ag-impacto > div > span:nth-child(3) { min-width: 84px; }
+.ag-impacto.is-unico > div { grid-template-columns: minmax(0, 1fr) auto; }
 .ag-impacto-cab { border-top: 0 !important; background: var(--flp-chalk); color: var(--flp-muted); font-size: 12px; font-weight: 500; }
 .ag-impacto > div.is-alerta { background: rgb(164 44 38 / 0.06); }
 .ag-impacto > div > span:first-child { color: var(--flp-carbon); }

@@ -175,5 +175,3 @@ export function entradaDeHistoria(h, mundo) {
   return e
 }
 
-// Compatibilidad: lo quita P5/P6. La UI actual aún pinta «Casos de uso» con CASOS.
-export const CASOS = HISTORIAS.map((h) => ({ ...h, descripcion: h.unaLinea }))

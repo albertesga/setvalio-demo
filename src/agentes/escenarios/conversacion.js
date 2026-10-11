@@ -1,7 +1,7 @@
 // Guiones de conversación: ayuda, cierre del recorrido, fuera de alcance,
 // desambiguar y no entendido.
 
-import { AGENTES, ORDEN_AGENTES, AUTONOMIA } from '../agentes.js'
+import { AGENTES, ORDEN_AGENTES, ORDEN_FAMILIAS, AUTONOMIA } from '../agentes.js'
 import { ROLES } from '../politicas.js'
 import { t, v, c, POLITICAS, paso, sug, texto, aviso, lista } from './comun.js'
 
@@ -31,10 +31,10 @@ function reglasAutonomia() {
   return [
     t('Clasifica solo si la confianza es de al menos {u}; por debajo, propone.', { u: v(POLITICAS.umbralConfianza, 'pct0') }),
     t('Contabiliza solo la factura que cuadra con un pedido aprobado.'),
-    t('Una compra de más de {imp} la aprueba line producer.', { imp: v(POLITICAS.umbralImporteOc, 'eur') }),
+    t('Una compra de más de {imp} la aprueba el line producer.', { imp: v(POLITICAS.umbralImporteOc, 'eur') }),
     t('Si deja su capítulo más de un {u} por encima de su presupuesto, la aprueba producción ejecutiva.', { u: v(POLITICAS.umbralDesviacion, 'pct0') }),
     t('Lo fiscal lo valida el fiscalista.'),
-    t('Riesgos de producción avisa sin que se lo pidas. Cambiar el plan lo decide line producer; apartar dinero o asumir el riesgo, producción ejecutiva.'),
+    t('Riesgos de producción avisa sin que se lo pidas. Cambiar el plan lo decide el line producer; apartar dinero o asumir el riesgo, producción ejecutiva.'),
     t('{regla}.', { regla: v(REGLA_COMUN) }),
   ]
 }
@@ -59,7 +59,8 @@ export const ayuda = {
           tipo: 'tabla',
           titulo: 'El equipo',
           plegado: true,
-          resumen: 'Ver el equipo',
+          // Informativo: el título ya dice qué es.
+          resumen: `${ORDEN_AGENTES.length - 1} agentes en ${ORDEN_FAMILIAS.length} familias, más el Orquestador`,
           columnas: [
             { id: 'agente', etiqueta: 'Agente' },
             { id: 'hace', etiqueta: 'Qué hace' },

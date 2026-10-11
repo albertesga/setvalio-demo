@@ -154,7 +154,7 @@ export function tarjetaRiesgo(m, id) {
   const fila = (etiqueta, despues) => ({ etiqueta, antes: cef, despues, cambio: despues - cef, formato: 'eur' })
   const impacto = [fila(lluvia ? 'Cambiar el orden de jornadas' : 'Replanificar las noches', lluvia ? base : cef)]
   if (acciones.some((a) => a.id === 'reservar')) {
-    impacto.push(fila(lluvia ? `Apartar ${eur(r.reserva)} por si llueve (${formatear(r.probabilidad, 'pct0').replace(' ', '\u00a0')} de lo que costaría perder la jornada)` : `Apartar ${eur(r.reserva)} ${porSi}`, base + r.reserva))
+    impacto.push(fila(lluvia ? `Apartar ${eur(r.reserva)} por si llueve (${formatear(r.probabilidad, 'pct0')} de lo que costaría perder la jornada)` : `Apartar ${eur(r.reserva)} ${porSi}`, base + r.reserva))
   }
   // Asumir parece gratis en la tabla: la etiqueta dice lo que se arriesga.
   const siOcurre = lluvia ? `si llueve, podría costar hasta ${eur(r.exposicion)} más` : `si hay más horas extra, podría costar unos ${eur(r.exposicion)} más`
@@ -166,7 +166,7 @@ export function tarjetaRiesgo(m, id) {
     agente: 'riesgos',
     nivel: 'aprueba',
     rol: 'Line producer',
-    nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Cambiar el plan lo decide line producer; apartar dinero o asumir el riesgo, producción ejecutiva.',
+    nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Cambiar el plan lo decide el line producer; apartar dinero o asumir el riesgo, producción ejecutiva.',
     entradaActual: PREGUNTA[id],
     titulo: r.titulo,
     resumen: lluvia

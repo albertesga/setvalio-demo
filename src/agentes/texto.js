@@ -60,13 +60,16 @@ export function isoDesde(ddmmaaaa) {
   return `${a}-${m}-${d}`
 }
 
+const sinCorte = (s) => s.replace(' %', '\u00a0%')
+
 const FORMATOS = {
   eur,
   eurCents,
   eurSigned,
-  pct: (n) => pct(n, 1),
-  pct0: (n) => pct(n, 0),
-  pctSigned: (n) => pctSigned(n, 1),
+  // Espacio de no separación antes de «%»: «80 %» no se parte en dos líneas.
+  pct: (n) => sinCorte(pct(n, 1)),
+  pct0: (n) => sinCorte(pct(n, 0)),
+  pctSigned: (n) => sinCorte(pctSigned(n, 1)),
   num,
   fecha,
   fechaCorta,

@@ -10,6 +10,7 @@ import { reducirVarias } from './acciones.js'
 import { RECORRIDO, HISTORIAS, EPILOGO, entradaDeHistoria } from './casos.js'
 import { DURACIONES } from './agentes.js'
 import { estadoDecision } from './calculos.js'
+import { renderTexto } from './texto.js'
 
 // Contrato EVENTOS: novedades del mundo. { id, retrasoMs, agente, titulo, automatico, historia }.
 // Solo las automáticas (EV-01 y EV-02) llegan solas, en este orden, con la conversación
@@ -180,8 +181,6 @@ function pasoTour(s0, indice) {
     titulo: paso.titulo,
     arco: paso.arco,
     historia: paso.historia,
-    // Compatibilidad: lo quita P5/P6. MensajeGuia aún pinta la nota en el hilo.
-    nota: paso.nota,
     hora: horaDe(s.reloj),
   })
   if (!paso.entrada) return s
@@ -242,7 +241,8 @@ function repiten(a, b) {
 export function sugerenciasDe(s) {
   const ultimo = [...s.mensajes].reverse().find((m) => m.rol === 'agentes')
   if (!ultimo || ultimo.estado === 'en_curso') return []
-  const enEpilogo = ultimo.turno.caso === EPILOGO.id
+  // Tras una acción propuesta/* el caso es null, pero el turno sigue en Itsasoa (turno.proyecto).
+  const enEpilogo = ultimo.turno.caso === EPILOGO.id || !!ultimo.turno.proyecto
   const clave = (texto) => {
     const det = interpretar(s.mundo, { tipo: 'texto', texto }, s.contexto)
     return { intencion: det.intencion, entidad: CLAVES_SUGERENCIA.map((k) => det.entidades?.[k] ?? '').join('|').replace(/^\|+$/, '') }
@@ -334,9 +334,15 @@ export function reducirSesion(s, a) {
       const mundo = reducirVarias(previo, [...propias, ...posteriores])
       const persona = personaDe(s)
       const decision = [...s.mensajes.slice(0, idx)].reverse().find((m) => m.rol === 'decision' || m.rol === 'novedad')
-      const que = decision?.rol === 'decision' ? decision.texto : msg.turno.titulo
+      // Lo que un agente hizo solo se cita por su resumen («Conciliación contabilizó sola…»).
+      const texto =
+        decision?.rol === 'decision'
+          ? `${persona.nombre} ha deshecho «${decision.texto}». Todo vuelve a como estaba.`
+          : msg.turno.resumen
+            ? `${persona.nombre} ha deshecho «${renderTexto(msg.turno.resumen)}». Todo vuelve a como estaba.`
+            : `${persona.nombre} ha deshecho «${msg.turno.titulo}». Todo vuelve a como estaba.`
       const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true } : m)) }
-      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: `${persona.nombre} ha deshecho «${que}». Todo vuelve a como estaba.`, hora: horaDe(n.reloj) })
+      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto, hora: horaDe(n.reloj) })
       return n
     }
 

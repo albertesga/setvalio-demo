@@ -238,4 +238,3 @@
 }
 
 /* Durante el recorrido no llegan novedades solas: «Pausar novedades» sobra. */
-.ag-app.is-recorrido .ag-msg-novedad .ag-link { display: none; }

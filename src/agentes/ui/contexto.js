@@ -10,8 +10,9 @@ import { createContext, useContext } from 'react'
 //   Con la demo recién abierta (solo el parte) empieza al momento; si ya hay conversación,
 //   abre la hoja «¿Empezar el recorrido desde cero?». Quien lo llama no pregunta nada.
 // - enRecorrido: hay un recorrido en marcha
+// - esperaRecorrido: la decisión ({ tipo, id }) que espera el paso del recorrido, o null
 // - vistos: ids de HISTORIAS vistas, en el orden del arco (vistosDe(s))
-// - deshacible, eventosPausados, primerAviso
+// - deshacible, eventosPausados
 export const AgentesCtx = createContext(null)
 
 export function useCtx() {

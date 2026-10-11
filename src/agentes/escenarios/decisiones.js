@@ -1,6 +1,6 @@
 // Lo que hacen los agentes después de una decisión de una persona.
 
-import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja } from './comun.js'
+import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja, nombreCorto } from './comun.js'
 import { cuenta } from '../texto.js'
 import { optimizacion, totalesPropuesta, ALTERNATIVAS_POR_ID } from '../propuesta.js'
 import { componerComparacion, kpisPropuesta, textoDiferencia, tarjetaEleccion, proyectoPropuesta, sugVolver } from './presupuesto.js'
@@ -220,7 +220,7 @@ export const accion = {
         )
         bloques.push(kpisProyecto(despues, antes, { claves: ['comprometido', 'cef', 'desviacion'] }))
         if (cambioCaja(antes, despues)) bloques.push(bloqueCaja(despues, antes))
-        if (capD.fueraRango) sugerencias.push(sug(`Explica la desviación del capítulo ${capD.id}`))
+        if (capD.fueraRango) sugerencias.push(sug(`¿Por qué se desvía ${nombreCorto(capD.nombre)}?`))
         break
       }
       case 'orden/rechazar': {
@@ -229,7 +229,7 @@ export const accion = {
         break
       }
       case 'orden/escalar':
-        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie: cambia a esa persona en «Ver como» y decide en la misma tarjeta.', { id: v(a.ocId, 'id'), rol: v(a.a) })))
+        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie: pulsa «Decidir como…» en la tarjeta, o cambia de persona en Opciones, y decide ahí mismo.', { id: v(a.ocId, 'id'), rol: v(a.a) })))
         break
       case 'documento/contabilizar': {
         const d = despues.documentos[a.docId]

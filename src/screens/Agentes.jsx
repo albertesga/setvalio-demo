@@ -245,16 +245,6 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const vistos = useMemo(() => vistosDe(s), [s])
   const porRevisar = useMemo(() => decisionesAbiertas(s.mundo).length, [s.mundo])
 
-  // El aviso completo de «En exploración» sale la primera vez; después, solo la etiqueta.
-  const primerAviso = useMemo(() => {
-    const out = {}
-    for (const m of s.mensajes) {
-      if (m.rol !== 'agentes') continue
-      for (const b of m.turno.bloques) if (b.tipo === 'aviso' && !(b.tono in out)) out[b.tono] = m.id
-    }
-    return out
-  }, [s.mensajes])
-
   const ctx = {
     mundo: s.mundo,
     persona,
@@ -267,9 +257,10 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     ocupado,
     deshacible: s.ultimaMutacion?.mensajeId,
     eventosPausados: s.eventosPausados,
-    primerAviso,
     iniciarRecorrido,
     enRecorrido,
+    // La decisión que espera el paso del recorrido ({ tipo, id }) o null.
+    esperaRecorrido: tour?.paso.espera ?? null,
     vistos,
   }
 

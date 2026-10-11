@@ -344,7 +344,7 @@ function MensajeAgentes({ msg, ultimo }) {
 
       {puedeDeshacer && (
         <div className="ag-deshacer">
-          <span>{automatico ? '¿Prefieres revisarla tú?' : '¿No era esto?'}</span>
+          <span>{automatico ? 'Lo hizo sin preguntarte.' : '¿No era esto?'}</span>
           <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={deshacer}>
             {automatico ? `Deshacer lo que hizo ${quien}` : 'Deshacer esta decisión'}
           </FilmpilotButton>
@@ -386,7 +386,7 @@ function MensajeDecision({ msg }) {
 }
 
 function MensajeNovedad({ msg, ultimaNovedad }) {
-  const { despachar, eventosPausados } = useCtx()
+  const { despachar, eventosPausados, enRecorrido } = useCtx()
   return (
     <div className="ag-msg-novedad" role="note">
       <span className="ag-msg-novedad-icono" aria-hidden="true">
@@ -398,7 +398,8 @@ function MensajeNovedad({ msg, ultimaNovedad }) {
           <span className="tnum">{msg.hora}</span> · Llega sola, sin que la pidas: así avisan los agentes.
         </span>
       </span>
-      {ultimaNovedad && (
+      {/* En el recorrido las novedades las trae cada paso: no hay nada que pausar. */}
+      {ultimaNovedad && !enRecorrido && (
         <button type="button" className="ag-link" onClick={() => despachar({ tipo: 'pausarEventos', valor: !eventosPausados })}>
           {eventosPausados ? 'Reanudar novedades' : 'Pausar novedades'}
         </button>

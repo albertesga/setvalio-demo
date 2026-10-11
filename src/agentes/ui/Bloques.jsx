@@ -495,17 +495,23 @@ const MOTIVO_INFORME = {
  * el botón amarillo; las demás, carbón.
  */
 export function BloqueAprobacion({ b, principal = true }) {
-  const { mundo, persona, decidir, ocupado, enviar, despachar } = useCtx()
+  const { mundo, persona, decidir, ocupado, enviar, enviarEntrada, despachar, enRecorrido, esperaRecorrido } = useCtx()
+  // En el recorrido el amarillo es «Siguiente», salvo en la tarjeta que el paso espera.
+  const amarillo = principal && (!enRecorrido || (esperaRecorrido?.tipo === b.ref?.tipo && esperaRecorrido?.id === b.ref?.id))
+  // «Todavía no» no decide: marca la tarjeta y la deja en «Por revisar».
+  const [pospuesta, setPospuesta] = useState(false)
   const ed = c.estadoDecision(mundo, b.ref)
   const decidida = ESTADO_DECISION[ed.estado]
   const tieneRolPropio = (a) => !a.rol || puedeDecidir(persona.rol, a.rol)
   const sinPermiso = b.acciones.some((a) => a.rol && !a.soloSinPermiso) && !b.acciones.some((a) => !a.soloSinPermiso && tieneRolPropio(a))
   const yaPedida = !!ed.escaladaA
-  const visibles = b.acciones.filter((a) => (a.soloSinPermiso ? sinPermiso && !yaPedida : true))
+  const visibles = b.acciones.filter((a) => (a.soloSinPermiso ? sinPermiso && !yaPedida : a.posponer ? !pospuesta : true))
+  // Solo deciden las acciones con `accion`; las de `entrada` (pedir la factura) y `posponer` no.
+  const decisorias = visibles.filter((a) => a.accion && !a.soloSinPermiso)
   const etiquetaRef = renderTexto(b.titulo)
   const informeViejo = b.ref?.tipo === 'informe' ? c.motivoInformeDesactualizado(mundo, b.ref.id) : null
   // Quién decide: «Decides tú (rol)», «Decide: rol» o, si las acciones son de dos roles, «Deciden: rol y rol».
-  const rolesAcciones = [...new Set(visibles.filter((a) => !a.soloSinPermiso && a.rol).map((a) => a.rol))]
+  const rolesAcciones = [...new Set(decisorias.filter((a) => a.rol).map((a) => a.rol))]
   const quienDecide =
     rolesAcciones.length > 1
       ? `Deciden: ${rolesAcciones.map((r) => r.toLowerCase()).join(' y ')}`
@@ -515,8 +521,13 @@ export function BloqueAprobacion({ b, principal = true }) {
           ? `Decide: ${b.rol.toLowerCase()}`
           : null
   // Si otra persona de la demo puede decidir lo que esta no, se ofrece verla como ella.
-  const otraPersona = Object.values(PERSONAS).find((p) => p.id !== persona.id && visibles.some((a) => !a.soloSinPermiso && a.rol && !tieneRolPropio(a) && puedeDecidir(p.rol, a.rol)))
-  const lineaPermiso = !sinPermiso && visibles.some((a) => !a.soloSinPermiso && !tieneRolPropio(a))
+  const otraPersona = Object.values(PERSONAS).find((p) => p.id !== persona.id && decisorias.some((a) => a.rol && !tieneRolPropio(a) && puedeDecidir(p.rol, a.rol)))
+  const lineaPermiso = !sinPermiso && decisorias.some((a) => !tieneRolPropio(a))
+  const pulsar = (a) => {
+    if (a.entrada) enviarEntrada(a.entrada)
+    else if (a.posponer) setPospuesta(true)
+    else decidir(a.accion, a.burbuja ? renderTexto(a.burbuja) : a.etiqueta)
+  }
 
   return (
     <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`} data-ref={b.ref ? `${b.ref.tipo}-${b.ref.id}` : undefined}>
@@ -548,7 +559,28 @@ export function BloqueAprobacion({ b, principal = true }) {
           .
         </p>
       )}
-      {b.impacto?.length > 0 && (
+      {b.impacto?.length > 0 && b.impactoUnico && (
+        <>
+          <p className="mt-3 text-sm text-flp-muted">
+            <Tx value={b.impactoUnico.titulo} />
+          </p>
+          <div className="ag-impacto is-unico" role="table" aria-label="Impacto de cada opción">
+            <div role="row" className="ag-impacto-cab">
+              <span role="columnheader">{b.impactoTitulo ?? 'Opción'}</span>
+              <span role="columnheader" className="text-right">{b.impactoUnico.columna}</span>
+            </div>
+            {b.impacto.map((f) => (
+              <div role="row" key={f.etiqueta}>
+                <span role="cell">{f.etiqueta}</span>
+                <span role="cell" className="tnum text-right font-semibold text-flp-ink">
+                  {f.cambio ? formatear(f.cambio, b.impactoUnico.formato) : 'Sin cambio'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {b.impacto?.length > 0 && !b.impactoUnico && (
         <div className="ag-impacto" role="table" aria-label="Impacto de la decisión">
           <div role="row" className="ag-impacto-cab">
             <span role="columnheader">{b.impactoTitulo ?? 'Si se aprueba'}</span>
@@ -563,7 +595,7 @@ export function BloqueAprobacion({ b, principal = true }) {
               </span>
               <span role="cell" className={`tnum text-right font-semibold ${f.alerta ? 'text-flp-error' : 'text-flp-ink'}`}>
                 {formatear(f.despues, f.formato)}
-                {f.alerta && <span className="sr-only"> (se pasa del límite)</span>}
+                {f.alerta && <span className="sr-only"> ({f.alertaTexto ?? 'se pasa del límite'})</span>}
               </span>
             </div>
           ))}
@@ -610,10 +642,11 @@ export function BloqueAprobacion({ b, principal = true }) {
               <Tono tono="info">Reserva aprobada ahora: {formatear(ed.reservaActual, 'eur')}</Tono>
             </div>
           )}
-          {(yaPedida || ed.aplazado) && (
+          {(yaPedida || ed.aplazado || pospuesta) && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {yaPedida && <Tono tono="info">Pendiente de {ed.escaladaA}{ed.por ? ` · pedido por ${ed.por}` : ''}</Tono>}
               {ed.aplazado && <Tono tono="neutral">En revisión{ed.por ? ` · ${ed.por}` : ''}</Tono>}
+              {pospuesta && <Tono tono="neutral">Lo decides luego · sigue en «Por revisar»</Tono>}
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
@@ -622,10 +655,10 @@ export function BloqueAprobacion({ b, principal = true }) {
               return (
                 <FilmpilotButton
                   key={a.id}
-                  variant={a.variante === 'primary' && permitido ? (principal ? 'primary' : 'carbon') : 'secondary'}
+                  variant={a.variante === 'primary' && permitido ? (amarillo ? 'primary' : 'carbon') : 'secondary'}
                   size="md"
                   disabled={!permitido || ocupado}
-                  onClick={() => decidir(a.accion, a.burbuja ? renderTexto(a.burbuja) : a.etiqueta)}
+                  onClick={() => pulsar(a)}
                   title={a.detalle ? renderTexto(a.detalle) : undefined}
                 >
                   {a.etiqueta}
@@ -635,7 +668,7 @@ export function BloqueAprobacion({ b, principal = true }) {
           </div>
           {lineaPermiso && (
             <p className="mt-2 text-xs text-flp-muted">
-              Como {persona.rol.toLowerCase()} puedes {visibles.filter((a) => !a.soloSinPermiso && tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' o ')}; {visibles.filter((a) => !a.soloSinPermiso && !tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' y ')} lo decide {visibles.find((a) => !a.soloSinPermiso && !tieneRolPropio(a)).rol.toLowerCase()}.
+              Como {persona.rol.toLowerCase()} puedes {decisorias.filter(tieneRolPropio).map((a) => a.etiqueta.toLowerCase()).join(' o ')}; {decisorias.filter((a) => !tieneRolPropio(a)).map((a) => a.etiqueta.toLowerCase()).join(' y ')} lo decide {decisorias.find((a) => !tieneRolPropio(a)).rol.toLowerCase()}.
             </p>
           )}
           {sinPermiso && (
