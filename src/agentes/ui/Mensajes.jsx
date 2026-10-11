@@ -281,8 +281,8 @@ function MensajeAgentes({ msg, ultimo }) {
           <div className="min-w-0 flex-1">
             {t.proyecto && (
               <p className="flp-kicker text-flp-muted">
+                {/* La productora ya la nombra la respuesta: el antetítulo cabe en una línea en móvil. */}
                 Otro proyecto · {t.proyecto.titulo}
-                {t.proyecto.productora ? ` (${t.proyecto.productora})` : ''}
                 {t.proyecto.estado ? ` · ${t.proyecto.estado}` : ''}
               </p>
             )}
