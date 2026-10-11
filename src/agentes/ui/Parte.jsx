@@ -306,3 +306,6 @@ export function BloqueEquipo({ b }) {
     </section>
   )
 }
+
+// Registro de los bloques de este archivo: Bloques.jsx los busca aquí por tipo al pintar.
+export const BLOQUES_PARTE = { tira: BloqueTira, agenda: BloqueAgenda, equipo: BloqueEquipo }

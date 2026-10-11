@@ -15,7 +15,7 @@ import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
 import { useMovimientoReducido } from '../useAgentes.js'
 import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, diaCorto } from './Piezas.jsx'
-import { BloqueTira, BloqueAgenda, BloqueEquipo } from './Parte.jsx'
+import { BLOQUES_PARTE } from './Parte.jsx'
 import { PERSONAS } from '../mundo.js'
 
 const fmt = (valor, formato) => (formato ? formatear(valor, formato) : String(valor ?? ''))
@@ -1418,13 +1418,12 @@ const REGISTRO = {
   llamada: BloqueLlamada,
   riesgos: BloqueRiesgos,
   plan: BloquePlan,
-  tira: BloqueTira,
-  agenda: BloqueAgenda,
-  equipo: BloqueEquipo,
 }
 
 export function Bloque({ b, mensajeId }) {
-  const C = REGISTRO[b.tipo]
+  // Los bloques del parte (y del índice de historias) viven en Parte.jsx y se registran allí,
+  // en BLOQUES_PARTE. Se leen al pintar, no al cargar el módulo: Parte.jsx también importa de aquí.
+  const C = REGISTRO[b.tipo] ?? BLOQUES_PARTE[b.tipo]
   return C ? <C b={b} mensajeId={mensajeId} /> : null
 }
 

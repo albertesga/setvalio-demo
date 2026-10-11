@@ -107,6 +107,9 @@ export function responder(mundo, entrada, contexto = {}) {
     fuentes: comp.fuentes ?? [],
     reglas: comp.reglas ?? [],
     noHecho: comp.noHecho ?? [],
+    // Opcionales: una línea para plegar el turno (novedades) y el proyecto si no es La última función.
+    resumen: comp.resumen ?? null,
+    proyecto: comp.proyecto ?? null,
   }
   const nuevoContexto =
     entrada.tipo === 'texto' && det.intencion !== 'no_entendido' && det.intencion !== 'desambiguar'
