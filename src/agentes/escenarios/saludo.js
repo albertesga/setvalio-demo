@@ -11,7 +11,7 @@ import { cuenta, esPlantilla, unir } from '../texto.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, jornada, jornadaOriginal, PREGUNTA, UMBRALES } from '../rodaje.js'
 import { borradorRiesgo } from './riesgos.js'
-import { t, v, c, POLITICAS, paso, texto } from './comun.js'
+import { t, v, c, POLITICAS, paso, texto, semanaDel } from './comun.js'
 
 // Las preguntas que mandan los botones de «Para hoy».
 export const PREGUNTAS_PARTE = {
@@ -85,7 +85,11 @@ export function agendaDelDia(m) {
     }
     const total = imps.reduce((s, x) => s + x.o.importe, 0)
     const exceso = imps.reduce((s, x) => s + x.imp.exceso, 0)
-    const semana = m.tesoreria.semanas.find((s) => s.semana === ordenes[0].semanaPago)
+    // La semana de pago del grupo: si alguna se paga ya, lo dice; si no, la más temprana.
+    const semanas = m.tesoreria.semanas
+    const idxs = ordenes.map((o) => semanas.findIndex((s) => s.semana === o.semanaPago)).filter((i) => i >= 0)
+    const enCurso = idxs.filter((i) => semanas[i].enCurso).length
+    const semana = idxs.length ? semanas[Math.min(...idxs)] : null
     const ejecutiva = imps.some((x) => x.imp.rol === 'Producción ejecutiva')
     items.push({
       id: 'compras',
@@ -94,7 +98,14 @@ export function agendaDelDia(m) {
         exceso > 0
           ? t('Suman {total}. Si las apruebas, el coste estimado final sube {exc}: no estaba previsto.', { total: v(total, 'eur'), exc: v(exceso, 'eur') })
           : t('Suman {total} y caben en lo previsto para sus partidas: no mueven el coste estimado final.', { total: v(total, 'eur') }),
-      cuando: semana?.enCurso ? t('Se pagan esta semana') : semana ? t('Se pagan la semana del {f}', { f: v(semana.fechas) }) : t('Sin semana de pago'),
+      cuando:
+        enCurso && enCurso === idxs.length
+          ? t(ordenes.length === 1 ? 'Se paga esta semana' : 'Se pagan esta semana')
+          : enCurso
+            ? t('{n} esta semana', { n: v(enCurso === 1 ? 'Una se paga' : `${enCurso} se pagan`) })
+            : semana
+              ? t(ordenes.length === 1 ? 'Se paga la semana del {f}' : 'Se pagan desde la semana del {f}', { f: v(semanaDel(semana.fechas)) })
+              : t('Sin semana de pago'),
       decide: ejecutiva ? 'Producción ejecutiva' : 'Line producer',
       // Plegadas tras «Ver las compras ›»: el punto ya dice cuántas son y cuánto suman.
       plegado: ordenes.length === 1 ? t('Ver la compra') : t('Ver las compras'),
@@ -221,7 +232,7 @@ function cifras(m) {
         etiqueta: 'Caja hoy',
         formato: 'eur',
         valor: tes.saldoHoy,
-        sub: tes.negativas.length ? t('En negativo la semana del {f}: {s}', { f: v(tes.minimo.fechas), s: v(tes.minimo.saldo, 'eur') }) : t('Sin semanas en negativo'),
+        sub: tes.negativas.length ? t('En negativo la semana del {f}: {s}', { f: v(semanaDel(tes.minimo.fechas)), s: v(tes.minimo.saldo, 'eurSigned') }) : t('Sin semanas en negativo'),
       },
     ],
   }
@@ -231,8 +242,11 @@ function cifras(m) {
  * «Ya hecho, sin pedírtelo»: tres líneas como mucho con lo que han hecho solos antes
  * de que llegues. El detalle de cada agente queda en «Cómo lo han hecho».
  */
+// Lo que contabilizó Conciliación sola, con su pedido; lo que decidió la persona no cuenta.
+const deConciliacion = (d) => d.estado === 'contabilizada' && d.oc && (d.contabilizadaPor == null || d.contabilizadaPor === 'Conciliación')
+
 function hecho(m) {
-  const contabilizadas = Object.values(m.documentos).filter((d) => d.estado === 'contabilizada')
+  const contabilizadas = Object.values(m.documentos).filter(deConciliacion)
   const riesgos = evaluarRiesgos(m)
   const altos = riesgos.filter((r) => r.severidad === 'alta').length
   const items = [
@@ -269,7 +283,7 @@ export const saludo = {
     const riesgos = evaluarRiesgos(m)
     const tot = c.totales(m)
     const tes = c.tesoreria(m)
-    const contab = Object.values(m.documentos).filter((d) => d.estado === 'contabilizada').length
+    const contab = Object.values(m.documentos).filter(deConciliacion).length
     const bandeja = Object.values(m.documentos).filter((d) => d.estado === 'en_bandeja').length
     const dossier = c.dossier(m).sort((a, b) => a.dias - b.dias)
     const dec = decisionesAbiertas(m)
@@ -285,7 +299,7 @@ export const saludo = {
       paso('conciliacion', t('Repasa lo que ha contabilizado sola'), { tipo: 'lectura', paralelo: true, salida: t('{n} casadas con su pedido', { n: cuenta(contab, 'factura', 'facturas') }) }),
       paso('facturas', t('Mira la bandeja de entrada'), { tipo: 'lectura', paralelo: true, salida: t('{n} esperando', { n: cuenta(bandeja, 'documento', 'documentos') }) }),
       paso('prevision', t('Recalcula la caja de las próximas semanas'), {
-        salida: tes.negativas.length ? t('La semana del {f} baja a {s}', { f: v(tes.minimo.fechas), s: v(tes.minimo.saldo, 'eur') }) : t('Sin semanas en negativo'),
+        salida: tes.negativas.length ? t('La semana del {f} baja a {s}', { f: v(semanaDel(tes.minimo.fechas)), s: v(tes.minimo.saldo, 'eurSigned') }) : t('Sin semanas en negativo'),
       }),
       paso('cumplimiento', t('Repasa los plazos del dossier fiscal'), {
         tipo: 'revision',
@@ -320,7 +334,8 @@ export const saludo = {
         t('Los plazos del dossier entran si vencen en los próximos {d}', { d: v(UMBRALES.diasAlta, 'dias') }),
       ],
       // Lo de «Ya hecho» se hizo antes: para preparar el parte solo se lee.
-      noHecho: [t('Para preparar el parte solo ha leído: no ha aprobado, contabilizado ni cambiado nada.'), t('No ha enviado avisos ni ha contactado con nadie.')],
+      // Lo han preparado varios agentes: plural.
+      noHecho: [t('Para preparar el parte solo han leído: no han aprobado, contabilizado ni cambiado nada.'), t('No han enviado avisos ni han contactado con nadie.')],
     }
   },
 }

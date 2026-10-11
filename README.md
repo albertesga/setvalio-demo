@@ -57,9 +57,9 @@ historia es un nivel de autonomía, en este orden:
 | Cada mañana | Lo que encuentras cada mañana | El parte, sin pedir nada |
 | Lo hace solo | Una factura que cuadra | Conciliación contabiliza sola lo rutinario y reversible, y se puede deshacer |
 | Te lo propone | Un ticket que no sabe dónde va | Facturas propone dos partidas con su impacto y espera tu sí |
-| Te pide aprobación | Una compra que ningún agente aprueba | Una compra de hotel que pasa el límite de Viajes: decides tú |
+| Pide tu aprobación | Una compra que ningún agente aprueba | Una compra de hotel que pasaría el límite de Viajes: decides tú |
 | Se adelantan | La lluvia de mañana | Riesgos propone cambiar el orden de jornadas antes de que llueva |
-| Todo el equipo | El informe del viernes | Siete agentes a la vez; compartir el informe necesita tu aprobación |
+| Todo el equipo | El informe del viernes | Siete agentes se reparten el trabajo; compartir el informe necesita tu aprobación |
 
 Las historias viven en `src/agentes/casos.js` (`HISTORIAS`) y de ahí salen el
 carril, «¿Qué puedes hacer?», el **recorrido guiado** (un paso por historia; el

@@ -89,11 +89,12 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
   )
 }
 
-/** Lleva a la tarjeta que espera la decisión del paso y le pasa el foco. */
+/** Lleva a la tarjeta que espera la decisión del paso y le pasa el foco. Devuelve si la encontró. */
 function irALaTarjeta(espera) {
   const abiertas = [...document.querySelectorAll(`.ag-aprobacion[data-ref="${espera.tipo}-${espera.id}"]:not(.is-decidida)`)]
-  const t = abiertas[abiertas.length - 1] ?? [...document.querySelectorAll('.ag-aprobacion:not(.is-decidida)')].pop()
-  if (!t) return
+  // Nunca otra tarjeta: decidirla no desbloquearía el paso.
+  const t = abiertas[abiertas.length - 1]
+  if (!t) return false
   const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   // Con un poco de aire arriba: la tarjeta no queda pegada a la barra del recorrido.
   const hilo = t.closest('.ag-scroll')
@@ -102,6 +103,7 @@ function irALaTarjeta(espera) {
   const foco = t.querySelector('h4') ?? t
   if (!foco.hasAttribute('tabindex') && foco.tabIndex < 0) foco.setAttribute('tabindex', '-1')
   foco.focus({ preventScroll: true })
+  return true
 }
 
 /**
@@ -109,7 +111,7 @@ function irALaTarjeta(espera) {
  * En móvil ocupa una línea («2/6 · Lo hace solo») y la nota se abre al tocarla;
  * en escritorio, la nota va entera.
  */
-export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, ocupado, onSiguiente, onSalir }, ref) {
+export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, ocupado, onSiguiente, onSalir, onPedirTarjeta }, ref) {
   const [nota, setNota] = useState(false)
   // Cada paso empieza con la nota plegada en móvil.
   const indice = tour?.indice
@@ -147,7 +149,7 @@ export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, ocupado
           Salir
         </FilmpilotButton>
         {esperaDecision ? (
-          <FilmpilotButton variant="secondary" onClick={() => irALaTarjeta(paso.espera)} aria-label="Decide en la tarjeta para seguir: ir a la tarjeta">
+          <FilmpilotButton variant="secondary" onClick={() => irALaTarjeta(paso.espera) || onPedirTarjeta?.()} aria-label="Decide en la tarjeta para seguir: ir a la tarjeta">
             <span className="hidden sm:inline">Decide en la tarjeta</span>
             <span className="sm:hidden">Decide</span>
             <span aria-hidden="true">↓</span>

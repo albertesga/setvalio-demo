@@ -230,7 +230,10 @@ export function excepciones(mundo) {
   const out = []
   for (const d of Object.values(mundo.documentos)) {
     if (d.estado !== 'en_bandeja') continue
-    if (confianzaBaja(d)) {
+    // Lo que Conciliación contabilizó sola y se deshizo espera a que la persona lo revise.
+    if (d.revisionManual) {
+      out.push({ id: `ex-${d.id}`, tipo: 'manual', ref: { tipo: 'documento', id: d.id }, nivel: 'propone', rol: ROLES.revisionHumana, aplazado: !!d.aplazado, importe: d.base, titulo: `${d.proveedor}: la revisas tú`, entrada: `Procesa la factura ${d.id}` })
+    } else if (confianzaBaja(d)) {
       out.push({ id: `ex-${d.id}`, tipo: 'confianza', ref: { tipo: 'documento', id: d.id }, nivel: 'propone', rol: ROLES.revisionHumana, aplazado: !!d.aplazado, importe: d.base, titulo: `${d.proveedor}: partida dudosa`, entrada: '¿Qué gastos tengo que revisar?' })
     } else if (d.impuesto?.tipo === 'IGIC') {
       if (!mundo.revisiones[d.id]) out.push({ id: `ex-${d.id}`, tipo: 'fiscal', ref: { tipo: 'revision', id: d.id }, nivel: 'aprueba', rol: ROLES.fiscalista, importe: d.base, titulo: `${d.proveedor}: IGIC por validar`, entrada: `Revisa el IGIC de la factura ${d.id}` })

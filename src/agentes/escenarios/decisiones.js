@@ -1,6 +1,6 @@
 // Lo que hacen los agentes después de una decisión de una persona.
 
-import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja, nombreCorto } from './comun.js'
+import { t, v, c, paso, sug, texto, aviso, kpisProyecto, kpisPartida, bloqueCaja, nombreCorto, minuscula } from './comun.js'
 import { cuenta } from '../texto.js'
 import { optimizacion, totalesPropuesta, ALTERNATIVAS_POR_ID } from '../propuesta.js'
 import { componerComparacion, kpisPropuesta, textoDiferencia, tarjetaEleccion, proyectoPropuesta, sugVolver } from './presupuesto.js'
@@ -74,7 +74,7 @@ export const accion = {
       'propuesta/elegir': 'Elección de proveedor',
       'propuesta/anadirLinea': 'Coste añadido a la propuesta',
       'riesgo/mitigar': 'Plan de rodaje cambiado',
-      'riesgo/reservar': 'Reserva aprobada',
+      'riesgo/reservar': 'Dinero apartado',
       'riesgo/aceptar': 'Riesgo asumido',
     })[det.accion?.tipo] ?? 'Tras tu decisión',
   ejemplos: [],
@@ -94,7 +94,7 @@ export const accion = {
       case 'orden/rechazar':
         return [paso('excepciones', t('Registra el rechazo de {id}', { id: v(a.ocId, 'id') }), { tipo: 'plan', acciones: [a], salida: t('No se compromete el gasto') })]
       case 'orden/escalar':
-        return [paso('excepciones', t('Lleva {id} a {rol}', { id: v(a.ocId, 'id'), rol: v(a.a) }), { tipo: 'plan', acciones: [a], salida: t('En espera de su decisión') })]
+        return [paso('excepciones', t('Lleva {id} a {rol}', { id: v(a.ocId, 'id'), rol: v(minuscula(a.a)) }), { tipo: 'plan', acciones: [a], salida: t('En espera de su decisión') })]
       case 'documento/contabilizar': {
         const d = m.documentos[a.docId]
         return [
@@ -146,7 +146,7 @@ export const accion = {
       }
       case 'riesgo/reservar':
         return [
-          paso('excepciones', t('Registra la aprobación de la reserva'), { tipo: 'plan', acciones: [a], salida: t('{imp} reservados', { imp: v(a.importe, 'eur') }) }),
+          paso('excepciones', t('Registra el dinero apartado'), { tipo: 'plan', acciones: [a], salida: t('{imp} apartados', { imp: v(a.importe, 'eur') }) }),
           paso('prevision', t('Suma lo apartado al coste estimado final'), { salida: (_, d) => t('Coste estimado final {cef}', { cef: v(c.totales(d).cef, 'eur') }) }),
           ...regInf,
         ]
@@ -229,7 +229,7 @@ export const accion = {
         break
       }
       case 'orden/escalar':
-        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie: pulsa «Decidir como…» en la tarjeta, o cambia de persona en Opciones, y decide ahí mismo.', { id: v(a.ocId, 'id'), rol: v(a.a) })))
+        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie: pulsa «Decidir como…» en la tarjeta, o cambia de persona en Opciones, y decide ahí mismo.', { id: v(a.ocId, 'id'), rol: v(minuscula(a.a)) })))
         break
       case 'documento/contabilizar': {
         const d = despues.documentos[a.docId]
@@ -269,7 +269,7 @@ export const accion = {
                 b: v(jb.n, 'num'),
                 p: v(despues.rodaje.meteo[jb.fecha] ?? 0, 'pct0'),
                 coste: liberada
-                  ? t('Se libera la reserva de {res}: el coste estimado final baja a {cef}.', { res: v(antes.reservas[a.riesgoId].importe, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
+                  ? t('Se libera lo apartado, {res}: el coste estimado final baja a {cef}.', { res: v(antes.reservas[a.riesgoId].importe, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
                   : t('El coste estimado final no cambia; confirma el cambio con dirección, reparto y transporte.'),
               }),
             ),
@@ -282,7 +282,7 @@ export const accion = {
           bloques.push(
             texto(
               mantenida
-                ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: la reserva de {res} se mantiene y Riesgos lo sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
+                ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: lo apartado, {res}, se mantiene y Riesgos lo sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
                 : t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: Riesgos lo sigue vigilando.', { por: v(por) }),
             ),
           )
@@ -296,8 +296,8 @@ export const accion = {
         bloques.push(
           texto(
             antes.reservas?.[a.riesgoId]
-              ? t('Reserva ajustada por {por}: pasa de {ant} a {imp} y el coste estimado final queda en {cef}. Ningún capítulo cambia: la reserva sale aparte en las desviaciones y en el informe semanal.', { por: v(por), ant: v(antes.reservas[a.riesgoId].importe, 'eur'), imp: v(a.importe, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
-              : t('Reserva de {imp} aprobada por {por}: el coste estimado final sube a {cef}. Ningún capítulo cambia: la reserva sale aparte en las desviaciones y en el informe semanal.', { imp: v(a.importe, 'eur'), por: v(por), cef: v(c.totales(despues).cef, 'eur') }),
+              ? t('Dinero apartado ajustado por {por}: pasa de {ant} a {imp} y el coste estimado final queda en {cef}. Ningún capítulo cambia: va por separado en las desviaciones y en el informe semanal.', { por: v(por), ant: v(antes.reservas[a.riesgoId].importe, 'eur'), imp: v(a.importe, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
+              : t('{imp} apartados con la aprobación de {por}: el coste estimado final sube a {cef}. Ningún capítulo cambia: va por separado en las desviaciones y en el informe semanal.', { imp: v(a.importe, 'eur'), por: v(por), cef: v(c.totales(despues).cef, 'eur') }),
           ),
         )
         bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))
@@ -308,7 +308,7 @@ export const accion = {
         bloques.push(
           texto(
             liberada
-              ? t('Riesgo asumido por {por}: se libera la reserva de {res} y el coste estimado final baja a {cef}. Riesgos lo sigue vigilando.', { por: v(por), res: v(liberada, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
+              ? t('Riesgo asumido por {por}: se libera lo apartado, {res}, y el coste estimado final baja a {cef}. Riesgos lo sigue vigilando.', { por: v(por), res: v(liberada, 'eur'), cef: v(c.totales(despues).cef, 'eur') })
               : t('Riesgo asumido por {por}: no cambia el plan ni la previsión. Riesgos lo sigue vigilando y todavía se puede cambiar el plan.', { por: v(por) }),
           ),
         )

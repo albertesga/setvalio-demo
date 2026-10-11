@@ -61,7 +61,11 @@ export const aprobarOc = {
       const imp = c.impactoOrden(m1, id)
       pasos.push(
         paso('costes', t('Calcula el impacto en {cap}', { cap: v(nombreCorto(imp.capitulo.despues.nombre)) }), {
-          salida: t('Desviación del capítulo: de {a} a {b}', { a: v(imp.capitulo.antes.desviacionPct, 'pctSigned'), b: v(imp.capitulo.despues.desviacionPct, 'pctSigned') }),
+          // Si al redondear no cambia, se dice así y no «de +1,1 % a +1,1 %».
+          salida:
+            Math.abs(imp.capitulo.antes.desviacionPct - imp.capitulo.despues.desviacionPct) < 0.0005
+              ? t('La desviación del capítulo no cambia: {b}', { b: v(imp.capitulo.despues.desviacionPct, 'pctSigned') })
+              : t('Desviación del capítulo: de {a} a {b}', { a: v(imp.capitulo.antes.desviacionPct, 'pctSigned'), b: v(imp.capitulo.despues.desviacionPct, 'pctSigned') }),
         }),
       )
       pasos.push(

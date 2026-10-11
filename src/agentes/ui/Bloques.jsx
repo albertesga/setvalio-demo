@@ -2,7 +2,7 @@
 // cola de decisiones, informe, borrador) leen el mundo actual: si decides en una
 // tarjeta, todas las vistas de esa decisión cambian a la vez.
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconPlay, IconClock } from '../../components/icons.jsx'
 import { formatear, renderTexto, esPlantilla, fecha as fechaLarga } from '../texto.js'
@@ -334,7 +334,7 @@ function BloqueDesviaciones({ b }) {
           Sobrecostes <strong className="tnum text-flp-ink">{formatear(b.resumen.sobrecostes, 'eurSigned')}</strong> · ahorros <strong className="tnum text-flp-ink">{formatear(b.resumen.ahorros, 'eurSigned')}</strong> {b.resumen.reservas > 0 && (
             <>
               {' '}
-              · reservas de riesgos <strong className="tnum text-flp-ink">{formatear(b.resumen.reservas, 'eurSigned')}</strong>
+              · apartado por riesgos <strong className="tnum text-flp-ink">{formatear(b.resumen.reservas, 'eurSigned')}</strong>
             </>
           )}{' '}
           · neto <strong className="tnum text-flp-ink">{formatear(b.resumen.neto, 'eurSigned')}</strong>
@@ -475,7 +475,7 @@ export const ESTADO_DECISION = {
   rechazada: { etiqueta: 'Rechazada', tono: 'neutral' },
   preparada: { etiqueta: 'Paquete preparado · no enviado', tono: 'info' },
   mitigado: { etiqueta: 'Plan cambiado', tono: 'positive' },
-  reservado: { etiqueta: 'Reserva aprobada', tono: 'info' },
+  reservado: { etiqueta: 'Dinero apartado', tono: 'info' },
   aceptado: { etiqueta: 'Riesgo asumido', tono: 'neutral' },
   desactualizada: { etiqueta: 'La previsión ha cambiado desde esta tarjeta', tono: 'neutral' },
 }
@@ -484,7 +484,7 @@ const ICONO_DECISION = { aprobada: IconCheck, mitigado: IconCheck, reservado: Ic
 const MOTIVO_INFORME = {
   cifras: 'Han cambiado el gasto o el coste estimado final desde esta edición',
   decisiones: 'Han cambiado las decisiones por revisar desde esta edición',
-  reservas: 'Ha cambiado la reserva de riesgos desde esta edición',
+  reservas: 'Ha cambiado lo apartado por riesgos desde esta edición',
   riesgos: 'Han cambiado los riesgos altos desde esta edición',
   caja: 'Ha cambiado la previsión de caja desde esta edición',
 }
@@ -500,6 +500,9 @@ export function BloqueAprobacion({ b, principal = true }) {
   const amarillo = principal && (!enRecorrido || (esperaRecorrido?.tipo === b.ref?.tipo && esperaRecorrido?.id === b.ref?.id))
   // «Todavía no» no decide: marca la tarjeta y la deja en «Por revisar».
   const [pospuesta, setPospuesta] = useState(false)
+  const seccion = useRef(null)
+  // El botón pulsado desaparece: el foco vuelve al título de la tarjeta.
+  const enfocarTitulo = () => requestAnimationFrame(() => seccion.current?.querySelector('h4')?.focus({ preventScroll: true }))
   const ed = c.estadoDecision(mundo, b.ref)
   const decidida = ESTADO_DECISION[ed.estado]
   const tieneRolPropio = (a) => !a.rol || puedeDecidir(persona.rol, a.rol)
@@ -525,13 +528,17 @@ export function BloqueAprobacion({ b, principal = true }) {
   const lineaPermiso = !sinPermiso && decisorias.some((a) => !tieneRolPropio(a))
   const pulsar = (a) => {
     if (a.entrada) enviarEntrada(a.entrada)
-    else if (a.posponer) setPospuesta(true)
+    else if (a.posponer) {
+      setPospuesta(true)
+      enfocarTitulo()
+    }
     else decidir(a.accion, a.burbuja ? renderTexto(a.burbuja) : a.etiqueta)
   }
 
   return (
-    <section className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`} data-ref={b.ref ? `${b.ref.tipo}-${b.ref.id}` : undefined}>
-      {!decidida && <StatusChip estado="pendiente" className="mb-3" />}
+    <section ref={seccion} className={`ag-aprobacion ${decidida ? 'is-decidida' : ''}`} aria-label={`Decisión: ${etiquetaRef}`} data-ref={b.ref ? `${b.ref.tipo}-${b.ref.id}` : undefined}>
+      {/* Un riesgo ya asumido no está «Por revisar»: cambiar el plan es opcional. */}
+      {!decidida && !ed.aceptadoPor && <StatusChip estado="pendiente" className="mb-3" />}
       <div className="flex flex-wrap items-center gap-2">
         <AgentAvatar id={b.agente} size={28} />
         <span className="text-sm font-medium text-flp-ink">{AGENTES[b.agente]?.nombre}</span>
@@ -639,7 +646,7 @@ export function BloqueAprobacion({ b, principal = true }) {
         <>
           {ed.reservaActual !== undefined && (
             <div className="mt-4">
-              <Tono tono="info">Reserva aprobada ahora: {formatear(ed.reservaActual, 'eur')}</Tono>
+              <Tono tono="info">Apartado ahora: {formatear(ed.reservaActual, 'eur')}</Tono>
             </div>
           )}
           {(yaPedida || ed.aplazado || pospuesta) && (
@@ -673,11 +680,20 @@ export function BloqueAprobacion({ b, principal = true }) {
           )}
           {sinPermiso && (
             <p className="mt-2 text-xs text-flp-muted">
-              Como {persona.rol.toLowerCase()} no puedes decidir esto: lo decide {b.rol.toLowerCase()}. {yaPedida ? 'Ya está pedido.' : 'Puedes pedir su aprobación.'}
+              Como {persona.rol.toLowerCase()} no puedes decidir esto: lo decide {b.rol.toLowerCase()}.{yaPedida ? ' Ya está pedido.' : b.acciones.some((a) => a.soloSinPermiso) ? ' Puedes pedir su aprobación.' : ''}
             </p>
           )}
           {otraPersona && (sinPermiso || lineaPermiso) && (
-            <FilmpilotButton className="mt-2" size="sm" variant="ghost" disabled={ocupado} onClick={() => despachar({ tipo: 'persona', persona: otraPersona.id })}>
+            <FilmpilotButton
+              className="mt-2"
+              size="sm"
+              variant="ghost"
+              disabled={ocupado}
+              onClick={() => {
+                despachar({ tipo: 'persona', persona: otraPersona.id })
+                enfocarTitulo()
+              }}
+            >
               Decidir como {otraPersona.nombre} ({otraPersona.rol.toLowerCase()})
             </FilmpilotButton>
           )}
@@ -740,7 +756,7 @@ export function ListaDecisiones({ filtro, onElegir }) {
               </span>
               {EN_EXPLORACION.has(e.tipo) && <EtiquetaCapacidad />}
             </div>
-            {e.importe > 0 && <div className="tnum text-xs text-flp-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Reserva propuesta ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
+            {e.importe > 0 && <div className="tnum text-xs text-flp-muted">{e.tipo === 'propuesta' ? `Ahorro ${formatear(e.importe, 'eur')}` : e.tipo === 'riesgo' ? `Propone apartar ${formatear(e.importe, 'eur')}` : formatear(e.importe, e.importe % 1 ? 'eurCents' : 'eur')}</div>}
           </div>
           <button
             type="button"
@@ -861,7 +877,7 @@ function BloqueInforme({ b }) {
             {r.reservas > 0 && (
               <li>
                 <span>
-                  Reservas de riesgos <EtiquetaCapacidad className="ml-1" />
+                  Apartado por riesgos <EtiquetaCapacidad className="ml-1" />
                 </span>
                 <span className="tnum">{formatear(r.reservas, 'eur')}</span>
               </li>
@@ -902,10 +918,23 @@ function BloqueBorrador({ b, principal = true }) {
   const uid = useId()
   const bor = mundo.borradores[b.id]
   // Las ediciones se guardan en el mundo: otro mensaje con el mismo borrador las ve.
-  const [asunto, setAsunto] = useState(() => (bor ? bor.textoAsunto ?? renderTexto(bor.asunto) : ''))
-  const [cuerpo, setCuerpo] = useState(() => (bor ? bor.textoCuerpo ?? [...bor.cuerpo.map(renderTexto), bor.firma].join('\n\n') : ''))
+  const asuntoMundo = bor ? bor.textoAsunto ?? renderTexto(bor.asunto) : ''
+  const cuerpoMundo = bor ? bor.textoCuerpo ?? [...bor.cuerpo.map(renderTexto), bor.firma].join('\n\n') : ''
+  const [asunto, setAsunto] = useState(asuntoMundo)
+  const [cuerpo, setCuerpo] = useState(cuerpoMundo)
+  // Solo guarda lo que ha editado esta copia; si otra copia cambia el texto, esta se pone al día.
+  const editado = useRef(false)
+  useEffect(() => {
+    if (editado.current) return
+    setAsunto(asuntoMundo)
+    setCuerpo(cuerpoMundo)
+  }, [asuntoMundo, cuerpoMundo])
   if (!bor) return null
-  const guardar = () => despachar({ tipo: 'editarBorrador', id: b.id, asunto, cuerpo })
+  const guardar = () => {
+    if (!editado.current) return
+    editado.current = false
+    despachar({ tipo: 'editarBorrador', id: b.id, asunto, cuerpo })
+  }
   const cerrado = bor.estado !== 'borrador'
   const copiar = async () => {
     try {
@@ -934,11 +963,17 @@ function BloqueBorrador({ b, principal = true }) {
       <label className="mt-3 block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-asunto`}>
         Asunto
       </label>
-      <input id={`${uid}-asunto`} className="flp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={asunto} onChange={(e) => setAsunto(e.target.value)} onBlur={guardar} disabled={cerrado} />
+      <input id={`${uid}-asunto`} className="flp-input mt-1 w-full px-3 text-[16px] sm:text-sm" value={asunto} onChange={(e) => {
+          editado.current = true
+          setAsunto(e.target.value)
+        }} onBlur={guardar} disabled={cerrado} />
       <label className="mt-3 block text-xs font-semibold text-flp-muted" htmlFor={`${uid}-cuerpo`}>
         Mensaje
       </label>
-      <textarea id={`${uid}-cuerpo`} className="flp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} onBlur={guardar} disabled={cerrado} />
+      <textarea id={`${uid}-cuerpo`} className="flp-input mt-1 min-h-[180px] w-full px-3 py-2 text-[16px] leading-relaxed sm:text-sm" value={cuerpo} onChange={(e) => {
+          editado.current = true
+          setCuerpo(e.target.value)
+        }} onBlur={guardar} disabled={cerrado} />
       {cuerpo.includes('[') && !cerrado && (
         <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-flp-ink">
           <IconAlert size={13} aria-hidden="true" /> Completa los campos entre corchetes antes de enviarlo.
@@ -1367,7 +1402,7 @@ function BloqueLlamada({ b }) {
 
 export { ChipSeveridad }
 
-export const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Reserva aprobada', mitigado: 'Plan cambiado', aceptado: 'Asumido · sigue vigilado' }
+export const ESTADO_RIESGO = { aviso: 'Aviso preparado · sin enviar', reservado: 'Dinero apartado', mitigado: 'Plan cambiado', aceptado: 'Asumido · sigue vigilado' }
 
 /** Radar en directo: lee el mundo actual, así que cambia con cada novedad o decisión. */
 export function RadarRiesgos({ compacto = false }) {

@@ -304,7 +304,7 @@ export function decisionesRiesgos(m) {
       nivel: 'aprueba',
       rol: 'Line producer y producción ejecutiva',
       importe: r.reserva,
-      titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, ${etiquetaJ(r.jornadas)}${r.reservaCorta ? ' (la reserva se queda corta)' : ''}`,
+      titulo: `Riesgo · ${TIPOS[r.id].tipo.toLowerCase()}, ${etiquetaJ(r.jornadas)}${r.reservaCorta ? ' (lo apartado se queda corto)' : ''}`,
       entrada: PREGUNTA[r.id],
     }))
 }

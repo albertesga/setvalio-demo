@@ -29,6 +29,7 @@ import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, S
 import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER } from '../src/screens/portada/datos.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
 import { REGLA_COMUN } from '../src/agentes/escenarios/conversacion.js'
+import { decisionesAbiertas } from '../src/agentes/pendientes.js'
 import { CASHFLOW } from '../src/lib/data.js'
 import { diasEntre } from '../src/agentes/texto.js'
 import { eur } from '../src/lib/format.js'
@@ -818,7 +819,7 @@ test('tras cambiar el orden, RG-1 sigue hablando de la jornada 8 y dice que est�
   assert.deepEqual(r.jornadas, [8])
   assert.match(renderTexto(r.respuesta), /Orden cambiado/)
   const txt = responder(reducir(mundoBase, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880 }), { tipo: 'accion', accion: { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar', por: 'Prueba' } })
-  assert.match(txt.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /Se libera la reserva/)
+  assert.match(txt.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /Se libera lo apartado/)
 })
 test('el informe se desactualiza con reservas o riesgos altos nuevos, y las desviaciones nombran la reserva', () => {
   let m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
@@ -828,7 +829,7 @@ test('el informe se desactualiza con reservas o riesgos altos nuevos, y las desv
   const citacion = reducir(m, { tipo: 'evento/recibir', eventoId: 'EV-CITACION' })
   assert.equal(c.informeDesactualizado(citacion, 'R1'), true)
   const d = responder(conReserva, { tipo: 'texto', texto: '¿Qué capítulos están fuera de rango?' })
-  assert.match(d.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /reservas de riesgos/)
+  assert.match(d.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /apartados por riesgos/)
 })
 test('preguntas por jornadas: la que tiene riesgo, una sin riesgo, una ya rodada y una fuera del plan', () => {
   const sin = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 19?' })
@@ -1058,6 +1059,77 @@ test('la interfaz no enseña el vocabulario retirado', () => {
     const src = readFileSync(new URL(f, dir), 'utf8')
     for (const v of VIEJOS) assert.ok(!src.includes(v), `${f}: «${v}»`)
   }
+})
+
+// ── 13. Regresiones de la revisión final ─────────────────────────────────────
+console.log('Revisión final')
+const avanza = (s, ms, paso = 50) => {
+  for (let t = 0; t < ms; t += paso) s = reducirSesion(s, { tipo: 'avanzar', ms: paso })
+  return s
+}
+test('detener una novedad antes de recibirla deja volver a pedirla y su historia sigue sin ver', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
+  s = avanza(s, 400)
+  s = reducirSesion(s, { tipo: 'detener' })
+  assert.equal(s.mundo.ordenes['OC-104'].estado, 'Por llegar')
+  assert.ok(!vistosDe(s).includes('aprueba'), 'la historia vuelve a «sin ver»')
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
+  s = avanza(s, 20_000, 100)
+  assert.equal(s.mundo.ordenes['OC-104'].estado, 'Pendiente', 'la novedad llega al volver a pedirla')
+})
+test('detener un turno que ya cambió el mundo invalida el deshacer anterior', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/rechazar', ocId: 'OC-105' }, etiqueta: 'Rechazo OC-105' } })
+  s = avanza(s, 10_000, 100)
+  assert.ok(s.ultimaMutacion)
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/aprobar', ocId: 'OC-106' }, etiqueta: 'Apruebo OC-106' } })
+  const msg = () => s.mensajes.filter((m) => m.rol === 'agentes').at(-1)
+  while (msg().estado === 'en_curso' && !msg().estadoPasos.some((e, i) => e === 'hecho' && msg().turno.pasos[i].acciones.some((a) => a.tipo === 'orden/aprobar'))) s = reducirSesion(s, { tipo: 'avanzar', ms: 50 })
+  assert.equal(msg().estado, 'en_curso', 'se detiene a medias, con la aprobación ya registrada')
+  s = reducirSesion(s, { tipo: 'detener' })
+  assert.equal(s.ultimaMutacion, null, 'no se puede deshacer lo anterior sin revertir lo detenido')
+})
+test('una pregunta corriente no marca como vista una historia que no enseña', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cuánto nos costará al final y llegamos de caja?' } })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué bloquea el dossier fiscal?' } })
+  s = avanza(s, 20_000, 200)
+  assert.ok(!vistosDe(s).includes('aprueba') && !vistosDe(s).includes('equipo'), vistosDe(s).join(','))
+})
+test('«Ya hecho» solo cuenta lo que Conciliación contabilizó sola con su pedido', () => {
+  let m = reducir(mundoBase, { tipo: 'documento/contabilizar', docId: 'G-004', partida: mundoBase.documentos['G-004'].partida, por: 'Marta Cobo' })
+  m = reducir(m, { tipo: 'documento/contabilizar', docId: 'F-2026-069', por: 'Marta Cobo' })
+  const h = responder(m, { tipo: 'texto', texto: 'Ponme al día' }).turno.bloques.find((b) => b.tipo === 'hecho')
+  assert.match(renderTexto(h.items[0].texto), /contabilizó 5 facturas/)
+})
+test('deshacer lo que contabilizó Conciliación sola lo deja para que lo revises tú', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  s = avanza(s, 20_000, 100)
+  const antes = decisionesAbiertas(s.mundo).length
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: s.mensajes.filter((m) => m.rol === 'agentes').at(-1).id })
+  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'en_bandeja')
+  assert.equal(decisionesAbiertas(s.mundo).length, antes + 1, 'entra en «Por revisar»')
+  const r = responder(s.mundo, { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' })
+  assert.ok(r.turno.bloques.some((b) => b.tipo === 'aprobacion' && b.ref.id === 'F-2026-078'), 'trae su tarjeta')
+  assert.equal(r.mundo.documentos['F-2026-078'].estado, 'en_bandeja', 'no la vuelve a contabilizar sola')
+  const inf = responder(s.mundo, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' })
+  assert.equal(inf.mundo.documentos['F-2026-078'].estado, 'en_bandeja', 'el informe tampoco')
+})
+test('el informe por aprobar cuenta en «Por revisar» y «Dejar en revisión» no se repite', () => {
+  const m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
+  assert.ok(decisionesAbiertas(m).some((d) => d.ref.tipo === 'informe'))
+  const aplazado = reducir(mundoBase, { tipo: 'documento/aplazar', docId: 'G-004', por: 'Marta Cobo' })
+  const tj = responder(aplazado, { tipo: 'texto', texto: '¿Qué gastos tengo que revisar?' }).turno.bloques.find((b) => b.tipo === 'aprobacion')
+  assert.ok(!tj.acciones.some((a) => a.id === 'aplazar'))
+})
+test('deshacer guarda qué decisión vuelve a estar abierta', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/rechazar', ocId: 'OC-105' }, etiqueta: 'Rechazo OC-105' } })
+  s = avanza(s, 10_000, 100)
+  const id = s.ultimaMutacion.mensajeId
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: id })
+  assert.deepEqual(s.mensajes.find((m) => m.id === id).deshechoRefs, [{ tipo: 'orden', id: 'OC-105' }])
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

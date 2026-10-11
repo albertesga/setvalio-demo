@@ -50,10 +50,6 @@
 }
 .ag-avatar.is-working { border-color: var(--flp-carbon); box-shadow: 0 0 0 1px var(--flp-carbon); }
 .ag-avatar.is-working svg { animation: flp-breathe 2s ease-in-out 2; }
-.ag-persona {
-  display: inline-flex; width: 28px; height: 28px; flex: none; align-items: center; justify-content: center;
-  border-radius: 50%; background: var(--flp-silver); color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px;
-}
 
 /* Autonomía: medidor de tres segmentos + texto, sin marco. No es un estado. */
 .ag-autonomia {
@@ -127,7 +123,9 @@
 .ag-hilo [data-msg]:empty { display: none; }
 /* Deshacer: lo que hicieron los agentes o tu decisión. Lo deshecho queda atenuado. */
 .ag-deshacer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: var(--flp-muted); font-size: 14px; }
-.ag-msg-agentes.is-deshecho .ag-bloques { padding-left: 12px; border-left: 3px solid var(--flp-border); opacity: .62; }
+/* Sin opacidad: bajaría el gris por debajo del contraste mínimo. Bastan el filete, el título y el texto en gris. */
+.ag-msg-agentes.is-deshecho .ag-bloques { padding-left: 12px; border-left: 3px solid var(--flp-border); }
+.ag-msg-agentes.is-deshecho .ag-bloques :is(.text-flp-ink, .ag-prosa) { color: var(--flp-muted); }
 .ag-msg-agentes.is-deshecho .ag-msg-titulo { color: var(--flp-muted); }
 @keyframes ag-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .ag-bloques { display: grid; gap: 12px; margin-top: 12px; }
@@ -325,7 +323,6 @@
 .ag-hoja-asa { position: absolute; top: 6px; left: 50%; width: 40px; height: 4px; border-radius: 2px; background: var(--flp-control-border); transform: translateX(-50%); }
 .ag-hoja-cuerpo { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
 
-.ag-hoja-cuerpo .ag-panel-scroll { padding: 16px 0 0; overflow: visible; }
 @media (min-width: 768px) {
   .ag-hoja-panel { top: 0; right: 0; bottom: 0; left: auto; width: 400px; max-height: none; border-radius: 0; transform: translateX(100%); }
   .ag-hoja.is-open .ag-hoja-panel { transform: translateX(0); }
@@ -416,3 +413,7 @@
 
 /* ── Parte de la mañana (el resto, en parte.css) ──────────────────────────── */
 .ag-msg-saludo > .mt-3:first-of-type { margin-top: 14px; }
+
+/* La marca no pasa de 600: las <strong> sin clase de peso heredan «bolder» (700). Especificidad
+   mínima para no pisar .font-medium ni las reglas de cada bloque. */
+:where(.ag-app) :where(strong, b) { font-weight: 600; }

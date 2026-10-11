@@ -331,7 +331,7 @@ function Linea({ it, n }) {
                   <Tx value={it.cuando} />
                 </span>
                 {' · '}
-                {it.rolEtiqueta ?? 'Decide'}: {it.decide.toLowerCase()}
+                {it.rolEtiqueta ?? (/ y /.test(it.decide) ? 'Deciden' : 'Decide')}: {it.decide.toLowerCase()}
                 {e.parcial && <span className="font-medium text-flp-ink"> · {e.etiqueta}</span>}
               </p>
               {it.acciones?.length > 0 && (
@@ -414,21 +414,21 @@ export function BloqueAgenda({ b }) {
 
 // ── Historias ────────────────────────────────────────────────────────────────
 
-// Historias cuyo arco ya dice su nivel («Lo hace solo», «Te lo propone», «Te pide
+// Historias cuyo arco ya dice su nivel («Lo hace solo», «Te lo propone», «Pide tu
 // aprobación»): no repiten la insignia, como en el carril.
 const ARCO_DICE_NIVEL = new Set(['solo', 'propone', 'aprueba'])
 
 /**
- * Índice de historias (ayuda y cierre del recorrido): una tarjeta por historia, sin
- * el parte, con su nivel de autonomía, si ya se ha visto y la pregunta que la abre.
- * Con b.epilogo, debajo, «Antes del rodaje · Itsasoa», que está en exploración.
+ * Índice de historias («¿Qué puedes hacer?»): una tarjeta por historia, también el parte
+ * («Ponme al día» lo rehace), con su nivel de autonomía, si ya se ha visto y la pregunta
+ * que la abre. Con b.epilogo, debajo, «Antes del rodaje · Itsasoa», que está en exploración.
  */
 export function BloqueHistorias({ b }) {
   const ctx = useCtx()
   const id = useId().replace(/:/g, '')
   const vistos = ctx.vistos ?? []
-  // El parte ya está en pantalla: no lleva tarjeta, pero cuenta en «N de 6 vistas», como en el carril.
-  const historias = HISTORIAS.filter((h) => h.id !== 'parte')
+  // Las seis, como en el carril: «N de 6 vistas» cuenta lo que hay en pantalla.
+  const historias = HISTORIAS
   const nVistas = HISTORIAS.filter((h) => vistos.includes(h.id)).length
   const abrir = (h) => {
     const entrada = entradaDeHistoria(h, ctx.mundo)

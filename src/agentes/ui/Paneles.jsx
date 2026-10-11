@@ -11,7 +11,7 @@ import { Tx, AgentAvatar, AutonomyBadge, Hoja } from './Piezas.jsx'
 import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
 
 // Qué agente sostiene cada tipo de decisión pendiente.
-const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores', riesgo: 'riesgos' }
+const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', manual: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores', riesgo: 'riesgos', informe: 'informes' }
 
 // Historias cuyo arco ya dice su nivel («Lo hace solo», «Te lo propone», «Te pide
 // aprobación»): no repiten la insignia. Las demás la llevan (el parte, la lluvia, el informe).
@@ -162,7 +162,7 @@ export function AgentesPorFamilia({ estados, onAbrir, nivel = 2 }) {
   return (
     <section className="ag-familias" aria-labelledby={`${uid}-equipo`}>
       <H id={`${uid}-equipo`} className="flp-kicker text-flp-muted">
-        El equipo · <span className="tnum">{ORDEN_AGENTES.length}</span> agentes en <span className="tnum">{ORDEN_FAMILIAS.length}</span> familias
+        El equipo · el Orquestador y <span className="tnum">{ORDEN_AGENTES.length - 1}</span> agentes en <span className="tnum">{ORDEN_FAMILIAS.length}</span> familias
       </H>
       <ul>
         <FilaAgente id="orquestador" e={estados.orquestador} onAbrir={onAbrir} />
@@ -220,7 +220,7 @@ export function DetalleAgente({ id, onCerrar }) {
             <h3 className="flp-kicker mb-2 text-flp-muted">Cómo actúa</h3>
             <ul className="space-y-2">
               {a.niveles.map((n) => (
-                <li key={n} className="flex flex-wrap items-start gap-x-3 gap-y-1">
+                <li key={n} className="flex flex-col items-start gap-1">
                   <AutonomyBadge nivel={n} />
                   <span className="text-sm text-flp-muted">{AUTONOMIA[n].descripcion}</span>
                 </li>

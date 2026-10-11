@@ -7,7 +7,7 @@ import { cuenta, fecha } from '../texto.js'
 import { t, v, c, POLITICAS, paso, sug, texto, aviso, kpisPartida, bloqueDocumento, nombrePartida, minuscula, articulo } from './comun.js'
 
 const enBandeja = (m) => Object.values(m.documentos).filter((d) => d.estado === 'en_bandeja')
-const casable = (m, d) => !confianzaBaja(d) && d.impuesto?.tipo !== 'IGIC' && c.conciliar(m, d.id).resultado === 'ok'
+const casable = (m, d) => !d.revisionManual && !confianzaBaja(d) && d.impuesto?.tipo !== 'IGIC' && c.conciliar(m, d.id).resultado === 'ok'
 
 /** ['a', 'b', 'c'] → 'a, b y c'. */
 const enLista = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : xs[0] ?? '')
@@ -22,7 +22,8 @@ export function documentoObjetivo(m, det) {
   const id = det.entidades?.documento
   if (id && m.documentos[id]) return id
   // Sin documento concreto, «¿ha llegado algo?» se responde con lo que de verdad está por llegar.
-  if (m.documentos['F-2026-078'].estado === 'por_llegar') return 'F-2026-078'
+  const llegada = m.documentos['F-2026-078']
+  if (llegada.estado === 'por_llegar' || (llegada.estado === 'en_bandeja' && llegada.revisionManual)) return 'F-2026-078'
   return null
 }
 
@@ -69,7 +70,11 @@ export const facturaNueva = {
     }
 
     const conc = c.conciliar(m1, id)
-    if (conc.resultado === 'ok') {
+    if (conc.resultado === 'ok' && d0.revisionManual) {
+      // Deshiciste lo que hizo sola: ahora no la contabiliza sin ti.
+      pasos.push(paso('conciliacion', t('Cuadra {id} con el pedido {oc}', { id: v(id, 'id'), oc: v(conc.oc, 'id') }), { tipo: 'conciliacion', salida: t('Cuadra con su pedido') }))
+      pasos.push(paso('excepciones', t('Te la trae para que la revises'), { tipo: 'revision', autonomia: 'propone', salida: t('No la contabiliza sin ti') }))
+    } else if (conc.resultado === 'ok') {
       pasos.push(
         paso('conciliacion', t('Cuadra {id} con el pedido {oc}', { id: v(id, 'id'), oc: v(conc.oc, 'id') }), {
           tipo: 'conciliacion',
@@ -78,9 +83,10 @@ export const facturaNueva = {
         }),
       )
       pasos.push(
+        // Comprobar es rutinario: lo hace solo, no propone nada.
         paso('cumplimiento', t('Comprueba si el gasto es elegible'), {
           tipo: 'revision',
-          autonomia: 'propone',
+          autonomia: 'ejecuta',
           paralelo: true,
           salida: (_, d) => {
             const el = c.elegibilidad(d, id)
@@ -168,11 +174,42 @@ export const facturaNueva = {
           kpisPartida(antes, despues, d.partida),
         ],
         // Una línea para plegar la novedad cuando llega sola.
-        resumen: t('Conciliación contabilizó sola {id} · {total} · cuadra con {oc}', { id: v(id, 'id'), total: v(d.total, 'eur'), oc: v(d.oc, 'id') }),
+        // Base sin IVA, como el parte y la partida.
+        resumen: t('Conciliación contabilizó sola {id} · {total} · cuadra con {oc}', { id: v(id, 'id'), total: v(d.base, 'eur'), oc: v(d.oc, 'id') }),
         sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('¿Qué bloquea el dossier fiscal?'), sug('Prepárame el informe semanal de coste')],
         fuentes: ['Bandeja de documentos', 'Órdenes de compra', 'Presupuesto por partidas'],
         reglas,
         noHecho: [t('No ha pagado la factura.'), t('No ha cambiado el pedido ni el presupuesto.')],
+      }
+    }
+
+    // La que deshiciste: cuadra, pero ahora la contabilizas tú.
+    if (d.revisionManual) {
+      const imp = c.impactoNuevoCoste(despues, d.partida, d.base, 'gastado')
+      const partida = nombrePartida(despues, d.partida)
+      return {
+        bloques: [
+          texto(t('{id} de {prov} cuadra con su pedido ({oc}). Deshiciste lo que hizo Conciliación, así que ahora no la contabiliza sin ti.', { id: v(id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') })),
+          bloqueDocumento(despues, id, { elegibilidad: true }),
+          {
+            tipo: 'aprobacion',
+            id: `ap-${id}-manual`,
+            ref: { tipo: 'documento', id },
+            agente: 'conciliacion',
+            nivel: 'propone',
+            rol: ROLES.revisionHumana,
+            titulo: t('Contabilizar {id} en {p}', { id: v(id, 'id'), p: v(partida) }),
+            resumen: imp.exceso > 0 ? t('Sube el coste estimado final de {p} en {exc}.', { p: v(partida), exc: v(imp.exceso, 'eur') }) : t('Cabe en lo previsto: el coste estimado final no cambia.'),
+            acciones: [
+              { id: 'aprobar', etiqueta: 'Contabilizar', burbuja: `Contabilizo ${id}`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: id }, rol: ROLES.revisionHumana },
+              { id: 'aplazar', etiqueta: 'Dejar en revisión', burbuja: `Dejo ${id} en revisión`, variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: id }, rol: ROLES.revisionHumana },
+            ].filter((a) => a.id !== 'aplazar' || !d.aplazado),
+          },
+        ],
+        sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('Prepárame el informe semanal de coste')],
+        fuentes: ['Bandeja de documentos', 'Órdenes de compra'],
+        reglas,
+        noHecho: [t('No ha contabilizado la factura: espera tu decisión.')],
       }
     }
 
@@ -206,7 +243,7 @@ export const facturaNueva = {
           acciones: [
             { id: 'aprobar', etiqueta: 'Contabilizar', burbuja: `Contabilizo ${id} sin pedido`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: id }, rol: ROLES.lineProducer },
             { id: 'aplazar', etiqueta: 'Dejar en la bandeja', burbuja: `Dejo ${id} en la bandeja`, variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: id }, rol: ROLES.lineProducer },
-          ],
+          ].filter((x) => x.id !== 'aplazar' || !d.aplazado),
         },
       ],
       sugerencias: [sug(`Pide a ${d.proveedor} la documentación que falta`), sug('¿Qué gastos tengo que revisar?')],
@@ -261,7 +298,7 @@ export const revisarGasto = {
       { id: 'confirmar', etiqueta: `Imputar a ${pa}`, burbuja: `Lo imputo a ${pa}`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.partida }, rol: ROLES.revisionHumana },
       { id: 'alternativa', etiqueta: `Imputar a ${pb}`, burbuja: `Lo imputo a ${pb}`, variante: 'secondary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.alternativa }, rol: ROLES.revisionHumana },
       { id: 'aplazar', etiqueta: 'Dejar en revisión', burbuja: 'Lo dejo en revisión', variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: d.id }, rol: ROLES.revisionHumana },
-    ]
+    ].filter((x) => x.id !== 'aplazar' || !d.aplazado)
     // Sin factura completa no vale para el dossier: se pide desde la misma tarjeta (guion pedir_documentacion).
     // Esta acción no decide nada: lleva `entrada` en lugar de `accion`.
     if (faltaDocumentacion(d)) {

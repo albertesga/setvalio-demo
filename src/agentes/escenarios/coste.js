@@ -28,7 +28,7 @@ export const informeSemanal = {
 
   planificar(m) {
     const bandeja = enBandeja(m)
-    const casables = bandeja.filter((d) => !confianzaBaja(d) && c.conciliar(m, d.id).resultado === 'ok')
+    const casables = bandeja.filter((d) => !d.revisionManual && !confianzaBaja(d) && c.conciliar(m, d.id).resultado === 'ok')
     const xml = bandeja.filter((d) => d.origen === 'Factura-e XML').length
     const dudosos = bandeja.filter((d) => confianzaBaja(d)).length
     const sinPedido = bandeja.filter((d) => !d.oc && !confianzaBaja(d)).length
@@ -210,7 +210,7 @@ export const explicarDesviacion = {
       const bloques = [
         texto(
           d.resumen.reservas > 0
-            ? t('Sobrecostes por {sobre}, ahorros por {ahorro} y reservas de riesgos por {res}: neto {neto}. {n} por encima del límite del {u}.', {
+            ? t('Sobrecostes por {sobre}, ahorros por {ahorro} y {res} apartados por riesgos: neto {neto}. {n} por encima del límite del {u}.', {
                 sobre: v(d.resumen.sobrecostes, 'eurSigned'),
                 ahorro: v(d.resumen.ahorros, 'eurSigned'),
                 res: v(d.resumen.reservas, 'eurSigned'),
@@ -401,7 +401,7 @@ export const prevision = {
             dia: v(m.proyecto.diaActual, 'num'),
             total: v(m.proyecto.diasRodaje, 'num'),
             n: cuenta(sinMargen.length, 'partida', 'partidas'),
-            lista: v(sinMargen.slice(0, 4).map((p) => p.nombre).join(', ') + (sinMargen.length > 4 ? '…' : '')),
+            lista: v(sinMargen.slice(0, 4).map((p) => p.nombre).join(', ') + (sinMargen.length > 4 ? ` y ${sinMargen.length - 4} más` : '')),
           }),
         ),
       )

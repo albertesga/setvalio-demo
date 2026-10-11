@@ -18,7 +18,7 @@ import { renderTexto } from './texto.js'
 // las piden los guiones (la tarjeta, el parte) y las pruebas.
 export const EVENTOS = [
   { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur', automatico: true, historia: 'solo' },
-  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado una solicitud de compra', automatico: true, historia: 'aprueba' },
+  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado un pedido de hotel', automatico: true, historia: 'aprueba' },
   { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas', automatico: false, historia: 'adelanta' },
   { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar', automatico: false, historia: 'adelanta' },
   { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana', automatico: false, historia: 'adelanta' },
@@ -97,6 +97,9 @@ function iniciar(s0, entrada) {
     estado: 'en_curso',
     hora,
     origen: entrada.tipo,
+    eventoId: entrada.tipo === 'evento' ? entrada.eventoId : undefined,
+    // Si este turno estrena su historia y se detiene, la historia vuelve a «sin ver».
+    casoNuevo: !!r.turno.caso && !s.casosVistos.includes(r.turno.caso),
   })
   if (r.turno.caso && !s.casosVistos.includes(r.turno.caso)) s.casosVistos = [...s.casosVistos, r.turno.caso]
   s.activo = { id, transcurrido: 0 }
@@ -275,7 +278,8 @@ export function reducirSesion(s, a) {
       if (a.entrada.tipo === 'texto' && !String(a.entrada.texto ?? '').trim()) return s
       // Una novedad solo llega una vez: ni si ya llegó, ni si está en la cola, ni si se está
       // reproduciendo (la recibe un paso del turno, así que sigue en mundo.entrantes un rato).
-      if (a.entrada.tipo === 'evento' && (!s.mundo.entrantes.includes(a.entrada.eventoId) || s.cola.some((e) => e.eventoId === a.entrada.eventoId) || s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === a.entrada.eventoId))) return s
+      // Una novedad detenida antes de recibirse puede volver a pedirse.
+      if (a.entrada.tipo === 'evento' && (!s.mundo.entrantes.includes(a.entrada.eventoId) || s.cola.some((e) => e.eventoId === a.entrada.eventoId) || s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === a.entrada.eventoId && !m.detenida))) return s
       // Una misma petición no se encola dos veces.
       if (s.cola.some((e) => JSON.stringify(e) === JSON.stringify(a.entrada))) return s
       return encolar({ ...s, inactivo: 0 }, a.entrada)
@@ -310,10 +314,21 @@ export function reducirSesion(s, a) {
 
     case 'detener': {
       if (!s.activo) return { ...s, cola: [] }
-      const mensajes = s.mensajes.map((m) =>
-        m.id === s.activo.id ? { ...m, estado: 'detenido', estadoPasos: m.estadoPasos.map((e) => (e === 'hecho' ? e : 'detenido')) } : m,
-      )
-      return { ...s, mensajes, activo: null, cola: [] }
+      const actual = s.mensajes.find((m) => m.id === s.activo.id)
+      // Una novedad que no llegó a recibirse se puede volver a pedir.
+      const sinRecibir = actual?.eventoId && s.mundo.entrantes.includes(actual.eventoId)
+      const mensajes = s.mensajes.map((m) => {
+        if (m.id === s.activo.id) return { ...m, estado: 'detenido', estadoPasos: m.estadoPasos.map((e) => (e === 'hecho' ? e : 'detenido')) }
+        if (sinRecibir && m.rol === 'novedad' && m.eventoId === actual.eventoId) return { ...m, detenida: true }
+        return m
+      })
+      const n = { ...s, mensajes, activo: null, cola: [] }
+      // La historia que estrenaba este turno no se ha llegado a ver.
+      if (actual?.casoNuevo) n.casosVistos = s.casosVistos.filter((c) => c !== actual.turno.caso)
+      // Si lo detenido ya cambió el mundo, deshacer lo anterior también lo revertiría: se invalida.
+      const hechas = actual ? actual.turno.pasos.flatMap((p, i) => (actual.estadoPasos[i] === 'hecho' ? p.acciones : [])) : []
+      if (hechas.some((x) => !CONSERVADAS.has(x.tipo))) n.ultimaMutacion = null
+      return n
     }
 
     case 'deshacer': {
@@ -324,14 +339,20 @@ export function reducirSesion(s, a) {
       if (!msg || !previo) return s
       // Se deshace solo lo que se decidió o contabilizó en ese turno. Las novedades
       // recibidas y los borradores redactados después se conservan.
-      const conservar = (m) => m.turno.pasos.flatMap((p) => p.acciones)
+      // Solo cuentan los pasos que llegaron a hacerse (un turno detenido no aplicó los demás).
+      const conservar = (m) => m.turno.pasos.flatMap((p, i) => (m.estadoPasos[i] === 'hecho' ? p.acciones : []))
       const propias = conservar(msg).filter((x) => x.tipo === 'evento/recibir')
       const posteriores = s.mensajes
         .slice(idx + 1)
         .filter((m) => m.rol === 'agentes')
         .flatMap(conservar)
         .filter((x) => x.tipo === 'evento/recibir' || x.tipo === 'borrador/crear')
-      const mundo = reducirVarias(previo, [...propias, ...posteriores])
+      let mundo = reducirVarias(previo, [...propias, ...posteriores])
+      // Lo que Conciliación contabilizó sola y se deshace queda en la bandeja para que lo revises tú.
+      const solas = msg.origen === 'evento' ? conservar(msg).filter((x) => x.tipo === 'documento/contabilizar' && x.por === 'Conciliación').map((x) => x.docId) : []
+      for (const id of solas) {
+        if (mundo.documentos[id]?.estado === 'en_bandeja') mundo = { ...mundo, documentos: { ...mundo.documentos, [id]: { ...mundo.documentos[id], revisionManual: true } } }
+      }
       const persona = personaDe(s)
       const decision = [...s.mensajes.slice(0, idx)].reverse().find((m) => m.rol === 'decision' || m.rol === 'novedad')
       // Lo que un agente hizo solo se cita por su resumen («Conciliación contabilizó sola…»).
@@ -339,9 +360,11 @@ export function reducirSesion(s, a) {
         decision?.rol === 'decision'
           ? `${persona.nombre} ha deshecho «${decision.texto}». Todo vuelve a como estaba.`
           : msg.turno.resumen
-            ? `${persona.nombre} ha deshecho «${renderTexto(msg.turno.resumen)}». Todo vuelve a como estaba.`
+            ? `${persona.nombre} ha deshecho «${renderTexto(msg.turno.resumen)}».${solas.length ? ` ${solas.join(' y ')} queda en la bandeja para que la revises tú.` : ' Todo vuelve a como estaba.'}`
             : `${persona.nombre} ha deshecho «${msg.turno.titulo}». Todo vuelve a como estaba.`
-      const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true } : m)) }
+      // Qué decisiones deshace (para «Volver a decidir»): las entradas de historial que añadió el turno.
+      const deshechoRefs = reducirVarias(previo, conservar(msg)).historial.slice(previo.historial.length).map((h) => h.ref).filter(Boolean)
+      const n = { ...s, mundo, ultimaMutacion: null, mensajes: s.mensajes.map((m) => (m.id === a.mensajeId ? { ...m, deshecho: true, deshechoRefs } : m)) }
       n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto, hora: horaDe(n.reloj) })
       return n
     }
@@ -363,7 +386,8 @@ export function reducirSesion(s, a) {
     case 'tour/iniciar': {
       // El recorrido parte de la demo recién abierta (con su parte de la mañana ya
       // leído) para que cada paso cuente lo que pasa. Solo avisa si había algo que cerrar.
-      const limpia = saludar(crearSesion({ persona: s.persona }), { instantaneo: true })
+      // seq sigue contando: ningún mensaje nuevo hereda la clave (y lo plegado) de uno anterior.
+      const limpia = saludar({ ...crearSesion({ persona: s.persona }), seq: s.seq }, { instantaneo: true })
       if (conversacionIniciada(s)) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: se han cerrado la conversación y las decisiones anteriores.', hora: horaDe(0) })
       return pasoTour(limpia, 0)
     }
@@ -385,7 +409,7 @@ export function reducirSesion(s, a) {
     }
 
     case 'reiniciar':
-      return crearSesion({ persona: s.persona })
+      return { ...crearSesion({ persona: s.persona }), seq: s.seq }
 
     default:
       return s

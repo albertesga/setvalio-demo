@@ -6,6 +6,7 @@ import '../agentes/agentes.css'
 import '../agentes/ui/pantalla.css'
 import { useAgentes } from '../agentes/useAgentes.js'
 import { personaDe, estadoTour, conversacionIniciada, vistosDe, epilogoVisto, sugerenciasDe } from '../agentes/sesion.js'
+import { HISTORIAS_POR_ID, entradaDeHistoria } from '../agentes/casos.js'
 import { decisionesAbiertas } from '../agentes/pendientes.js'
 import { AgentesCtx } from '../agentes/ui/contexto.js'
 import { Hoja } from '../agentes/ui/Piezas.jsx'
@@ -53,9 +54,16 @@ function Anunciador({ s }) {
   )
 }
 
+// La velocidad sobrevive a ir a la portada y volver, como la conversación (el almacén es global).
+let ritmoGuardado = 'normal'
+
 export default function Agentes({ onNavigate, contexto, pushToast }) {
   useBloqueoScroll()
-  const [ritmo, setRitmo] = useState('normal')
+  const [ritmo, setRitmoEstado] = useState(() => ritmoGuardado)
+  const setRitmo = useCallback((r) => {
+    ritmoGuardado = r
+    setRitmoEstado(r)
+  }, [])
   const { s, despachar } = useAgentes({ ritmo })
   const persona = personaDe(s)
   const ocupado = !!s.activo
@@ -78,17 +86,24 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   // para que quede arriba) se recoloca con cada bloque, porque lo de encima puede cambiar
   // de alto. Se suelta en cuanto la persona se desplaza.
   const pendiente = useRef(null)
+  // Cuándo se desplazó la vista por código: ese desplazamiento no vuelve a anclar al final.
+  const programado = useRef(0)
+  const tourRef = useRef(null)
+  tourRef.current = s.tour
   // Lo que se pide desde una hoja, una tarjeta o una sugerencia: cierra la hoja,
   // vuelve a seguir la conversación y devuelve el foco al redactor (no en pantallas táctiles).
-  const trasPedir = useCallback(() => {
+  // Una decisión dentro del recorrido lo devuelve a su barra, donde está «Siguiente».
+  const trasPedir = useCallback((foco = 'redactor') => {
     setHoja(null)
     anclado.current = true
-    if (!window.matchMedia?.('(pointer: coarse)').matches) requestAnimationFrame(() => inputRef.current?.focus())
+    pendiente.current = null
+    if (foco === 'barra') requestAnimationFrame(() => barraRef.current?.focus({ preventScroll: true }))
+    else if (!window.matchMedia?.('(pointer: coarse)').matches) requestAnimationFrame(() => inputRef.current?.focus())
   }, [])
   const enviarEntrada = useCallback(
     (entrada) => {
       despachar({ tipo: 'enviar', entrada })
-      trasPedir()
+      trasPedir(entrada.tipo === 'accion' && tourRef.current ? 'barra' : 'redactor')
     },
     [despachar, trasPedir],
   )
@@ -110,26 +125,6 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     despachar({ tipo: 'actividad' })
   }, [despachar])
 
-  // Al abrir, el parte de la mañana ya está escrito: no se ve a los agentes prepararlo.
-  // Si la portada pide algo, el recorrido empieza después del parte y una pregunta llega justo debajo.
-  const pedidoAtendido = useRef(null)
-  const vacia = s.mensajes.length === 0
-  useEffect(() => {
-    if (contexto && pedidoAtendido.current !== contexto) {
-      pedidoAtendido.current = contexto
-      if (contexto.tour) {
-        if (!s.tour) despachar({ tipo: 'tour/iniciar' })
-        return
-      }
-      if (contexto.pregunta) {
-        despachar({ tipo: 'saludar', instantaneo: true })
-        enviar(contexto.pregunta)
-        return
-      }
-    }
-    if (vacia && !s.tour) despachar({ tipo: 'saludar', instantaneo: true })
-  }, [contexto, vacia, s.tour, despachar, enviar])
-
   // El recorrido. Con conversación en marcha pide confirmar (el parte solo no cuenta);
   // al empezar, vuelve a seguir la conversación desde el paso 1.
   const hayConversacion = conversacionIniciada(s)
@@ -145,10 +140,42 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     else empezarRecorrido()
   }, [hayConversacion, empezarRecorrido])
 
+  // Al abrir, el parte de la mañana ya está escrito: no se ve a los agentes prepararlo.
+  // Si la portada pide algo, el recorrido empieza después del parte (preguntando si hay
+  // conversación que cerrar) y una pregunta llega justo debajo.
+  const pedidoAtendido = useRef(null)
+  const vacia = s.mensajes.length === 0
+  useEffect(() => {
+    if (contexto && pedidoAtendido.current !== contexto) {
+      pedidoAtendido.current = contexto
+      if (contexto.tour) {
+        if (!s.tour) iniciarRecorrido()
+        return
+      }
+      if (contexto.pregunta) {
+        despachar({ tipo: 'saludar', instantaneo: true })
+        enviar(contexto.pregunta)
+        return
+      }
+    }
+    if (vacia && !s.tour) despachar({ tipo: 'saludar', instantaneo: true })
+  }, [contexto, vacia, s.tour, despachar, enviar, iniciarRecorrido])
+
   // Al empezar el recorrido, el foco va a su barra: ahí están el paso, la nota y «Siguiente».
+  // Al terminar o salir, la barra desaparece: el foco pasa al cierre (o al redactor).
   const enRecorrido = !!s.tour
+  const estabaEnRecorrido = useRef(false)
   useEffect(() => {
     if (enRecorrido) requestAnimationFrame(() => barraRef.current?.focus({ preventScroll: true }))
+    else if (estabaEnRecorrido.current) {
+      requestAnimationFrame(() => {
+        const ultimo = [...document.querySelectorAll('[data-msg]')].pop()
+        const titulo = ultimo?.querySelector('h3[tabindex="-1"]')
+        if (titulo) titulo.focus({ preventScroll: true })
+        else if (!window.matchMedia?.('(pointer: coarse)').matches) inputRef.current?.focus({ preventScroll: true })
+      })
+    }
+    estabaEnRecorrido.current = enRecorrido
   }, [enRecorrido])
 
   // Desplazamiento. Mientras los agentes trabajan, sigue el final; cuando llega la
@@ -158,14 +185,27 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     const el = scrollRef.current
     if (!el) return
     const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    programado.current = Date.now()
     el.scrollTo({ top: el.scrollHeight, behavior: suave && !reducido ? 'smooth' : 'auto' })
+  }
+  // Deja el mensaje empezando arriba. Devuelve si ha podido (si no, falta contenido debajo).
+  const colocarArriba = (id) => {
+    const el = scrollRef.current
+    const nodo = document.querySelector(`[data-msg="${id}"]`)
+    if (!nodo || !el) return true
+    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const top = nodo.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 12
+    programado.current = Date.now()
+    el.scrollTo({ top, behavior: reducido ? 'auto' : 'smooth' })
+    return top <= el.scrollHeight - el.clientHeight + 1
   }
   const onScroll = () => {
     const el = scrollRef.current
     if (!el) return
     const estaCerca = el.scrollHeight - el.scrollTop - el.clientHeight < 140
     setCerca(estaCerca)
-    if (estaCerca) {
+    // Solo vuelve a seguir el final si baja la persona, no un desplazamiento por código.
+    if (estaCerca && !pendiente.current && Date.now() - programado.current > 700) {
       anclado.current = true
       setNuevos(false)
     }
@@ -184,16 +224,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
       posicionados.current.clear()
       return
     }
-    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     const el = scrollRef.current
-    // Devuelve si el mensaje ha podido quedar arriba (si no, falta contenido debajo).
-    const llevarArriba = (id) => {
-      const nodo = document.querySelector(`[data-msg="${id}"]`)
-      if (!nodo || !el) return true
-      const top = nodo.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 12
-      el.scrollTo({ top, behavior: reducido ? 'auto' : 'smooth' })
-      return top <= el.scrollHeight - el.clientHeight + 1
-    }
+    const llevarArriba = colocarArriba
     // Cada paso del recorrido empieza arriba, con su separador; el primero es el parte,
     // que ya está al principio. Lo que responden los agentes crece debajo sin mover la vista.
     const guia = s.tour ? [...s.mensajes].reverse().find((m) => m.rol === 'guia') : null
@@ -211,7 +243,9 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         if (llevarArriba(ultimoMsg.id) && ultimoMsg.estado === 'hecho') pendiente.current = null
         return
       }
+      // Llega otra cosa (una novedad) mientras se leía la anterior: no se mueve la vista.
       pendiente.current = null
+      anclado.current = false
     }
     // El parte de la mañana ya está arriba al abrir: no se mueve, se lee desde su fecha.
     if (ultimoMsg.rol === 'agentes' && ultimoMsg.origen === 'saludo') {
@@ -222,7 +256,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     if (!anclado.current) {
       // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos
       // mensajes»; en el recorrido tampoco, porque cada paso ya se coloca solo.
-      if (!s.tour && !(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos(true)
+      // Se recuerda el primero que llegó: «Nuevos mensajes» lleva a su principio.
+      if (!s.tour && !(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos((n) => n || ultimoMsg.id)
       return
     }
     if (ultimoMsg.rol === 'agentes' && ultimoMsg.bloquesVisibles > 0) {
@@ -324,6 +359,11 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                 setNuevos(false)
                 despachar({ tipo: 'tour/salir' })
               }}
+              // Si la tarjeta del paso no está en el hilo, se vuelve a pedir su historia.
+              onPedirTarjeta={() => {
+                const h = HISTORIAS_POR_ID[tour?.paso.historia]
+                if (h) enviarEntrada(entradaDeHistoria(h, s.mundo))
+              }}
             />
             <div ref={scrollRef} className="ag-scroll" onScroll={onScroll} onWheel={soltar} onTouchMove={() => {
                 anclado.current = false
@@ -331,7 +371,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
               }} onKeyDown={soltar}>
               <div className="ag-hilo">
                 {s.mensajes.length > 0 && (
-                  <section aria-labelledby="ag-titulo-conversacion" className="space-y-6">
+                  <section aria-labelledby="ag-titulo-conversacion" className="flex flex-col gap-6">
                     <h2 id="ag-titulo-conversacion" className="sr-only">
                       Conversación
                     </h2>
@@ -354,8 +394,9 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                   type="button"
                   className="ag-nuevos"
                   onClick={() => {
-                    anclado.current = true
-                    alFinal()
+                    // Lo nuevo se lee desde su principio; lo que siga llegando no mueve la vista.
+                    anclado.current = false
+                    colocarArriba(nuevos)
                     setNuevos(false)
                   }}
                 >
@@ -388,7 +429,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         </Hoja>
 
         <Hoja abierta={hoja === 'demo'} onCerrar={cerrarHoja} titulo="Opciones de la demo" subtitulo={`Ahora: ${persona.nombre} · ${persona.rol}`} id="ag-hoja-demo">
-          <OpcionesDemo s={s} despachar={despachar} ritmo={ritmo} setRitmo={setRitmo} onCerrar={cerrarHoja} avisar={avisar} />
+          {hoja === 'demo' && <OpcionesDemo s={s} despachar={despachar} ritmo={ritmo} setRitmo={setRitmo} onCerrar={cerrarHoja} avisar={avisar} />}
         </Hoja>
 
         <Hoja abierta={hoja === 'recorrido'} onCerrar={cerrarHoja} titulo="¿Empezar el recorrido desde cero?" id="ag-hoja-recorrido">

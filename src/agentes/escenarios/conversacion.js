@@ -4,6 +4,7 @@
 import { AGENTES, ORDEN_AGENTES, ORDEN_FAMILIAS, AUTONOMIA } from '../agentes.js'
 import { ROLES } from '../politicas.js'
 import { t, v, c, POLITICAS, paso, sug, texto, aviso, lista } from './comun.js'
+import { EPILOGO } from '../casos.js'
 
 // La regla común de lo que nunca hacen los agentes. Se repite igual en todas partes.
 export const REGLA_COMUN = 'No paga, no firma y no se comunica con nadie sin tu permiso'
@@ -60,7 +61,7 @@ export const ayuda = {
           titulo: 'El equipo',
           plegado: true,
           // Informativo: el título ya dice qué es.
-          resumen: `${ORDEN_AGENTES.length - 1} agentes en ${ORDEN_FAMILIAS.length} familias, más el Orquestador`,
+          resumen: `El Orquestador y ${ORDEN_AGENTES.length - 1} agentes en ${ORDEN_FAMILIAS.length} familias`,
           columnas: [
             { id: 'agente', etiqueta: 'Agente' },
             { id: 'hace', etiqueta: 'Qué hace' },
@@ -102,12 +103,12 @@ function lineasCierre(m) {
   if (dec.estado === 'aprobada' || dec.estado === 'rechazada') {
     lineas.push(
       dec.por
-        ? t('Te pide aprobación: ningún agente podía aprobar {oc}. Esperó a {rol} y {por} la {que}.', { oc: v(orden.id, 'id'), rol: v(ROLES.produccionEjecutiva.toLowerCase()), por: v(dec.por), que: v(dec.estado === 'aprobada' ? 'aprobó' : 'rechazó') })
-        : t('Te pide aprobación: ningún agente podía aprobar {oc}. Esperó a {rol}.', { oc: v(orden.id, 'id'), rol: v(ROLES.produccionEjecutiva.toLowerCase()) }),
+        ? t('Pide tu aprobación: ningún agente podía aprobar {oc}. Esperó a {rol} y {por} la {que}.', { oc: v(orden.id, 'id'), rol: v(ROLES.produccionEjecutiva.toLowerCase()), por: v(dec.por), que: v(dec.estado === 'aprobada' ? 'aprobó' : 'rechazó') })
+        : t('Pide tu aprobación: ningún agente podía aprobar {oc}. Esperó a {rol}.', { oc: v(orden.id, 'id'), rol: v(ROLES.produccionEjecutiva.toLowerCase()) }),
     )
   } else {
     const rol = c.impactoOrden(m, orden.id)?.rol ?? ROLES.produccionEjecutiva
-    lineas.push(t('Te pide aprobación: ningún agente puede aprobar {oc}. Espera a {rol}.', { oc: v(orden.id, 'id'), rol: v(rol.toLowerCase()) }))
+    lineas.push(t('Pide tu aprobación: ningún agente puede aprobar {oc}. Espera a {rol}.', { oc: v(orden.id, 'id'), rol: v(rol.toLowerCase()) }))
   }
   return lineas
 }
@@ -118,14 +119,15 @@ export const cierreRecorrido = {
   titulo: 'Lo que acabas de ver',
   ejemplos: [],
   planificar() {
-    return [paso('orquestador', t('Resume lo que has visto en el recorrido'), { tipo: 'lectura', salida: t('Lo hace solo, te lo propone y te pide aprobación') })]
+    return [paso('orquestador', t('Resume lo que has visto en el recorrido'), { tipo: 'lectura', salida: t('Lo hace solo, te lo propone y pide tu aprobación') })]
   },
   componer({ antes }) {
     return {
       bloques: [
         texto(t('Así trabaja Filmpilot: los agentes preparan, tú decides. Lo has visto en sus tres formas de actuar.')),
         lista('Tres formas de actuar', lineasCierre(antes).map((x) => ({ texto: x }))),
-        { tipo: 'historias', epilogo: true },
+        // Las seis historias ya están en el carril con su marca: aquí solo lo que queda por ver.
+        { tipo: 'acciones', texto: t('Para después: otro proyecto, antes del rodaje. Está en exploración.'), acciones: [{ id: 'itsasoa', etiqueta: EPILOGO.titulo, variante: 'secondary', entrada: EPILOGO.entrada ?? { tipo: 'texto', texto: EPILOGO.prompt } }] },
       ],
       sugerencias: ['¿Por qué se desvía Escenografía?', '¿Qué bloquea el dossier fiscal?', '¿Cuánto nos costará al final y llegamos de caja?'].map(sug),
       fuentes: [],
@@ -143,7 +145,7 @@ const ALCANCE = {
   },
   pagos: {
     titulo: 'Sin pagos',
-    texto: t('No hago pagos ni transferencias: salen de vuestra banca, con vuestras firmas. Sí puedo decirte qué vence y cómo queda la caja.'),
+    texto: t('No hago pagos ni transferencias: salen de tu banca, con tus firmas. Sí puedo decirte qué vence y cómo queda la caja.'),
     sugerencias: ['¿Cuánto nos costará al final y llegamos de caja?', '¿Qué bloquea el dossier fiscal?'],
   },
 }

@@ -194,7 +194,7 @@ function CabeceraSaludo({ msg, tituloId, enCurso, onSaltar, onDetener }) {
 }
 
 function MensajeAgentes({ msg, ultimo }) {
-  const { despachar, deshacible, ocupado, mundo, enRecorrido } = useCtx()
+  const { despachar, deshacible, ocupado, mundo, enRecorrido, esperaRecorrido } = useCtx()
   const [detalle, setDetalle] = useState(false)
   const t = msg.turno
   const enCurso = msg.estado === 'en_curso'
@@ -202,8 +202,13 @@ function MensajeAgentes({ msg, ultimo }) {
   const tituloId = `${msg.id}-titulo`
   // Al terminar: cuántas decisiones de esta respuesta siguen esperando a una persona.
   const porDecidir = !enCurso && msg.estado === 'hecho' ? t.bloques.filter((b) => aprobacionPendiente(mundo, b)).length : 0
-  // El amarillo, en un solo bloque de la respuesta.
-  const principal = bloquePrincipal(mundo, bloques)
+  // El amarillo, en un solo bloque de la respuesta. En el recorrido lo lleva «Siguiente»,
+  // salvo la tarjeta que espera el paso.
+  const principal = enRecorrido
+    ? (bloques.find((b) => esperaRecorrido && b.ref?.tipo === esperaRecorrido.tipo && b.ref?.id === esperaRecorrido.id && aprobacionPendiente(mundo, b))?.clave ?? null)
+    : bloquePrincipal(mundo, bloques)
+  // Lo deshecho que sigue abierto: «Volver a decidir» lleva a su tarjeta.
+  const refsAbiertas = (msg.deshechoRefs ?? []).filter((ref) => aprobacionPendiente(mundo, { tipo: 'aprobacion', ref }))
   const automatico = msg.origen === 'evento'
   const puedeDeshacer = !enCurso && deshacible === msg.id && !msg.deshecho
   const quien = automatico ? agenteQueActuo(t) : null
@@ -223,7 +228,9 @@ function MensajeAgentes({ msg, ultimo }) {
   const volverADecidir = () => {
     const art = document.getElementById(`msg-${msg.id}`)
     if (!art) return
-    const antes = [...document.querySelectorAll('.ag-aprobacion:not(.is-decidida)')].filter((x) => x.compareDocumentPosition(art) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const selector = refsAbiertas.map((r) => `.ag-aprobacion[data-ref="${r.tipo}-${r.id}"]:not(.is-decidida)`).join(', ')
+    if (!selector) return
+    const antes = [...document.querySelectorAll(selector)].filter((x) => x.compareDocumentPosition(art) & Node.DOCUMENT_POSITION_FOLLOWING)
     const tarjeta = antes[antes.length - 1]
     if (!tarjeta) return
     tarjeta.scrollIntoView({ block: 'center', behavior: reducido() ? 'auto' : 'smooth' })
@@ -290,7 +297,8 @@ function MensajeAgentes({ msg, ultimo }) {
               {msg.deshecho ? `Deshecho: ${t.titulo}` : t.titulo}
             </h3>
             <p className="text-xs text-flp-muted">
-              <span className="tnum">{msg.hora}</span> · {automatico ? 'Novedad que llega sola' : msg.origen === 'accion' ? 'Los agentes aplican tu decisión' : 'Orquestador'}
+              {/* La línea de la novedad, justo encima, ya dice que llega sola. */}
+              <span className="tnum">{msg.hora}</span> · {automatico ? quien : msg.origen === 'accion' ? 'Los agentes aplican tu decisión' : 'Orquestador'}
             </p>
             {ultimo && msg.estado === 'hecho' && (
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -310,9 +318,12 @@ function MensajeAgentes({ msg, ultimo }) {
               <button type="button" className="ag-boton-fila" onClick={saltar}>
                 Saltar al resultado
               </button>
-              <button type="button" className="ag-boton-fila" onClick={detener}>
-                <IconStop size={14} aria-hidden="true" /> Detener
-              </button>
+              {/* En el recorrido cada paso necesita su respuesta entera: solo se puede saltar. */}
+              {!enRecorrido && (
+                <button type="button" className="ag-boton-fila" onClick={detener}>
+                  <IconStop size={14} aria-hidden="true" /> Detener
+                </button>
+              )}
             </div>
           )}
         </header>
@@ -326,7 +337,7 @@ function MensajeAgentes({ msg, ultimo }) {
 
       {msg.estado === 'detenido' && <p className="mt-3 text-sm text-flp-muted">Detenido. Los pasos completados quedan registrados; el resto no se ha hecho.</p>}
 
-      {msg.deshecho && msg.origen === 'accion' && (
+      {msg.deshecho && msg.origen === 'accion' && refsAbiertas.length > 0 && (
         <button type="button" className="ag-link ag-volver" onClick={volverADecidir}>
           Volver a decidir&nbsp;<span aria-hidden="true">↑</span>
         </button>
@@ -395,7 +406,7 @@ function MensajeNovedad({ msg, ultimaNovedad }) {
       <span className="min-w-0 flex-1">
         <strong className="font-medium">Novedad</strong> · {msg.titulo}
         <span className="block text-xs text-flp-muted">
-          <span className="tnum">{msg.hora}</span> · Llega sola, sin que la pidas: así avisan los agentes.
+          <span className="tnum">{msg.hora}</span> · {enRecorrido ? 'Así avisan los agentes.' : 'Llega sola, sin que la pidas: así avisan los agentes.'}
         </span>
       </span>
       {/* En el recorrido las novedades las trae cada paso: no hay nada que pausar. */}

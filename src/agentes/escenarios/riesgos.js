@@ -134,8 +134,8 @@ export function tarjetaRiesgo(m, id) {
   if (!soloCambiarPlan && r.reserva && (!d || r.reservaCorta)) {
     acciones.push({
       id: 'reservar',
-      etiqueta: reservada ? 'Ajustar la reserva' : `Apartar dinero ${porSi}`,
-      burbuja: reservada ? `Ajusto la reserva a ${eur(r.reserva)}` : `Aparto ${eur(r.reserva)} ${porSi}`,
+      etiqueta: reservada ? 'Ajustar lo apartado' : `Apartar dinero ${porSi}`,
+      burbuja: reservada ? `Ajusto lo apartado a ${eur(r.reserva)}` : `Aparto ${eur(r.reserva)} ${porSi}`,
       variante: 'secondary',
       accion: { tipo: 'riesgo/reservar', riesgoId: id, importe: r.reserva },
       rol: 'Producción ejecutiva',
@@ -144,8 +144,8 @@ export function tarjetaRiesgo(m, id) {
   if (!soloCambiarPlan) {
     acciones.push({
       id: 'rechazar',
-      etiqueta: reservada ? 'Asumirlo y liberar la reserva' : 'Asumir el riesgo',
-      burbuja: reservada ? 'Asumo el riesgo y libero la reserva' : 'Asumo el riesgo sin apartar dinero',
+      etiqueta: reservada ? 'Asumirlo y liberar lo apartado' : 'Asumir el riesgo',
+      burbuja: reservada ? 'Asumo el riesgo y libero lo apartado' : 'Asumo el riesgo sin apartar dinero',
       variante: 'secondary',
       accion: { tipo: 'riesgo/aceptar', riesgoId: id },
       rol: 'Producción ejecutiva',
@@ -158,7 +158,7 @@ export function tarjetaRiesgo(m, id) {
   }
   // Asumir parece gratis en la tabla: la etiqueta dice lo que se arriesga.
   const siOcurre = lluvia ? `si llueve, podría costar hasta ${eur(r.exposicion)} más` : `si hay más horas extra, podría costar unos ${eur(r.exposicion)} más`
-  if (!soloCambiarPlan) impacto.push(fila(`${reservada ? 'Asumir el riesgo y liberar la reserva' : 'Asumir el riesgo sin apartar dinero'} (${siOcurre})`, base))
+  if (!soloCambiarPlan) impacto.push(fila(`${reservada ? 'Asumir el riesgo y liberar lo apartado' : 'Asumir el riesgo sin apartar dinero'} (${siOcurre})`, base))
   return {
     tipo: 'aprobacion',
     id: `ap-${id}-${d?.estado ?? 'abierto'}-${r.reserva ?? 0}`,
@@ -320,7 +320,7 @@ export const riesgos = {
       if (d?.estado === 'mitigado') {
         bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia, pero la jornada {n} ya es interior: no afecta al rodaje.', { cuando, p, n: v(j0.n, 'num') })))
       } else if (d?.estado === 'reservado') {
-        bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia. La reserva de {res} se queda corta: ahora conviene apartar {nuevo}.', { cuando, p, res: v(d.importe, 'eur'), nuevo: v(r.reserva, 'eur') })))
+        bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia. Lo apartado, {res}, se queda corto: ahora conviene apartar {nuevo}.', { cuando, p, res: v(d.importe, 'eur'), nuevo: v(r.reserva, 'eur') })))
         bloques.push(tarjetaRiesgo(m, 'RG-1'))
       } else if (d?.estado === 'aceptado') {
         bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia. Se decidió asumir el riesgo; todavía se puede cambiar el orden de jornadas.', { cuando, p })))
@@ -364,7 +364,7 @@ export const riesgos = {
       if (r.estado === 'mitigado') {
         bloques.push(texto(r.respuesta))
       } else if (r.decision || r.estado === 'aceptado' || r.estado === 'reservado') {
-        if (r.estado === 'reservado') bloques.push(texto(r.reservaCorta ? t('La reserva de {res} se queda corta: ahora conviene apartar {nuevo}.', { res: v(r.reservaAprobada, 'eur'), nuevo: v(r.reserva, 'eur') }) : t('Ya hay una reserva de {res} en la previsión por si ocurre.', { res: v(r.reservaAprobada, 'eur') })))
+        if (r.estado === 'reservado') bloques.push(texto(r.reservaCorta ? t('Lo apartado, {res}, se queda corto: ahora conviene apartar {nuevo}.', { res: v(r.reservaAprobada, 'eur'), nuevo: v(r.reserva, 'eur') }) : t('Ya hay {res} apartados en la previsión por si ocurre.', { res: v(r.reservaAprobada, 'eur') })))
         bloques.push(tarjetaRiesgo(m, id))
       } else if (r.aviso) {
         bloques.push(lista('Respuesta propuesta', [{ texto: r.respuesta }], 'propone'))
