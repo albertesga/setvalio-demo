@@ -5,7 +5,7 @@ import { cuenta } from '../texto.js'
 import { optimizacion, totalesPropuesta, ALTERNATIVAS_POR_ID } from '../propuesta.js'
 import { componerComparacion, kpisPropuesta, textoDiferencia, tarjetaEleccion, proyectoPropuesta, sugVolver } from './presupuesto.js'
 // El aviso «En exploración» se importa: un solo texto para todos los turnos de riesgos.
-import { AVISO_EXPLORATORIO, tarjetaRiesgo } from './riesgos.js'
+import { AVISO_EXPLORATORIO, tarjetaRiesgo, OPCIONES_RIESGO } from './riesgos.js'
 import { mejoresConfirmadas } from '../propuesta.js'
 import { jornadaOriginal } from '../rodaje.js'
 import { PERSONAS } from '../mundo.js'
@@ -136,9 +136,8 @@ export const accion = {
         ]
       }
       case 'riesgo/mitigar': {
-        const ll = m.rodaje.senales.lluvia
         return [
-          paso('riesgos', a.riesgoId === 'RG-1' ? t('Cambia el orden de las jornadas {a} y {b}', { a: v(ll.jornada, 'num'), b: v(ll.intercambio, 'num') }) : t('Replanifica las noches con una citación más tardía'), { tipo: 'plan', acciones: [a], salida: t('Plan de rodaje actualizado') }),
+          paso('riesgos', OPCIONES_RIESGO[a.riesgoId]?.pasoMitigar(m) ?? t('Cambia el plan'), { tipo: 'plan', acciones: [a], salida: t('Plan de rodaje actualizado') }),
           ...(a.riesgoId === 'RG-1' ? [paso('riesgos', t('Redacta los avisos del cambio para el equipo y para transportes'), { tipo: 'redaccion', autonomia: 'propone', acciones: avisosCambioOrden(m).map((borrador) => ({ tipo: 'borrador/crear', borrador })), salida: t('Borradores listos; no se envían') })] : []),
           paso('prevision', t('Recalcula la previsión'), { salida: (_, d) => t('Coste estimado final {cef}', { cef: v(c.totales(d).cef, 'eur') }) }),
           ...regInf,
@@ -279,13 +278,7 @@ export const accion = {
           bloques.push({ tipo: 'borrador', id: 'BOR-CAMBIO-TRANSPORTE' })
         } else {
           const mantenida = despues.reservas?.[a.riesgoId]?.importe
-          bloques.push(
-            texto(
-              mantenida
-                ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: lo apartado, {res}, se mantiene y Riesgos lo sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
-                : t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: Riesgos lo sigue vigilando.', { por: v(por) }),
-            ),
-          )
+          bloques.push(texto(OPCIONES_RIESGO[a.riesgoId].textoMitigado({ por, mantenida, antes, despues })))
           bloques.push({ tipo: 'plan' })
         }
         if (liberada) bloques.push(kpisProyecto(despues, antes, { claves: ['cef', 'desviacion'] }))

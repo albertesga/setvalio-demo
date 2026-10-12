@@ -12,6 +12,34 @@ import { riesgosAltos, riesgo as riesgoDe, jornadaOriginal } from './rodaje.js'
 // Lo que entra con EV-01, en el orden en que llegó esta mañana.
 export const LLEGAN_CON_EV01 = ['F-2026-078', 'F-2026-079', 'G-004']
 
+// Cómo se cambia el plan de cada riesgo con decisión (sobre la copia n). Devuelve los
+// efectos, o null si no procede (y entonces el mundo no cambia).
+const MITIGAR = {
+  'RG-1': (n, accion) => {
+    // Intercambia el contenido de las dos jornadas; cada una conserva su número y su fecha.
+    const { jornada: ja, intercambio: jb } = n.rodaje.senales.lluvia
+    const a = n.rodaje.jornadas.find((j) => j.n === ja)
+    const b = n.rodaje.jornadas.find((j) => j.n === jb)
+    if (a.localizacion !== jornadaOriginal(ja).localizacion) return null
+    for (const c of ['localizacion', 'tipo', 'franja', 'roles', 'nota']) [a[c], b[c]] = [b[c], a[c]]
+    const efectos = [{ ambito: 'plan', id: `J${ja}`, campo: 'localizacion', antes: b.localizacion, despues: a.localizacion }]
+    // El riesgo desaparece: se libera la reserva si la había.
+    if (n.reservas[accion.riesgoId]) {
+      efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+      delete n.reservas[accion.riesgoId]
+    }
+    return efectos
+  },
+  'RG-5': (n) => {
+    // Replanificar reduce las horas extra, no las elimina: una reserva aprobada se mantiene.
+    for (const j of n.rodaje.jornadas.filter((x) => n.rodaje.senales.noches.jornadas.includes(x.n))) {
+      j.franja = 'Tarde-noche'
+      j.nota = 'Citación más tardía para reducir horas extra'
+    }
+    return [{ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' }]
+  },
+}
+
 function clonar(m) {
   return JSON.parse(JSON.stringify(m))
 }
@@ -240,29 +268,11 @@ export function reducir(m, accion) {
       // Se puede cambiar el plan sin decisión previa, con una reserva aprobada o tras asumir el riesgo.
       const d0 = m.decisionesRiesgo[accion.riesgoId]
       if (d0?.estado === 'mitigado') return m
+      const cambiar = MITIGAR[accion.riesgoId]
+      if (!cambiar) return m
       const n = clonar(m)
-      const efectos = []
-      if (accion.riesgoId === 'RG-1') {
-        // Intercambia el contenido de las dos jornadas; cada una conserva su número y su fecha.
-        const { jornada: ja, intercambio: jb } = n.rodaje.senales.lluvia
-        const a = n.rodaje.jornadas.find((j) => j.n === ja)
-        const b = n.rodaje.jornadas.find((j) => j.n === jb)
-        if (a.localizacion !== jornadaOriginal(ja).localizacion) return m
-        for (const c of ['localizacion', 'tipo', 'franja', 'roles', 'nota']) [a[c], b[c]] = [b[c], a[c]]
-        efectos.push({ ambito: 'plan', id: `J${ja}`, campo: 'localizacion', antes: b.localizacion, despues: a.localizacion })
-        // El riesgo desaparece: se libera la reserva si la había.
-        if (n.reservas[accion.riesgoId]) {
-          efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
-          delete n.reservas[accion.riesgoId]
-        }
-      } else if (accion.riesgoId === 'RG-5') {
-        // Replanificar reduce las horas extra, no las elimina: una reserva aprobada se mantiene.
-        for (const j of n.rodaje.jornadas.filter((x) => n.rodaje.senales.noches.jornadas.includes(x.n))) {
-          j.franja = 'Tarde-noche'
-          j.nota = 'Citación más tardía para reducir horas extra'
-        }
-        efectos.push({ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' })
-      } else return m
+      const efectos = cambiar(n, accion)
+      if (!efectos) return m
       n.decisionesRiesgo[accion.riesgoId] = { estado: 'mitigado', opcion: accion.opcion ?? null, por: accion.por ?? null, reservaMantenida: n.reservas[accion.riesgoId]?.importe ?? null }
       return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId }, efectos)
     }

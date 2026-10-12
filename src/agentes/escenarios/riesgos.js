@@ -4,6 +4,7 @@
 import { cuenta, fecha as fechaLarga, fechaDia, formatear, renderTexto } from '../texto.js'
 import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, UMBRALES, TIPOS, PREGUNTA, HECHAS, SENALES } from '../rodaje.js'
 import { PERSONAS } from '../mundo.js'
+import { reducir } from '../acciones.js'
 import { t, v, c, paso, sug, texto, aviso, lista } from './comun.js'
 import { REGLA_COMUN } from './conversacion.js'
 
@@ -104,38 +105,68 @@ export function borradorRiesgo(m, id) {
   return null
 }
 
-/** Tarjeta de decisión de un riesgo con impacto económico (RG-1 lluvia, RG-5 horas extra).
+const eur = (n) => formatear(n, 'eur')
+
+/**
+ * Lo propio de cada riesgo con decisión: cómo se cambia el plan, cómo se dicen las filas y
+ * qué se recomienda. La tarjeta, los pasos y la respuesta a la decisión lo leen de aquí.
+ * Contrato: { opcion, plan(r) → { etiqueta, burbuja, fila }, porSi, filaReserva?(r),
+ *   siOcurre(r), resumen(m, r), recomendacion, pasoMitigar(m), textoMitigado({ por, mantenida, antes, despues }) }
+ */
+export const OPCIONES_RIESGO = {
+  'RG-1': {
+    opcion: 'permutar',
+    plan: (r) => ({ etiqueta: `Cambiar el orden con la jornada ${r.intercambio}`, burbuja: `Cambio el orden de las jornadas ${r.jornadas[0]} y ${r.intercambio}`, fila: 'Cambiar el orden de jornadas' }),
+    porSi: 'por si llueve',
+    filaReserva: (r) => `Apartar ${eur(r.reserva)} por si llueve (${formatear(r.probabilidad, 'pct0')} de lo que costaría perder la jornada)`,
+    siOcurre: (r) => `si llueve, podría costar hasta ${eur(r.exposicion)} más`,
+    resumen: (m, r) =>
+      t('El pronóstico da un {p} de lluvia {cuando} y la jornada {n} es un exterior de día sin cobertura: perderla costaría unos {exp}. La jornada {otra} es un interior con el decorado montado. Cambiarlas de orden no cambia el coste final, pero hay que confirmarlo con dirección, reparto y transporte.', {
+        p: v(r.probabilidad, 'pct0'),
+        cuando: v(cuandoEs(r.dias, r.fecha)),
+        n: v(r.jornadas[0], 'num'),
+        exp: v(r.exposicion, 'eur'),
+        otra: v(jornadaOriginal(r.intercambio).n, 'num'),
+      }),
+    recomendacion: t('Recomendamos cambiar el orden: quita el riesgo y no cambia el coste final.'),
+    pasoMitigar: (m) => t('Cambia el orden de las jornadas {a} y {b}', { a: v(m.rodaje.senales.lluvia.jornada, 'num'), b: v(m.rodaje.senales.lluvia.intercambio, 'num') }),
+  },
+  'RG-5': {
+    opcion: 'replanificar',
+    plan: () => ({ etiqueta: 'Replanificar las noches', burbuja: 'Replanifico las noches con una citación más tardía', fila: 'Replanificar las noches' }),
+    porSi: 'por si hay más horas extra',
+    siOcurre: (r) => `si hay más horas extra, podría costar unos ${eur(r.exposicion)} más`,
+    resumen: (m, r) => t('Las noches anteriores generaron horas extra y quedan dos más. Si se repiten, el coste estimado final subiría unos {exp}. Una citación más tardía reduce las horas extra, aunque no las elimina.', { exp: v(r.exposicion, 'eur') }),
+    recomendacion: t('Recomendamos replanificar: reduce las horas extra sin tocar la previsión.'),
+    pasoMitigar: () => t('Replanifica las noches con una citación más tardía'),
+    textoMitigado: ({ por, mantenida }) =>
+      mantenida
+        ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: lo apartado, {res}, se mantiene y Riesgos lo sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
+        : t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: Riesgos lo sigue vigilando.', { por: v(por) }),
+  },
+}
+
+/** Tarjeta de decisión de un riesgo con impacto económico (los de OPCIONES_RIESGO).
  *  Las acciones dependen del estado: tras asumirlo solo queda cambiar el plan; con dinero
  *  apartado se puede ajustar, cambiar el plan o asumirlo (y liberarlo).
- *  Cada fila de impacto lleva el coste final antes y después y `cambio` (después − ahora):
- *  `impactoUnico` pide pintarlas en una sola columna con el valor actual en el título. */
+ *  Cada fila de impacto lleva el coste final antes y después de su acción, calculado con el
+ *  reductor, y `cambio` (después − ahora): `impactoUnico` pide pintarlas en una sola columna. */
 export function tarjetaRiesgo(m, id) {
   const r = riesgoDe(m, id)
+  const o = OPCIONES_RIESGO[id]
   const d = m.decisionesRiesgo[id]
-  const lluvia = id === 'RG-1'
   const cef = c.totales(m).cef
   const reservada = m.reservas[id]?.importe ?? 0
-  const base = cef - reservada
   const soloCambiarPlan = d?.estado === 'aceptado'
-  const ji = lluvia ? jornadaOriginal(r.intercambio) : null
-  const eur = (n) => formatear(n, 'eur')
-  const porSi = lluvia ? 'por si llueve' : 'por si hay más horas extra'
-  const etiquetaPlan = lluvia ? `Cambiar el orden con la jornada ${r.intercambio}` : 'Replanificar las noches'
+  const plan = o.plan(r)
   const acciones = [
-    {
-      id: 'aprobar',
-      etiqueta: etiquetaPlan,
-      burbuja: lluvia ? `Cambio el orden de las jornadas ${r.jornadas[0]} y ${r.intercambio}` : 'Replanifico las noches con una citación más tardía',
-      variante: 'primary',
-      accion: { tipo: 'riesgo/mitigar', riesgoId: id, opcion: lluvia ? 'permutar' : 'replanificar' },
-      rol: 'Line producer',
-    },
+    { id: 'aprobar', etiqueta: plan.etiqueta, burbuja: plan.burbuja, variante: 'primary', accion: { tipo: 'riesgo/mitigar', riesgoId: id, opcion: o.opcion }, rol: 'Line producer' },
   ]
   if (!soloCambiarPlan && r.reserva && (!d || r.reservaCorta)) {
     acciones.push({
       id: 'reservar',
-      etiqueta: reservada ? 'Ajustar lo apartado' : `Apartar dinero ${porSi}`,
-      burbuja: reservada ? `Ajusto lo apartado a ${eur(r.reserva)}` : `Aparto ${eur(r.reserva)} ${porSi}`,
+      etiqueta: reservada ? 'Ajustar lo apartado' : `Apartar dinero ${o.porSi}`,
+      burbuja: reservada ? `Ajusto lo apartado a ${eur(r.reserva)}` : `Aparto ${eur(r.reserva)} ${o.porSi}`,
       variante: 'secondary',
       accion: { tipo: 'riesgo/reservar', riesgoId: id, importe: r.reserva },
       rol: 'Producción ejecutiva',
@@ -151,14 +182,17 @@ export function tarjetaRiesgo(m, id) {
       rol: 'Producción ejecutiva',
     })
   }
-  const fila = (etiqueta, despues) => ({ etiqueta, antes: cef, despues, cambio: despues - cef, formato: 'eur' })
-  const impacto = [fila(lluvia ? 'Cambiar el orden de jornadas' : 'Replanificar las noches', lluvia ? base : cef)]
-  if (acciones.some((a) => a.id === 'reservar')) {
-    impacto.push(fila(lluvia ? `Apartar ${eur(r.reserva)} por si llueve (${formatear(r.probabilidad, 'pct0')} de lo que costaría perder la jornada)` : `Apartar ${eur(r.reserva)} ${porSi}`, base + r.reserva))
+  // El coste final con cada opción sale de aplicarla: así cuadra con lo que pasará al decidir.
+  const tras = (accion) => c.totales(reducir(m, accion)).cef
+  const fila = (etiqueta, accion) => {
+    const despues = tras(accion)
+    return { etiqueta, antes: cef, despues, cambio: despues - cef, formato: 'eur' }
   }
+  const porId = (x) => acciones.find((a) => a.id === x)?.accion
+  const impacto = [fila(plan.fila, porId('aprobar'))]
+  if (porId('reservar')) impacto.push(fila(o.filaReserva ? o.filaReserva(r) : `Apartar ${eur(r.reserva)} ${o.porSi}`, porId('reservar')))
   // Asumir parece gratis en la tabla: la etiqueta dice lo que se arriesga.
-  const siOcurre = lluvia ? `si llueve, podría costar hasta ${eur(r.exposicion)} más` : `si hay más horas extra, podría costar unos ${eur(r.exposicion)} más`
-  if (!soloCambiarPlan) impacto.push(fila(`${reservada ? 'Asumir el riesgo y liberar lo apartado' : 'Asumir el riesgo sin apartar dinero'} (${siOcurre})`, base))
+  if (porId('rechazar')) impacto.push(fila(`${reservada ? 'Asumir el riesgo y liberar lo apartado' : 'Asumir el riesgo sin apartar dinero'} (${o.siOcurre(r)})`, porId('rechazar')))
   return {
     tipo: 'aprobacion',
     id: `ap-${id}-${d?.estado ?? 'abierto'}-${r.reserva ?? 0}`,
@@ -169,20 +203,12 @@ export function tarjetaRiesgo(m, id) {
     nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Cambiar el plan lo decide el line producer; apartar dinero o asumir el riesgo, producción ejecutiva.',
     entradaActual: PREGUNTA[id],
     titulo: r.titulo,
-    resumen: lluvia
-      ? t('El pronóstico da un {p} de lluvia {cuando} y la jornada {n} es un exterior de día sin cobertura: perderla costaría unos {exp}. La jornada {otra} es un interior con el decorado montado. Cambiarlas de orden no cambia el coste final, pero hay que confirmarlo con dirección, reparto y transporte.', {
-          p: v(r.probabilidad, 'pct0'),
-          cuando: v(cuandoEs(r.dias, r.fecha)),
-          n: v(r.jornadas[0], 'num'),
-          exp: v(r.exposicion, 'eur'),
-          otra: v(ji.n, 'num'),
-        })
-      : t('Las noches anteriores generaron horas extra y quedan dos más. Si se repiten, el coste estimado final subiría unos {exp}. Una citación más tardía reduce las horas extra, aunque no las elimina.', { exp: v(r.exposicion, 'eur') }),
+    resumen: o.resumen(m, r),
     impactoTitulo: 'Opción',
     impactoColumnas: ['Coste final ahora', 'Con esta opción'],
     impactoUnico: { titulo: t('Coste estimado final ahora: {cef}', { cef: v(cef, 'eur') }), columna: 'Impacto en el coste final', formato: 'eurSigned' },
     impacto,
-    recomendacion: soloCambiarPlan ? null : lluvia ? t('Recomendamos cambiar el orden: quita el riesgo y no cambia el coste final.') : t('Recomendamos replanificar: reduce las horas extra sin tocar la previsión.'),
+    recomendacion: soloCambiarPlan ? null : o.recomendacion,
     acciones,
   }
 }
