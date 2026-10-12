@@ -9,6 +9,57 @@ import { crearMundo } from './mundo.js'
 import { ALTERNATIVAS_POR_ID, resultadoLlamada } from './propuesta.js'
 import { riesgosAltos, riesgo as riesgoDe, jornadaOriginal } from './rodaje.js'
 
+// Lo que entra con EV-01, en el orden en que llegó esta mañana.
+export const LLEGAN_CON_EV01 = ['F-2026-078', 'F-2026-079', 'G-004']
+
+// Cómo se cambia el plan de cada riesgo con decisión (sobre la copia n). Devuelve los
+// efectos, o null si no procede (y entonces el mundo no cambia).
+const MITIGAR = {
+  'RG-1': (n, accion) => {
+    // Intercambia el contenido de las dos jornadas; cada una conserva su número y su fecha.
+    const { jornada: ja, intercambio: jb } = n.rodaje.senales.lluvia
+    const a = n.rodaje.jornadas.find((j) => j.n === ja)
+    const b = n.rodaje.jornadas.find((j) => j.n === jb)
+    if (a.localizacion !== jornadaOriginal(ja).localizacion) return null
+    for (const c of ['localizacion', 'tipo', 'franja', 'roles', 'nota']) [a[c], b[c]] = [b[c], a[c]]
+    const efectos = [{ ambito: 'plan', id: `J${ja}`, campo: 'localizacion', antes: b.localizacion, despues: a.localizacion }]
+    // El riesgo desaparece: se libera la reserva si la había.
+    if (n.reservas[accion.riesgoId]) {
+      efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+      delete n.reservas[accion.riesgoId]
+    }
+    return efectos
+  },
+  'RG-5': (n) => {
+    // Replanificar reduce las horas extra, no las elimina: una reserva aprobada se mantiene.
+    for (const j of n.rodaje.jornadas.filter((x) => n.rodaje.senales.noches.jornadas.includes(x.n))) {
+      j.franja = 'Tarde-noche'
+      j.nota = 'Citación más tardía para reducir horas extra'
+    }
+    return [{ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' }]
+  },
+  'RG-7': (n, accion) => {
+    // Montar la grúa al cerrar la víspera, en el mismo decorado: un día más de grúa en su
+    // partida. Su montaje sale de la jornada y el retraso de la víspera ya no la deja corta.
+    const g = n.rodaje.senales.grua
+    const o = n.ordenes[g.oc]
+    if (!o || g.premontada) return null
+    const tarifa = r2(o.importe / g.diasFactura)
+    const efectos = []
+    aplicarCoste(n, g.partida, tarifa, 'comprometido', efectos)
+    g.premontada = true
+    const v = n.rodaje.jornadas.find((j) => j.n === g.vispera)
+    if (v) v.nota = 'Montaje de la grúa al cerrar'
+    efectos.push({ ambito: 'plan', id: `J${g.vispera}`, campo: 'nota', antes: '', despues: 'Montaje de la grúa al cerrar' })
+    // El riesgo queda cubierto: se libera lo apartado si lo había.
+    if (n.reservas[accion.riesgoId]) {
+      efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+      delete n.reservas[accion.riesgoId]
+    }
+    return efectos
+  },
+}
+
 function clonar(m) {
   return JSON.parse(JSON.stringify(m))
 }
@@ -40,9 +91,14 @@ export function reducir(m, accion) {
       if (!m.entrantes.includes(accion.eventoId)) return m
       const n = clonar(m)
       n.entrantes = n.entrantes.filter((e) => e !== accion.eventoId)
+      // EV-01: las tres de esta mañana (correo, formulario web y WhatsApp) entran en la bandeja.
       if (accion.eventoId === 'EV-01') {
-        n.documentos['F-2026-078'].estado = 'en_bandeja'
-        n.documentos['F-2026-078'].recibida = n.corte.fecha
+        for (const id of LLEGAN_CON_EV01) {
+          const d = n.documentos[id]
+          if (d?.estado !== 'por_llegar') continue
+          d.estado = 'en_bandeja'
+          d.recibida = n.corte.fecha
+        }
       }
       if (accion.eventoId === 'EV-02') n.ordenes['OC-104'].estado = 'Pendiente'
       if (accion.eventoId === 'EV-03') n.avisos.push({ id: 'DOS-01', tipo: 'vencimiento' })
@@ -232,29 +288,11 @@ export function reducir(m, accion) {
       // Se puede cambiar el plan sin decisión previa, con una reserva aprobada o tras asumir el riesgo.
       const d0 = m.decisionesRiesgo[accion.riesgoId]
       if (d0?.estado === 'mitigado') return m
+      const cambiar = MITIGAR[accion.riesgoId]
+      if (!cambiar) return m
       const n = clonar(m)
-      const efectos = []
-      if (accion.riesgoId === 'RG-1') {
-        // Intercambia el contenido de las dos jornadas; cada una conserva su número y su fecha.
-        const { jornada: ja, intercambio: jb } = n.rodaje.senales.lluvia
-        const a = n.rodaje.jornadas.find((j) => j.n === ja)
-        const b = n.rodaje.jornadas.find((j) => j.n === jb)
-        if (a.localizacion !== jornadaOriginal(ja).localizacion) return m
-        for (const c of ['localizacion', 'tipo', 'franja', 'roles', 'nota']) [a[c], b[c]] = [b[c], a[c]]
-        efectos.push({ ambito: 'plan', id: `J${ja}`, campo: 'localizacion', antes: b.localizacion, despues: a.localizacion })
-        // El riesgo desaparece: se libera la reserva si la había.
-        if (n.reservas[accion.riesgoId]) {
-          efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
-          delete n.reservas[accion.riesgoId]
-        }
-      } else if (accion.riesgoId === 'RG-5') {
-        // Replanificar reduce las horas extra, no las elimina: una reserva aprobada se mantiene.
-        for (const j of n.rodaje.jornadas.filter((x) => n.rodaje.senales.noches.jornadas.includes(x.n))) {
-          j.franja = 'Tarde-noche'
-          j.nota = 'Citación más tardía para reducir horas extra'
-        }
-        efectos.push({ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' })
-      } else return m
+      const efectos = cambiar(n, accion)
+      if (!efectos) return m
       n.decisionesRiesgo[accion.riesgoId] = { estado: 'mitigado', opcion: accion.opcion ?? null, por: accion.por ?? null, reservaMantenida: n.reservas[accion.riesgoId]?.importe ?? null }
       return confirmar(n, accion, { tipo: 'riesgo', id: accion.riesgoId }, efectos)
     }

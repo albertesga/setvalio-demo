@@ -167,7 +167,7 @@ export function extraerEntidades(texto, mundo) {
   const mJ = norm.match(/\bjornadas?\s*(\d{1,2})\b/)
   if (mJ) e.jornada = Number(mJ[1])
   const RIESGO = [
-    [/\b(lluvia|llover|llovera|llueve|lloviendo|meteo|meteorolog|chubasco|tormenta)|prevision del tiempo/, 'RG-1'],
+    [/\b(lluvia|llover|llovera|llueve|lloviendo|meteo|meteorolog|chubasco|tormenta)|prevision del tiempo|tiempo hara|que tiempo|tiempo va a hacer/, 'RG-1'],
     [/\b(actriz|ausencia|no show|no se presente)|(billete|vuelo).*(actriz|convocad)|(actriz|convocad).*(billete|vuelo)/, 'RG-2'],
     [/(permiso de rodaje|via publica|permiso municipal)/, 'RG-3'],
     [/(orden de rodaje|orden del dia|hoja de citacion|call sheet|citacion de manana)/, 'RG-4'],
@@ -176,7 +176,28 @@ export function extraerEntidades(texto, mundo) {
   ]
   const r = RIESGO.find(([re]) => re.test(norm))
   if (r) e.riesgo = r[1]
+  // RG-7 · la grúa de la jornada 17. «Grúa» también es un proveedor (Grúas y Cámaras del Sur):
+  // solo cuenta con una palabra de riesgo y sin hablar de precios, facturas o Itsasoa.
+  const GRUA = /\b(grua|technocrane)/
+  const PELIGRO_GRUA = /(falla|fallar|falle|averi|retras|tarde|a tiempo|montaj|montar|respaldo|plan b|jornada 17|horas)/
+  const NO_ES_RIESGO = /(precio|presupuest|factur|\bpag|propuesta|itsasoa|anad|\d+\s*(€|e\b|eur))/
+  if (!e.riesgo && ((GRUA.test(norm) && PELIGRO_GRUA.test(norm)) || /recurso (mas caro|critico)|grua de respaldo/.test(norm)) && !NO_ES_RIESGO.test(norm)) {
+    e.riesgo = 'RG-7'
+    // Lo que se dedujo del nombre del proveedor no aplica: se habla del rodaje, no de su factura.
+    if (!/\bf[\s-]*2026|\bg-\d/.test(norm)) delete e.documento
+    if (!/\boc[\s-]*\d/.test(norm)) {
+      delete e.oc
+      delete e.ocConocida
+    }
+    delete e.proveedor
+    delete e.capitulo
+  }
 
+  // Un paso del dossier fiscal, solo con verbo: «prepara la solicitud del certificado», «pide los justificantes de pago».
+  if (/\b(prepara|preparar|preparame|redacta|redactar|pide|pedir|pideles|solicita|solicitar)\b/.test(norm)) {
+    if (/(certificado|icaa)/.test(norm)) e.dossierPaso = 'DOS-01'
+    else if (/(justificantes?|comprobantes?) de pago/.test(norm)) e.dossierPaso = 'DOS-02'
+  }
   if (/\b(envia|enviar|enviale|envialo|enviala|manda|mandar|mandale|mandalo)\b/.test(norm)) e.accionExterna = 'enviar'
   if (/\b(paga|pagar|pagale|pagala|pagues|abona|abonar|transfiere|transferir|haz la transferencia)\b/.test(norm)) e.accionExterna = 'pagar'
 
@@ -190,7 +211,7 @@ export const LEXICO = {
     raices: { informe: 2, report: 2, semanal: 3 },
   },
   factura_nueva: {
-    frases: ['nueva factura', 'factura nueva', 'ha llegado', 'han llegado', 'procesa la factura', 'procesa la', 'facturas nuevas', 'buzon', 'concilia la factura', 'sin pedido', 'facturas sin pedido'],
+    frases: ['nueva factura', 'factura nueva', 'ha llegado', 'han llegado', 'procesa la factura', 'procesa la', 'facturas nuevas', 'buzon', 'concilia la factura', 'sin pedido', 'facturas sin pedido', 'como se contabilizo', 'como contabilizo'],
     raices: { factura: 1, lleg: 2, recib: 2, proces: 2, concili: 2, entrant: 2, contabiliz: 2 },
     entidades: { documento: 2 },
   },
@@ -199,7 +220,7 @@ export const LEXICO = {
     raices: { bandeja: 2, ticket: 3, ocr: 3, confianza: 3, clasific: 2, revis: 1, gasto: 1, dudos: 2 },
   },
   explicar_desviacion: {
-    frases: ['por que', 'fuera de rango', 'sobre presupuesto', 'por encima del presupuesto', 'por encima de presupuesto', 'se desvia', 'se desvian', 'fuera de umbral', 'que capitulos'],
+    frases: ['por que', 'fuera de rango', 'sobre presupuesto', 'por encima del presupuesto', 'por encima de presupuesto', 'se desvia', 'se desvian', 'fuera de umbral', 'que capitulos', 'del limite', 'se pasa del limite', 'se pasan del limite', 'fuera del limite', 'cerca del limite'],
     raices: { desvi: 3, explic: 2, sobrecost: 3, causa: 2, encima: 1, capitulo: 1 },
     entidades: { capitulo: 2, partida: 2 },
   },
@@ -209,12 +230,13 @@ export const LEXICO = {
     entidades: { oc: 4 },
   },
   prevision: {
-    frases: ['coste final', 'como cerramos', 'como cerraremos', 'como vamos a cerrar', 'a cierre', 'semanas en negativo', 'coste estimado final', 'llegamos con la caja', 'flujo de caja', 'cash flow'],
+    frases: ['coste final', 'como cerramos', 'como cerraremos', 'como vamos a cerrar', 'a cierre', 'semanas en negativo', 'coste estimado final', 'llegamos con la caja', 'flujo de caja', 'cash flow', 'cuanto dinero tenemos', 'cuanto dinero nos queda', 'dinero tenemos', 'cuanto nos costara', 'costara al final', 'llegamos de caja'],
     raices: { forecast: 3, cef: 3, previs: 2, cierre: 2, proyecc: 2, tesorer: 3, caja: 3, saldo: 2, liquidez: 3, cerra: 1, negativ: 1 },
   },
   cumplimiento: {
-    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal', 'riesgos fiscales'],
-    raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1 },
+    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal', 'riesgos fiscales', 'adecuacion fiscal', 'dossier al dia', 'solicitud del certificado', 'justificantes de pago'],
+    raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1, adecuacion: 2 },
+    entidades: { dossierPaso: 3 },
   },
   pedir_documentacion: {
     frases: ['pide a', 'pidele a', 'pidele', 'pedir a', 'solicita a', 'escribe a', 'escribele', 'redacta un correo', 'redacta un email', 'email al proveedor', 'correo al proveedor', 'pide la factura', 'pide los justificantes', 'documentacion que falta', 'factura completa', 'al proveedor'],
@@ -227,7 +249,7 @@ export const LEXICO = {
     entidades: { porcentaje: 1, territorio: 1 },
   },
   riesgos: {
-    frases: ['que riesgos', 'riesgos de rodaje', 'riesgos del rodaje', 'parte de riesgos', 'radar de riesgos', 'que puede salir mal', 'proximas jornadas', 'prevision del tiempo', 'va a llover', 'orden del dia', 'orden de rodaje', 'call sheet', 'hoja de citacion', 'horas extra de noche', 'via publica', 'cambio de localizacion', 'aviso a transportes', 'informe de riesgos'],
+    frases: ['que riesgos', 'riesgos de rodaje', 'riesgos del rodaje', 'parte de riesgos', 'radar de riesgos', 'que puede salir mal', 'recurso critico', 'recurso mas caro', 'grua de respaldo', 'plan b', 'proximas jornadas', 'prevision del tiempo', 'va a llover', 'orden del dia', 'orden de rodaje', 'call sheet', 'hoja de citacion', 'horas extra de noche', 'via publica', 'cambio de localizacion', 'aviso a transportes', 'informe de riesgos', 'cambia el orden', 'cambiar el orden', 'cambio de orden', 'orden de las jornadas', 'orden de jornadas', 'que tiempo hara', 'tiempo hara', 'que tiempo va a hacer'],
     raices: { riesg: 3, radar: 3, lluv: 3, llov: 3, llue: 3, meteo: 3, citacion: 2, jornad: 1 },
     entidades: { riesgo: 2, jornada: 2 },
   },
@@ -245,12 +267,12 @@ export const LEXICO = {
     entidades: { importe: 2 },
   },
   ayuda: {
-    frases: ['que puedes hacer', 'que sabes hacer', 'como funciona', 'que agentes', 'como decides', 'quien eres', 'que haces', 'casos de uso'],
+    frases: ['que puedes hacer', 'que sabes hacer', 'como funciona', 'que agentes', 'como decides', 'quien eres', 'que haces', 'casos de uso', 'que hace el agente', 'que hacen los agentes'],
     raices: { ayuda: 3, agente: 2, autonom: 2, decid: 1 },
   },
   // El parte de la mañana. Un saludo dentro de otra petición («buenos días, prepárame el informe») no cuenta.
   saludo: {
-    frases: ['buenos dias', 'buenas tardes', 'buenas', 'hola', 'ponme al dia', 'parte de la manana', 'parte del dia', 'parte de hoy', 'que hay hoy', 'que tenemos hoy', 'que pasa hoy', 'que esta pasando', 'que esta pasando hoy', 'novedades de hoy', 'como empieza el dia'],
+    frases: ['buenos dias', 'buenas tardes', 'buenas', 'hola', 'ponme al dia', 'parte de la manana', 'parte del dia', 'parte de hoy', 'que hay hoy', 'que tenemos hoy', 'que pasa hoy', 'que esta pasando', 'que esta pasando hoy', 'novedades de hoy', 'como empieza el dia', 'que ha pasado hoy', 'que ha pasado esta manana'],
     raices: { hola: 2, saludo: 3 },
   },
   resumen: {
@@ -297,6 +319,12 @@ function puntuar(norm, tokens, entidades, mundo) {
   // «Aprueba las horas extra de Eléctricos Prado» es una orden de compra, no un riesgo.
   if (entidades.oc && !/riesg/.test(norm)) out.riesgos = 0
   if (/riesgo fiscal|riesgos fiscales/.test(norm)) out.riesgos = 0
+  // Un paso del dossier (certificado, justificantes) no es pedir documentación a un proveedor.
+  if (entidades.dossierPaso) out.pedir_documentacion = Math.max(0, out.pedir_documentacion - 3)
+  // La grúa como riesgo de rodaje no es buscar proveedores para Itsasoa.
+  if (entidades.riesgo === 'RG-7') out.optimizar_proveedores = 0
+  // «Cambia el orden de las jornadas / del día» habla del plan de rodaje, no de una orden de compra.
+  if (!entidades.oc && /\b(cambia|cambiar|cambio de) (el )?orden\b|\borden (de las|de|del) (jornadas?|dia|rodaje)\b/.test(norm)) out.aprobar_oc = Math.max(0, out.aprobar_oc - 2)
   if (Object.entries(out).some(([id, s]) => id !== 'saludo' && s >= 3)) out.saludo = 0
   return out
 }

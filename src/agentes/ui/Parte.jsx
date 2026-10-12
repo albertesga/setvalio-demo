@@ -1,20 +1,29 @@
-// Bloques del parte de la mañana: la tira del rodaje, «Para hoy» y lo que ha hecho
-// cada agente. La tira y «Para hoy» leen el mundo actual: lo que decides en la
-// conversación se tacha aquí también.
+// Bloques del parte de la mañana: lo que han hecho solos (hecho), «Para hoy», la tira
+// del rodaje y el índice de conversaciones.
+// La tira y «Para hoy» leen el mundo actual: lo que decides en la conversación se
+// tacha aquí también.
 
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { IconCheck, IconChevronRight, IconClock } from '../../components/icons.jsx'
 import * as c from '../calculos.js'
 import { AGENTES } from '../agentes.js'
+import { CONVERSACIONES, ETIQUETA_CAPACIDAD } from '../casos.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, riesgo as riesgoDe, HECHAS } from '../rodaje.js'
 import { renderTexto, fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
-import { Tx, Tono, AgentAvatar, rangoFechas } from './Piezas.jsx'
+import { Tx, Tono, AgentAvatar, AutonomyBadge, rangoFechas } from './Piezas.jsx'
 import { ESTADO_DECISION, ESTADO_RIESGO, irATarjeta } from './Bloques.jsx'
+import './parte.css'
 
 const PESO = { alta: 0, media: 1, baja: 2, controlado: 3 }
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
+
+/** Etiqueta de alcance: solo lo exploratorio lleva («En exploración»). */
+function Capacidad({ capacidad }) {
+  const etiqueta = ETIQUETA_CAPACIDAD[capacidad]
+  return etiqueta ? <span className="ag-etiqueta-capacidad">{etiqueta}</span> : null
+}
 
 /** Todas las jornadas del rodaje: las rodadas y el plan vivo (con los cambios de orden). */
 function todasLasJornadas(mundo) {
@@ -39,13 +48,41 @@ function riesgoPorJornada(riesgos) {
   return marca
 }
 
-// «Madrid centro · interiores» → «Madrid centro».
-const sitio = (loc) => loc.split(' · ')[0]
 const tipo = (j) => `${j.tipo === 'EXT' ? 'Exterior' : 'Interior'} · ${j.franja.toLowerCase()}`
+
+// ── Ya hecho, sin pedírtelo ──────────────────────────────────────────────────
+
+/** Lo que han hecho solos antes de que llegues: tres líneas como mucho. */
+export function BloqueHecho({ b }) {
+  const id = useId().replace(/:/g, '')
+  return (
+    <section className="ag-hecho" aria-labelledby={`${id}-t`}>
+      <div className="ag-hecho-cab">
+        <h4 id={`${id}-t`} className="flp-kicker text-flp-muted">
+          {b.titulo}
+        </h4>
+        <AutonomyBadge nivel={b.nivel ?? 'ejecuta'} />
+      </div>
+      <ul className="ag-hecho-lista">
+        {b.items.map((it) => (
+          <li key={it.agente} className="ag-hecho-item">
+            <AgentAvatar id={it.agente} size={24} />
+            <p className="min-w-0 flex-1">
+              <span className="font-medium text-flp-ink">{AGENTES[it.agente]?.nombre}</span> <Tx value={it.texto} />
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 // ── Tira del rodaje ──────────────────────────────────────────────────────────
 
-/** Las jornadas del rodaje en una tira: rodadas, hoy y por rodar, con los riesgos encima. */
+/**
+ * El plan de rodaje en una fila: las 20 jornadas por semana, rodadas en carbón, hoy
+ * con borde y marca, y los riesgos como barra superior (alto, roja; medio, discontinua).
+ */
 export function BloqueTira() {
   const { mundo } = useCtx()
   const id = useId().replace(/:/g, '')
@@ -58,44 +95,38 @@ export function BloqueTira() {
   return (
     <section className="ag-panel ag-tira" aria-labelledby={`${id}-t`}>
       <div className="ag-tira-cab">
-        <h4 id={`${id}-t`} className="text-sm font-semibold text-flp-ink">
-          Rodaje · día <span className="tnum">{hoy}</span> de <span className="tnum">{total}</span>
+        <h4 id={`${id}-t`} className="flp-kicker text-flp-muted">
+          Plan de rodaje
         </h4>
         <span className="text-xs text-flp-muted">
-          <span className="tnum">{hoy - 1}</span> rodadas · <span className="tnum">{total - hoy}</span> por rodar después de hoy · cierre el {fechaDia(fin.fecha)}
+          <span className="tnum">{hoy - 1}</span> rodadas · <span className="tnum">{total - hoy}</span> por rodar · cierre el {fechaDia(fin.fecha)}
         </span>
       </div>
-      <div className="ag-tira-progreso" aria-hidden="true">
-        <span style={{ width: `${((hoy - 1) / total) * 100}%` }} />
-      </div>
       <ol className="ag-tira-semanas" aria-label={`Plan de rodaje: ${total} jornadas`}>
-        {semanas.map((g) => {
-          const lugares = [...new Set(g.jornadas.map((j) => sitio(j.localizacion)))]
-          return (
-            <li key={g.semana} className="ag-tira-semana">
-              <span className="ag-tira-sem">
-                {g.semana} · {rangoFechas(g.jornadas[0].fecha, g.jornadas[g.jornadas.length - 1].fecha)}
-                {lugares.length === 1 && <span className="block truncate text-flp-ink">{lugares[0]}</span>}
-              </span>
-              <ol className="ag-tira-dias">
-                {g.jornadas.map((j) => {
-                  const estado = j.n < hoy ? 'hecha' : j.n === hoy ? 'hoy' : 'pendiente'
-                  const r = j.n >= hoy ? marca[j.n] : null
-                  const aviso = r && (r.severidad === 'alta' || r.severidad === 'media') ? r : null
-                  const texto = `Jornada ${j.n}, ${fechaDia(j.fecha)}: ${j.localizacion}, ${tipo(j).toLowerCase()}. ${estado === 'hecha' ? 'Rodada.' : estado === 'hoy' ? 'Hoy.' : 'Por rodar.'}${aviso ? ` ${aviso.severidad === 'alta' ? 'Riesgo alto' : 'Riesgo medio'}: ${renderTexto(aviso.titulo)}.` : ''}`
-                  return (
-                    <li key={j.n} className={`ag-tira-dia is-${estado} ${aviso ? `con-${aviso.severidad}` : ''}`} title={texto}>
-                      <span className="ag-tira-n tnum" aria-hidden="true">
-                        {j.n}
-                      </span>
-                      <span className="sr-only">{texto}</span>
-                    </li>
-                  )
-                })}
-              </ol>
-            </li>
-          )
-        })}
+        {semanas.map((g) => (
+          <li key={g.semana} className="ag-tira-semana">
+            <span className="ag-tira-sem">
+              <span className="ag-tira-sem-nombre">{g.semana} · </span>
+              {rangoFechas(g.jornadas[0].fecha, g.jornadas[g.jornadas.length - 1].fecha)}
+            </span>
+            <ol className="ag-tira-dias">
+              {g.jornadas.map((j) => {
+                const estado = j.n < hoy ? 'hecha' : j.n === hoy ? 'hoy' : 'pendiente'
+                const r = j.n >= hoy ? marca[j.n] : null
+                const aviso = r && (r.severidad === 'alta' || r.severidad === 'media') ? r : null
+                const texto = `Jornada ${j.n}, ${fechaDia(j.fecha)}: ${j.localizacion}, ${tipo(j).toLowerCase()}. ${estado === 'hecha' ? 'Rodada.' : estado === 'hoy' ? 'Hoy.' : 'Por rodar.'}${aviso ? ` ${aviso.severidad === 'alta' ? 'Riesgo alto' : 'Riesgo medio'}: ${renderTexto(aviso.titulo)}.` : ''}`
+                return (
+                  <li key={j.n} className={`ag-tira-dia is-${estado} ${aviso ? `con-${aviso.severidad}` : ''}`} title={texto}>
+                    <span className="ag-tira-n tnum" aria-hidden="true">
+                      {j.n}
+                    </span>
+                    <span className="sr-only">{texto}</span>
+                  </li>
+                )
+              })}
+            </ol>
+          </li>
+        ))}
       </ol>
       <ul className="ag-tira-leyenda" aria-label="Leyenda">
         <li>
@@ -104,7 +135,7 @@ export function BloqueTira() {
         <li>
           <i className="is-hoy" aria-hidden="true" /> Hoy
         </li>
-        <li>
+        <li className="ag-solo-ancho">
           <i className="is-pendiente" aria-hidden="true" /> Por rodar
         </li>
         <li>
@@ -143,8 +174,18 @@ function clave(ref) {
   return ref ? `${ref.tipo}-${ref.id}` : ''
 }
 
+/** Botón para ir a algo: siempre .ag-boton-fila con chevron, nunca amarillo. */
+function BotonIr({ etiqueta, contexto, onClick }) {
+  const { ocupado } = useCtx()
+  return (
+    <button type="button" className="ag-boton-fila" disabled={ocupado} aria-label={contexto ? `${etiqueta}: ${contexto}` : undefined} onClick={onClick}>
+      {etiqueta} <IconChevronRight size={15} aria-hidden="true" />
+    </button>
+  )
+}
+
 function Sublinea({ su }) {
-  const { mundo, enviar, ocupado } = useCtx()
+  const { mundo, enviar } = useCtx()
   const e = estadoLinea(mundo, su.ref)
   return (
     <li className={`ag-agenda-sub-item ${e.hecho ? 'is-hecho' : ''}`}>
@@ -162,24 +203,50 @@ function Sublinea({ su }) {
           {e.etiqueta}
         </Tono>
       ) : (
-        <button
-          type="button"
-          className="ag-boton-fila"
-          disabled={ocupado}
-          aria-label={`${su.etiqueta}: ${renderTexto(su.titulo)}`}
+        <BotonIr
+          etiqueta={su.etiqueta}
+          contexto={renderTexto(su.titulo)}
           onClick={() => {
-            if (su.ref?.tipo !== 'orden' || !irATarjeta(su.ref)) enviar(su.entrada)
+            if (su.ref?.tipo !== 'orden' || !irATarjeta(su.ref)) enviar(su.entrada, { ref: su.ref })
           }}
-        >
-          {su.etiqueta} <IconChevronRight size={15} aria-hidden="true" />
-        </button>
+        />
       )}
     </li>
   )
 }
 
+/** Subpuntos plegados tras «Ver las compras ›» o «Verlos ›» (avisos): el punto ya dice lo esencial. */
+function Plegados({ etiqueta, titulo, intro, subitems }) {
+  const [abierto, setAbierto] = useState(false)
+  const id = useId().replace(/:/g, '')
+  return (
+    <div className="ag-agenda-plegado">
+      <button type="button" className="ag-agenda-plegar" aria-expanded={abierto} aria-controls={`${id}-l`} onClick={() => setAbierto((x) => !x)}>
+        <Tx value={etiqueta} />
+        {/* «Verlos» solo se entiende al lado del título: el lector de pantalla lo oye entero. */}
+        <span className="sr-only">: {titulo}</span>
+        <IconChevronRight size={15} aria-hidden="true" />
+      </button>
+      {abierto && (
+        <div id={`${id}-l`} className="ag-agenda-plegado-cuerpo">
+          {intro && (
+            <p className="ag-agenda-detalle">
+              <Tx value={intro} />
+            </p>
+          )}
+          <ul className="ag-agenda-sub" aria-label={`Detalle: ${titulo}`}>
+            {subitems.map((su) => (
+              <Sublinea key={su.id} su={su} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Linea({ it, n }) {
-  const { mundo, enviar, ocupado } = useCtx()
+  const { mundo, enviar } = useCtx()
   const e = estadoLinea(mundo, it.ref)
   const titulo = renderTexto(it.titulo)
   return (
@@ -193,7 +260,7 @@ function Linea({ it, n }) {
             <span className="sr-only">{e.hecho ? 'Hecho: ' : `${n}. `}</span>
             <Tx value={it.titulo} />
           </h5>
-          {it.capacidad === 'exploratoria' && <span className="ag-etiqueta-capacidad">Exploratorio</span>}
+          <Capacidad capacidad={it.capacidad} />
         </div>
         {e.hecho ? (
           <p className="mt-1">
@@ -207,40 +274,54 @@ function Linea({ it, n }) {
             <p className="ag-agenda-detalle">
               <Tx value={it.detalle} />
             </p>
-            <p className="ag-agenda-meta">
-              <span className="inline-flex items-center gap-1 font-medium text-flp-ink">
+            {/* Cuándo y quién decide a la izquierda; ir a algo, a la derecha; lo plegado, debajo. */}
+            <div className="ag-agenda-pie">
+              {/* En una línea que parte como texto: cuándo · quién decide. */}
+              <p className="ag-agenda-meta">
                 <IconClock size={13} aria-hidden="true" />
-                <Tx value={it.cuando} />
-              </span>
-              <span>
-                {it.rolEtiqueta ?? 'Decide'}: {it.decide.toLowerCase()}
-              </span>
-              {e.parcial && <span className="font-medium text-flp-ink">{e.etiqueta}</span>}
-            </p>
+                <span className="font-medium text-flp-ink">
+                  <Tx value={it.cuando} />
+                </span>
+                {' · '}
+                {it.rolEtiqueta ?? (/ y /.test(it.decide) ? 'Deciden' : 'Decide')}: {it.decide.toLowerCase()}
+                {e.parcial && <span className="font-medium text-flp-ink"> · {e.etiqueta}</span>}
+              </p>
+              {it.acciones?.length > 0 && (
+                <div className="ag-agenda-acciones">
+                  {it.acciones.map((a) => (
+                    <BotonIr key={a.etiqueta} etiqueta={a.etiqueta} contexto={titulo} onClick={() => enviar(a.entrada)} />
+                  ))}
+                </div>
+              )}
+              {it.subitems?.length > 0 && <Plegados etiqueta={it.plegado ?? plural(it.subitems.length, 'punto', 'puntos')} titulo={titulo} subitems={it.subitems} />}
+            </div>
           </>
-        )}
-        {it.subitems?.length > 0 && (
-          <ul className="ag-agenda-sub" aria-label={`Detalle: ${titulo}`}>
-            {it.subitems.map((su) => (
-              <Sublinea key={su.id} su={su} />
-            ))}
-          </ul>
-        )}
-        {!e.hecho && it.acciones?.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {it.acciones.map((a) => (
-              <button key={a.etiqueta} type="button" className="ag-boton-fila" disabled={ocupado} aria-label={`${a.etiqueta}: ${titulo}`} onClick={() => enviar(a.entrada)}>
-                {a.etiqueta} <IconChevronRight size={15} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
         )}
       </div>
     </li>
   )
 }
 
-/** «Para hoy»: lo urgente, ordenado; se tacha en cuanto se decide. */
+/** Los avisos al equipo: no son decisiones, van aparte y plegados. */
+function Avisos({ av }) {
+  const { mundo } = useCtx()
+  const titulo = renderTexto(av.titulo)
+  // En la demo nada sale: un aviso marcado queda revisado, no enviado.
+  const total = av.subitems.length
+  const revisados = av.subitems.filter((su) => estadoLinea(mundo, su.ref).hecho).length
+  const estado = !revisados ? null : revisados === total ? (total === 1 ? 'revisado' : 'revisados') : `${revisados} de ${total} revisados`
+  return (
+    <div className="ag-agenda-avisos">
+      <p className="text-sm text-flp-ink">
+        <Tx value={av.titulo} />
+        {estado && <span className="text-flp-muted"> · {estado}</span>}
+      </p>
+      <Plegados etiqueta={av.plegado} titulo={titulo} intro={av.detalle} subitems={av.subitems} />
+    </div>
+  )
+}
+
+/** «Para hoy»: tres puntos como mucho, por urgencia; se tachan en cuanto se deciden. */
 export function BloqueAgenda({ b }) {
   const { mundo, enviar, ocupado } = useCtx()
   const id = useId().replace(/:/g, '')
@@ -251,8 +332,8 @@ export function BloqueAgenda({ b }) {
   const resto = decisionesAbiertas(mundo).filter((d) => !cubiertas.has(clave(d.ref)))
   return (
     <section className="ag-panel ag-agenda" aria-labelledby={`${id}-t`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h4 id={`${id}-t`} className="text-sm font-semibold text-flp-ink">
+      <div className="ag-agenda-cab">
+        <h4 id={`${id}-t`} className="flp-kicker text-flp-ink">
           {b.titulo}
         </h4>
         <span className="text-xs text-flp-muted">{hechas ? `${hechas} de ${b.items.length} hechas` : 'Por orden de urgencia'}</span>
@@ -266,43 +347,54 @@ export function BloqueAgenda({ b }) {
       ) : (
         <p className="text-sm text-flp-muted">Nada urgente para hoy.</p>
       )}
-      {resto.length > 0 && (
-        <p className="ag-agenda-resto">
-          <span>Y {plural(resto.length, 'decisión más', 'decisiones más')}, menos urgentes.</span>
-          <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar('¿Qué tengo que revisar?')}>
-            Verlas todas
-          </button>
-        </p>
+      {(resto.length > 0 || b.avisos) && (
+        <div className="ag-agenda-resto">
+          {resto.length > 0 && (
+            <p className="ag-agenda-resto-linea">
+              <span>Y {plural(resto.length, 'decisión más', 'decisiones más')} por revisar.</span>
+              <button type="button" className="ag-link" disabled={ocupado} onClick={() => enviar('¿Qué tengo que revisar?')}>
+                Verlas todas
+              </button>
+            </p>
+          )}
+          {b.avisos && <Avisos av={b.avisos} />}
+        </div>
       )}
     </section>
   )
 }
 
-// ── Lo que ha hecho cada agente ──────────────────────────────────────────────
+// ── Conversaciones («¿Qué puedes hacer?») ─────────────────────────────────────
 
-export function BloqueEquipo({ b }) {
+/** Las conversaciones de la demo, cada una con su agente y de qué trata: un toque la abre. */
+export function BloqueConversaciones() {
+  const ctx = useCtx()
   const id = useId().replace(/:/g, '')
   return (
-    <section className="ag-panel" aria-labelledby={`${id}-t`}>
-      <h4 id={`${id}-t`} className="mb-3 text-sm font-semibold text-flp-ink">
-        {b.titulo}
-      </h4>
-      <ul className="ag-equipo">
-        {b.items.map((it) => (
-          <li key={it.agente}>
-            <AgentAvatar id={it.agente} size={28} />
-            <div className="min-w-0">
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="text-sm font-medium text-flp-ink">{AGENTES[it.agente].nombre}</span>
-                {it.exploratorio && <span className="ag-etiqueta-capacidad">Exploratorio</span>}
-              </span>
-              <p className="text-sm leading-relaxed text-flp-muted">
-                <Tx value={it.texto} />
-              </p>
+    <section className="ag-indice" aria-labelledby={`${id}-t`}>
+      <div className="ag-indice-cab">
+        <h4 id={`${id}-t`} className="flp-kicker text-flp-muted">
+          Conversaciones
+        </h4>
+      </div>
+      <ul className="ag-indice-lista">
+        {CONVERSACIONES.filter((c) => c.id !== 'parte').map((c) => (
+          <li key={c.id} className="ag-indice-item">
+            <p className="ag-indice-etiqueta">{c.etiqueta}</p>
+            <h5 className="ag-indice-titulo">{c.titulo}</h5>
+            <div className="ag-indice-meta">
+              <span className="text-xs text-flp-muted">{AGENTES[c.agente]?.nombre}</span>
+              <Capacidad capacidad={c.capacidad} />
             </div>
+            <button type="button" className="ag-boton-fila ag-indice-boton" onClick={() => ctx.abrirConversacion(c.id)}>
+              <span>Abrir la conversación</span> <IconChevronRight size={15} aria-hidden="true" />
+            </button>
           </li>
         ))}
       </ul>
     </section>
   )
 }
+
+// Registro de los bloques de este archivo: Bloques.jsx los busca aquí por tipo al pintar.
+export const BLOQUES_PARTE = { hecho: BloqueHecho, agenda: BloqueAgenda, tira: BloqueTira, conversaciones: BloqueConversaciones }

@@ -1,24 +1,52 @@
-// Guiones del agente de riesgos de producción (EXPLORATORIO): parte de riesgos,
+// Guiones del agente de riesgos de producción (en exploración): parte de riesgos,
 // detalle de un riesgo y avisos que llegan solos (orden del día, lluvia).
 
-import { cuenta, fecha as fechaLarga, formatear } from '../texto.js'
-import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, UMBRALES, TIPOS, PREGUNTA, HECHAS } from '../rodaje.js'
+import { cuenta, fecha as fechaLarga, fechaDia, formatear, renderTexto } from '../texto.js'
+import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, datosGrua, UMBRALES, TIPOS, PREGUNTA, HECHAS, SENALES } from '../rodaje.js'
 import { PERSONAS } from '../mundo.js'
+import { reducir } from '../acciones.js'
 import { t, v, c, paso, sug, texto, aviso, lista } from './comun.js'
+import { REGLA_COMUN } from './conversacion.js'
 
-export const AVISO_EXPLORATORIO = aviso(
-  'exploratorio',
-  'Exploratorio',
-  t('El agente de riesgos es una idea en estudio: aún no está en el producto. Plan de rodaje, previsión del tiempo, convocatorias y permisos son datos de ejemplo: no consulta ningún servicio externo.'),
-)
+// Tono interno 'exploratorio'; lo que se ve es «En exploración». Lo importan los turnos de decisiones.
+export const AVISO_EXPLORATORIO = aviso('exploratorio', 'En exploración', t('En exploración: este agente aún no está en Filmpilot. Plan, pronóstico y permisos son de ejemplo.'))
 
 const NO_HECHO = [t('No ha enviado ningún aviso: los mensajes al equipo quedan como borradores.'), t('No ha cambiado el plan de rodaje ni la previsión sin tu decisión.')]
 
 const REGLAS = [
   t('Riesgo alto: probabilidad de al menos {p} en los próximos {d}, o un aviso urgente', { p: v(UMBRALES.probabilidad, 'pct0'), d: v(UMBRALES.diasAlta, 'dias') }),
-  t('Riesgo medio: exposición de {e} o más, o una jornada en los próximos {d}', { e: v(UMBRALES.exposicion, 'eur'), d: v(UMBRALES.diasUrgente, 'dias') }),
+  t('Riesgo medio: puede costar {e} o más, o cae en los próximos {d}', { e: v(UMBRALES.exposicion, 'eur'), d: v(UMBRALES.diasUrgente, 'dias') }),
   t('Coste de una jornada: pagos previstos de su semana entre cinco jornadas'),
+  t('Dinero que conviene apartar: la probabilidad por lo que costaría'),
+  t('{regla}.', { regla: v(REGLA_COMUN) }),
 ]
+
+/** Cuándo, en prosa: «hoy», «mañana» o «el lunes 8 de junio». */
+export function cuandoEs(dias, iso) {
+  return dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `el ${fechaDia(iso)}`
+}
+
+// Jornadas de cada riesgo, para el título (que no conoce el mundo).
+const JORNADAS_RIESGO = {
+  'RG-1': [SENALES.lluvia.jornada],
+  'RG-2': SENALES.billete.jornadas,
+  'RG-3': [SENALES.permiso.jornada],
+  'RG-4': [SENALES.citacion.jornada],
+  'RG-5': SENALES.noches.jornadas,
+  'RG-6': [SENALES.cambio.jornada],
+  'RG-7': [SENALES.grua.jornada],
+}
+
+// Título de la respuesta por riesgo: lo que pasa, sin códigos.
+const TITULO_RIESGO = {
+  'RG-1': 'La lluvia de mañana',
+  'RG-2': 'Billete sin emitir',
+  'RG-3': 'Permiso de vía pública',
+  'RG-4': 'Orden del día sin publicar',
+  'RG-5': 'Horas extra de noche',
+  'RG-6': 'Aviso a transportes',
+  'RG-7': 'La grúa de la jornada 17',
+}
 
 const FIRMA = () => `${PERSONAS.alvaro.nombre} · ${PERSONAS.alvaro.rol} · La última función`
 
@@ -35,7 +63,7 @@ export function borradorRiesgo(m, id) {
       asunto: t('Billete de la actriz secundaria · jornadas {a} y {b}', { a: v(s.billete.jornadas[0], 'num'), b: v(s.billete.jornadas[1], 'num') }),
       cuerpo: [
         t('Hola:'),
-        t('La actriz secundaria está convocada en Canarias las jornadas {a} y {b} ({f}) y su billete sigue sin emitir.', { a: v(s.billete.jornadas[0], 'num'), b: v(s.billete.jornadas[1], 'num'), f: v(fechaLarga(r.fecha)) }),
+        t('La actriz secundaria está convocada en Canarias las jornadas {a} y {b} (desde el {f}) y su billete sigue sin emitir.', { a: v(s.billete.jornadas[0], 'num'), b: v(s.billete.jornadas[1], 'num'), f: v(fechaDia(r.fecha)) }),
         t('¿Puedes emitirlo hoy y confirmarme el vuelo? Si hay algún problema de fechas, avísame cuanto antes.'),
       ],
     }
@@ -48,7 +76,7 @@ export function borradorRiesgo(m, id) {
       asunto: t('Permiso de rodaje en vía pública · {f}', { f: v(fechaLarga(r.fecha)) }),
       cuerpo: [
         t('Buenos días:'),
-        t('El {s} solicitamos permiso para rodar en vía pública el {f} para el largometraje «La última función» (Candilejas Films).', { s: v(fechaLarga(s.permiso.solicitado)), f: v(fechaLarga(r.fecha)) }),
+        t('El {s} solicitamos permiso para rodar en vía pública el {f} para el largometraje «La última función» (Candilejas Films).', { s: v(fechaDia(s.permiso.solicitado)), f: v(fechaDia(r.fecha)) }),
         t('¿Nos pueden indicar en qué estado está la solicitud y si falta algún documento?'),
         t('Gracias.'),
       ],
@@ -71,7 +99,7 @@ export function borradorRiesgo(m, id) {
       asunto: t('Cambio de localización · jornada {n} ({f})', { n: v(s.cambio.jornada, 'num'), f: v(fechaLarga(r.fecha)) }),
       cuerpo: [
         t('Hola:'),
-        t('La jornada del {f} se rueda en {a} y no en {de}.', { f: v(fechaLarga(r.fecha)), a: v(s.cambio.a), de: v(s.cambio.de) }),
+        t('La jornada del {f} se rueda en {a} y no en {de}.', { f: v(fechaDia(r.fecha)), a: v(s.cambio.a), de: v(s.cambio.de) }),
         t('Por favor, actualizad la hoja de ruta de los camiones y confirmadnos la hora de llegada.'),
       ],
     }
@@ -79,29 +107,145 @@ export function borradorRiesgo(m, id) {
   return null
 }
 
-/** Tarjeta de decisión de un riesgo con impacto económico (RG-1 lluvia, RG-5 horas extra).
- *  Las acciones dependen del estado: tras asumirlo solo queda cambiar el plan; con una
- *  reserva aprobada se puede ajustar, cambiar el plan o asumirlo (y liberarla). */
+const eur = (n) => formatear(n, 'eur')
+
+/**
+ * Lo propio de cada riesgo con decisión: cómo se cambia el plan, cómo se dicen las filas y
+ * qué se recomienda. La tarjeta, los pasos y la respuesta a la decisión lo leen de aquí.
+ * Contrato: { opcion, plan(r) → { etiqueta, burbuja, fila }, porSi, filaReserva?(r),
+ *   siOcurre(r), resumen(m, r), recomendacion, pasoMitigar(m), textoMitigado({ por, mantenida, antes, despues }) }
+ */
+export const OPCIONES_RIESGO = {
+  'RG-1': {
+    opcion: 'permutar',
+    plan: (r) => ({ etiqueta: `Cambiar el orden con la jornada ${r.intercambio}`, burbuja: `Cambio el orden de las jornadas ${r.jornadas[0]} y ${r.intercambio}`, fila: 'Cambiar el orden de jornadas' }),
+    porSi: 'por si llueve',
+    filaReserva: (r) => `Apartar ${eur(r.reserva)} por si llueve (${formatear(r.probabilidad, 'pct0')} de lo que costaría perder la jornada)`,
+    siOcurre: (r) => `si llueve, podría costar hasta ${eur(r.exposicion)} más`,
+    resumen: (m, r) =>
+      t('El pronóstico da un {p} de lluvia {cuando} y la jornada {n} es un exterior de día sin cobertura: perderla costaría unos {exp}. La jornada {otra} es un interior con el decorado montado. Cambiarlas de orden no cambia el coste final, pero hay que confirmarlo con dirección, reparto y transporte.', {
+        p: v(r.probabilidad, 'pct0'),
+        cuando: v(cuandoEs(r.dias, r.fecha)),
+        n: v(r.jornadas[0], 'num'),
+        exp: v(r.exposicion, 'eur'),
+        otra: v(jornadaOriginal(r.intercambio).n, 'num'),
+      }),
+    recomendacion: t('Recomendamos cambiar el orden: quita el riesgo y no cambia el coste final.'),
+    pasoMitigar: (m) => t('Cambia el orden de las jornadas {a} y {b}', { a: v(m.rodaje.senales.lluvia.jornada, 'num'), b: v(m.rodaje.senales.lluvia.intercambio, 'num') }),
+  },
+  'RG-5': {
+    opcion: 'replanificar',
+    plan: () => ({ etiqueta: 'Replanificar las noches', burbuja: 'Replanifico las noches con una citación más tardía', fila: 'Replanificar las noches' }),
+    porSi: 'por si hay más horas extra',
+    siOcurre: (r) => `si hay más horas extra, podría costar unos ${eur(r.exposicion)} más`,
+    resumen: (m, r) => t('Las noches anteriores generaron horas extra y quedan dos más. Si se repiten, el coste estimado final subiría unos {exp}. Una citación más tardía reduce las horas extra, aunque no las elimina.', { exp: v(r.exposicion, 'eur') }),
+    recomendacion: t('Recomendamos replanificar: reduce las horas extra sin tocar la previsión.'),
+    pasoMitigar: () => t('Replanifica las noches con una citación más tardía'),
+    textoMitigado: ({ por, mantenida }) =>
+      mantenida
+        ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: lo apartado, {res}, se mantiene y Riesgos lo sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
+        : t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: Riesgos lo sigue vigilando.', { por: v(por) }),
+  },
+  'RG-7': {
+    opcion: 'premontar',
+    plan: () => ({ etiqueta: `Montar la grúa al cerrar la jornada ${SENALES.grua.vispera}`, burbuja: `Monto la grúa al cerrar la jornada ${SENALES.grua.vispera}`, fila: 'Montar la grúa la víspera (un día más de grúa)' }),
+    porSi: 'por si se retrasa',
+    filaReserva: (r) => `Apartar ${eur(r.reserva)} por si se retrasa (${formatear(r.probabilidad, 'pct0')} de lo que costaría repetir las secuencias)`,
+    siOcurre: (r) => `si no da tiempo, podría costar unos ${eur(r.exposicion)} más`,
+    resumen: (m) => {
+      const g = datosGrua(m)
+      return t('La jornada {n} necesita la grúa {h} horas. Con el montaje quedan {sin}, pero si la {vis} se alarga solo quedarían {con}. Montarla al cerrar la {vis}, en el mismo decorado, cuesta un día más de grúa, {tar}, y deja {pre} aunque haya retraso.', {
+        n: v(g.jornada, 'num'),
+        h: v(g.horas, 'num'),
+        sin: v(`${g.sinRetraso} horas`),
+        vis: v(g.vispera, 'num'),
+        con: v(`${g.conRetraso} horas`),
+        tar: v(g.tarifa, 'eur'),
+        pre: v(`${g.horasJornada - g.retraso} horas`),
+      })
+    },
+    recomendacion: t('Recomendamos montarla la víspera: asegura sus horas aunque la jornada anterior se alargue.'),
+    pasoMitigar: (m) => t('Monta la grúa al cerrar la jornada {v}', { v: v(m.rodaje.senales.grua.vispera, 'num') }),
+    textoMitigado: ({ por, antes, despues }) => {
+      const g = datosGrua(despues)
+      const sube = c.totales(despues).cef - c.totales(antes).cef
+      return t('Grúa montada al cerrar la jornada {vis} por decisión de {por}: aunque la citación de la {n} se retrase, quedan {quedan} de grúa y hacen falta {h}. {coste}', {
+        vis: v(g.vispera, 'num'),
+        por: v(por),
+        n: v(g.jornada, 'num'),
+        quedan: v(`${g.conRetraso} horas`),
+        h: v(g.horas, 'num'),
+        coste:
+          sube > 0.004
+            ? t('El día más de grúa sube el coste estimado final {dif}.', { dif: v(sube, 'eurSigned') })
+            : t('El día más de grúa, {tar}, cabe en lo previsto para {p}: el coste final no cambia.', { tar: v(g.tarifa, 'eur'), p: v(g.partida, 'id') }),
+      })
+    },
+  },
+}
+
+/** Plan B de la jornada de la grúa: qué hacer si falla cada recurso. */
+function planBGrua(m) {
+  const g = datosGrua(m)
+  const r = g.respaldo
+  return lista(
+    'Plan B por recurso',
+    [
+      { texto: t('Si la grúa falla o no llega: {prov}, en Madrid, tiene una grúa telescópica por {tar} al día más {tr} de transporte.', { prov: v(r.proveedor), tar: v(r.tarifa, 'eur'), tr: v(r.transporte, 'eur') }) },
+      { texto: t('Si se retrasa el transporte desde {origen}: montarla al cerrar la jornada {vis} lo absorbe.', { origen: v(g.origen), vis: v(g.vispera, 'num') }) },
+      { texto: t('Si nada de eso basta: las secuencias con grúa pasan a la jornada {alt}, en el mismo decorado.', { alt: v(g.alternativa, 'num') }) },
+    ],
+    'propone',
+  )
+}
+
+/** Tarjeta de decisión de un riesgo con impacto económico (los de OPCIONES_RIESGO).
+ *  Las acciones dependen del estado: tras asumirlo solo queda cambiar el plan; con dinero
+ *  apartado se puede ajustar, cambiar el plan o asumirlo (y liberarlo).
+ *  Cada fila de impacto lleva el coste final antes y después de su acción, calculado con el
+ *  reductor, y `cambio` (después − ahora): `impactoUnico` pide pintarlas en una sola columna. */
 export function tarjetaRiesgo(m, id) {
   const r = riesgoDe(m, id)
+  const o = OPCIONES_RIESGO[id]
   const d = m.decisionesRiesgo[id]
-  const lluvia = id === 'RG-1'
   const cef = c.totales(m).cef
   const reservada = m.reservas[id]?.importe ?? 0
-  const base = cef - reservada
   const soloCambiarPlan = d?.estado === 'aceptado'
-  const ji = lluvia ? jornadaOriginal(r.intercambio) : null
-  const etiquetaPlan = lluvia ? `Cambiar el orden con la jornada ${r.intercambio}` : 'Replanificar las noches'
-  const acciones = [{ id: 'aprobar', etiqueta: etiquetaPlan, variante: 'primary', accion: { tipo: 'riesgo/mitigar', riesgoId: id, opcion: lluvia ? 'permutar' : 'replanificar' }, rol: 'Line producer' }]
-  if (!soloCambiarPlan && r.reserva && (!d || r.reservaCorta)) acciones.push({ id: 'reservar', etiqueta: reservada ? 'Ajustar la reserva' : 'Reservar en la previsión', variante: 'secondary', accion: { tipo: 'riesgo/reservar', riesgoId: id, importe: r.reserva }, rol: 'Producción ejecutiva' })
-  if (!soloCambiarPlan) acciones.push({ id: 'rechazar', etiqueta: reservada ? 'Asumirlo y liberar la reserva' : 'Asumir el riesgo', variante: 'secondary', accion: { tipo: 'riesgo/aceptar', riesgoId: id }, rol: 'Producción ejecutiva' })
-  const impacto = [{ etiqueta: lluvia ? 'Cambiar el orden de jornadas' : 'Replanificar las noches', antes: cef, despues: lluvia ? base : cef, formato: 'eur' }]
-  if (acciones.some((a) => a.id === 'reservar')) {
-    impacto.push({ etiqueta: lluvia ? `Reservar el impacto esperado (${formatear(r.probabilidad, 'pct0')} de ${formatear(r.exposicion, 'eur')})` : 'Reservar el coste si se repiten', antes: cef, despues: base + r.reserva, formato: 'eur' })
+  const plan = o.plan(r)
+  const acciones = [
+    { id: 'aprobar', etiqueta: plan.etiqueta, burbuja: plan.burbuja, variante: 'primary', accion: { tipo: 'riesgo/mitigar', riesgoId: id, opcion: o.opcion }, rol: 'Line producer' },
+  ]
+  if (!soloCambiarPlan && r.reserva && (!d || r.reservaCorta)) {
+    acciones.push({
+      id: 'reservar',
+      etiqueta: reservada ? 'Ajustar lo apartado' : `Apartar dinero ${o.porSi}`,
+      burbuja: reservada ? `Ajusto lo apartado a ${eur(r.reserva)}` : `Aparto ${eur(r.reserva)} ${o.porSi}`,
+      variante: 'secondary',
+      accion: { tipo: 'riesgo/reservar', riesgoId: id, importe: r.reserva },
+      rol: 'Producción ejecutiva',
+    })
   }
+  if (!soloCambiarPlan) {
+    acciones.push({
+      id: 'rechazar',
+      etiqueta: reservada ? 'Asumirlo y liberar lo apartado' : 'Asumir el riesgo',
+      burbuja: reservada ? 'Asumo el riesgo y libero lo apartado' : 'Asumo el riesgo sin apartar dinero',
+      variante: 'secondary',
+      accion: { tipo: 'riesgo/aceptar', riesgoId: id },
+      rol: 'Producción ejecutiva',
+    })
+  }
+  // El coste final con cada opción sale de aplicarla: así cuadra con lo que pasará al decidir.
+  const tras = (accion) => c.totales(reducir(m, accion)).cef
+  const fila = (etiqueta, accion) => {
+    const despues = tras(accion)
+    return { etiqueta, antes: cef, despues, cambio: despues - cef, formato: 'eur' }
+  }
+  const porId = (x) => acciones.find((a) => a.id === x)?.accion
+  const impacto = [fila(plan.fila, porId('aprobar'))]
+  if (porId('reservar')) impacto.push(fila(o.filaReserva ? o.filaReserva(r) : `Apartar ${eur(r.reserva)} ${o.porSi}`, porId('reservar')))
   // Asumir parece gratis en la tabla: la etiqueta dice lo que se arriesga.
-  const siOcurre = lluvia ? `si llueve, hasta ${formatear(r.exposicion, 'eur')} más` : `si se repiten, unos ${formatear(r.exposicion, 'eur')} más`
-  if (!soloCambiarPlan) impacto.push({ etiqueta: `${reservada ? 'Asumir el riesgo y liberar la reserva' : 'Asumir el riesgo sin reservar'} (${siOcurre})`, antes: cef, despues: base, formato: 'eur' })
+  if (porId('rechazar')) impacto.push(fila(`${reservada ? 'Asumir el riesgo y liberar lo apartado' : 'Asumir el riesgo sin apartar dinero'} (${o.siOcurre(r)})`, porId('rechazar')))
   return {
     tipo: 'aprobacion',
     id: `ap-${id}-${d?.estado ?? 'abierto'}-${r.reserva ?? 0}`,
@@ -109,29 +253,48 @@ export function tarjetaRiesgo(m, id) {
     agente: 'riesgos',
     nivel: 'aprueba',
     rol: 'Line producer',
-    nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Cambiar el plan lo decide line producer; reservar o asumir el riesgo, producción ejecutiva.',
+    nota: soloCambiarPlan ? 'Se decidió asumir el riesgo; cambiar el plan sigue siendo posible.' : 'Cambiar el plan lo decide el line producer; apartar dinero o asumir el riesgo, producción ejecutiva.',
     entradaActual: PREGUNTA[id],
     titulo: r.titulo,
-    resumen: lluvia
-      ? t('Previsión de ejemplo: {p} de lluvia el {f}, y la jornada {n} es un exterior de día sin cobertura. Perder la jornada costaría unos {exp}. La jornada {otra} es un interior con el decorado montado: cambiarlas de orden no cuesta nada en la previsión, pero confirma con dirección, reparto y transporte.', {
-          p: v(r.probabilidad, 'pct0'),
-          f: v(fechaLarga(r.fecha)),
-          n: v(r.jornadas[0], 'num'),
-          exp: v(r.exposicion, 'eur'),
-          otra: v(ji.n, 'num'),
-        })
-      : t('Las noches anteriores generaron horas extra y quedan dos más. Si se repiten, el coste estimado final subiría unos {exp}. Una citación más tardía reduce las horas extra, aunque no las elimina.', { exp: v(r.exposicion, 'eur') }),
+    resumen: o.resumen(m, r),
     impactoTitulo: 'Opción',
-    impactoColumnas: ['Coste estimado final ahora', 'Con esta opción'],
+    impactoColumnas: ['Coste final ahora', 'Con esta opción'],
+    impactoUnico: { titulo: t('Coste estimado final ahora: {cef}', { cef: v(cef, 'eur') }), columna: 'Impacto en el coste final', formato: 'eurSigned' },
     impacto,
-    recomendacion: soloCambiarPlan ? null : lluvia ? t('Recomiendo cambiar el orden: elimina el riesgo sin coste en la previsión.') : t('Recomiendo replanificar: reduce las horas extra sin tocar la previsión.'),
+    recomendacion: soloCambiarPlan ? null : o.recomendacion,
     acciones,
   }
 }
 
 function etiquetaJornadas(r) {
-  return r.jornadas.length > 1 ? v(`jornadas ${r.jornadas.join(' y ')}`) : v(`jornada ${r.jornadas[0]}`)
+  return r.jornadas.length > 1 ? `jornadas ${r.jornadas.join(' y ')}` : `jornada ${r.jornadas[0]}`
 }
+
+/** Título con cuándo y qué jornadas, sin repetir lo que ya dice:
+ *  «Lluvia en el exterior de la jornada 8, mañana», «Actriz…, jornadas 11 y 12, desde el lunes 8 de junio». */
+function conCuando(r) {
+  const titulo = renderTexto(r.titulo)
+  const j = etiquetaJornadas(r)
+  const cuando = `${r.jornadas.length > 1 ? 'desde ' : ''}${cuandoEs(r.dias, r.fecha)}`
+  return [titulo, titulo.includes(j) ? null : j, titulo.includes(cuando) ? null : cuando].filter(Boolean).join(', ')
+}
+
+/** «1 alto, 3 medios y 2 bajos»: cuenta todos, también los ya resueltos. */
+function porSeveridad(rs) {
+  const grupos = [
+    ['alta', 'alto', 'altos'],
+    ['media', 'medio', 'medios'],
+    ['baja', 'bajo', 'bajos'],
+    ['controlado', 'resuelto', 'resueltos'],
+  ]
+    .map(([sev, uno, varios]) => [rs.filter((r) => r.severidad === sev).length, uno, varios])
+    .filter(([n]) => n > 0)
+    .map(([n, uno, varios]) => `${formatear(n, 'num')} ${n === 1 ? uno : varios}`)
+  return grupos.length > 1 ? `${grupos.slice(0, -1).join(', ')} y ${grupos.at(-1)}` : grupos.join('')
+}
+
+// El título va dentro de una frase: primera letra en minúscula.
+const minuscula = (s) => s.charAt(0).toLowerCase() + s.slice(1)
 
 /** Qué pregunta la persona: un riesgo, una jornada sin riesgo o el parte entero. */
 function riesgoPedido(m, det) {
@@ -149,8 +312,18 @@ function riesgoPedido(m, det) {
 export const riesgos = {
   id: 'riesgos',
   titulo: (det) =>
-    det.eventoId === 'EV-CITACION' ? 'Aviso urgente · orden del día' : det.eventoId === 'EV-LLUVIA' ? 'Aviso · previsión de lluvia' : det.entidades?.jornada != null && !det.entidades?.riesgo ? 'Jornada de rodaje' : det.entidades?.riesgo ? 'Riesgo de rodaje' : 'Parte de riesgos de rodaje',
-  ejemplos: ['¿Qué riesgos hay para las próximas jornadas?', PREGUNTA['RG-1'], PREGUNTA['RG-5'], PREGUNTA['RG-4']],
+    det.eventoId === 'EV-CITACION'
+      ? 'Aviso urgente · orden del día'
+      : det.eventoId === 'EV-LLUVIA'
+        ? 'Aviso · sube el pronóstico de lluvia'
+        : det.entidades?.jornada != null && !det.entidades?.riesgo
+          ? 'Jornada de rodaje'
+          : det.entidades?.riesgo
+            ? det.entidades.jornada == null || JORNADAS_RIESGO[det.entidades.riesgo]?.includes(det.entidades.jornada)
+              ? (TITULO_RIESGO[det.entidades.riesgo] ?? 'Riesgo de rodaje')
+              : 'Jornada de rodaje'
+            : 'Riesgos de las próximas jornadas',
+  ejemplos: ['¿Qué riesgos hay para las próximas jornadas?', PREGUNTA['RG-1'], PREGUNTA['RG-5'], PREGUNTA['RG-4'], PREGUNTA['RG-7'], '¿Qué pasa si falla la grúa de la jornada 17?'],
 
   planificar(m, det) {
     // Alertas que llegan solas.
@@ -162,8 +335,8 @@ export const riesgos = {
     }
     if (det.eventoId === 'EV-LLUVIA') {
       return [
-        paso('riesgos', t('Recibe la previsión actualizada'), { tipo: 'lectura', acciones: [{ tipo: 'evento/recibir', eventoId: 'EV-LLUVIA' }], salida: (_, d) => { const f = jornadaOriginal(d.rodaje.senales.lluvia.jornada).fecha; return t('Lluvia el {f}: {p}', { f: v(fechaLarga(f)), p: v(d.rodaje.meteo[f], 'pct0') }) } }),
-        paso('prevision', t('Recalcula el impacto esperado'), { salida: (_, d) => (d.decisionesRiesgo['RG-1']?.estado === 'mitigado' ? t('Sin impacto: la jornada ya es interior') : t('Impacto esperado {i}', { i: v(riesgoDe(d, 'RG-1').reserva, 'eur') })) }),
+        paso('riesgos', t('Recibe el pronóstico actualizado'), { tipo: 'lectura', acciones: [{ tipo: 'evento/recibir', eventoId: 'EV-LLUVIA' }], salida: (_, d) => { const f = jornadaOriginal(d.rodaje.senales.lluvia.jornada).fecha; return t('Lluvia el {f}: {p}', { f: v(fechaDia(f)), p: v(d.rodaje.meteo[f], 'pct0') }) } }),
+        paso('prevision', t('Recalcula cuánto conviene apartar'), { salida: (_, d) => (d.decisionesRiesgo['RG-1']?.estado === 'mitigado' ? t('Nada: la jornada ya es interior') : t('Conviene apartar {i}', { i: v(riesgoDe(d, 'RG-1').reserva, 'eur') })) }),
       ]
     }
 
@@ -178,11 +351,11 @@ export const riesgos = {
       const pasos = [
         paso('riesgos', t('Revisa las señales: {tipo}, {j}', { tipo: v(r.tipo.toLowerCase()), j: etiquetaJornadas(r) }), { tipo: 'lectura', acciones: recibirParte, salida: t('{n} revisadas', { n: cuenta(r.senales.length, 'señal', 'señales') }) }),
       ]
-      if (r.exposicion) pasos.push(paso('prevision', t('Calcula el impacto económico posible'), { salida: t('Exposición {e}', { e: v(r.exposicion, 'eur') }) }))
+      if (r.exposicion) pasos.push(paso('prevision', t('Calcula cuánto podría costar'), { salida: t('Podría costar {e}', { e: v(r.exposicion, 'eur') }) }))
       if (r.aviso && (!m.borradores[r.aviso] || m.borradores[r.aviso].estado === 'descartado')) {
         pasos.push(paso('riesgos', t('Redacta el aviso para quien puede resolverlo'), { tipo: 'redaccion', autonomia: 'propone', acciones: [{ tipo: 'borrador/crear', borrador: borradorRiesgo(m, id) }], salida: t('Borrador listo; no se envía') }))
       } else if (r.decision || m.decisionesRiesgo[id]?.estado === 'aceptado' || m.decisionesRiesgo[id]?.estado === 'reservado') {
-        pasos.push(paso('excepciones', t('Te trae las opciones para decidir'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Cambio de plan, reserva o asumirlo') }))
+        pasos.push(paso('excepciones', t('Te trae las opciones para decidir'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Cambiar el plan, apartar dinero o asumirlo') }))
       }
       return pasos
     }
@@ -198,8 +371,8 @@ export const riesgos = {
         },
       }),
       paso('riesgos', t('Revisa órdenes del día, convocatorias, permisos y avisos'), { tipo: 'revision', salida: t('{n} detectados', { n: cuenta(evaluados.length, 'riesgo', 'riesgos') }) }),
-      paso('prevision', t('Calcula el impacto económico posible'), { salida: t('El riesgo con más exposición: {e}', { e: v(Math.max(...evaluados.map((r) => r.exposicion ?? 0)), 'eur') }) }),
-      paso('excepciones', t('Asigna quién decide cada uno'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Cambios de plan: line producer. Reservas: producción ejecutiva') }),
+      paso('prevision', t('Calcula cuánto podría costar cada uno'), { salida: t('El que más podría costar: {e}', { e: v(Math.max(...evaluados.map((r) => r.exposicion ?? 0)), 'eur') }) }),
+      paso('excepciones', t('Asigna quién decide cada uno'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Cambiar el plan: line producer. Apartar dinero: producción ejecutiva') }),
     ]
   },
 
@@ -208,7 +381,7 @@ export const riesgos = {
 
     if (det.eventoId === 'EV-CITACION') {
       return {
-        bloques: [AVISO_EXPLORATORIO, aviso('aviso', 'Urgente', t('La orden del día de mañana sigue sin publicar y ayudantía de dirección no ha confirmado a qué hora sale. Te dejo un recordatorio.')), { tipo: 'borrador', id: 'BOR-RG-4' }],
+        bloques: [AVISO_EXPLORATORIO, aviso('aviso', 'Urgente', t('La orden del día de mañana sigue sin publicar y ayudantía de dirección no ha confirmado a qué hora sale. Te dejamos un recordatorio en borrador.')), { tipo: 'borrador', id: 'BOR-RG-4' }],
         sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?')],
         fuentes,
         reglas: REGLAS,
@@ -221,17 +394,18 @@ export const riesgos = {
       const d = m.decisionesRiesgo['RG-1']
       const j0 = jornadaOriginal(m.rodaje.senales.lluvia.jornada)
       const p = v(m.rodaje.meteo[j0.fecha], 'pct0')
+      const cuando = v(cuandoEs(r.dias, j0.fecha))
       const bloques = [AVISO_EXPLORATORIO]
       if (d?.estado === 'mitigado') {
-        bloques.push(texto(t('La previsión de ejemplo para el {f} sube al {p} de lluvia, pero la jornada {n} ya es interior: no afecta al rodaje.', { f: v(fechaLarga(j0.fecha)), p, n: v(j0.n, 'num') })))
+        bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia, pero la jornada {n} ya es interior: no afecta al rodaje.', { cuando, p, n: v(j0.n, 'num') })))
       } else if (d?.estado === 'reservado') {
-        bloques.push(texto(t('La previsión de ejemplo sube al {p}. La reserva aprobada ({res}) se queda corta: el impacto esperado es ahora {nuevo}.', { p, res: v(d.importe, 'eur'), nuevo: v(r.reserva, 'eur') })))
+        bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia. Lo apartado, {res}, se queda corto: ahora conviene apartar {nuevo}.', { cuando, p, res: v(d.importe, 'eur'), nuevo: v(r.reserva, 'eur') })))
         bloques.push(tarjetaRiesgo(m, 'RG-1'))
       } else if (d?.estado === 'aceptado') {
-        bloques.push(texto(t('La previsión de ejemplo sube al {p}. Se decidió asumir el riesgo; todavía se puede cambiar el orden de jornadas.', { p })))
+        bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia. Se decidió asumir el riesgo; todavía se puede cambiar el orden de jornadas.', { cuando, p })))
         bloques.push(tarjetaRiesgo(m, 'RG-1'))
       } else {
-        bloques.push(texto(t('La previsión de ejemplo para el {f} sube al {p} de lluvia. El impacto esperado pasa a {nuevo}.', { f: v(fechaLarga(j0.fecha)), p, nuevo: v(r.reserva, 'eur') })))
+        bloques.push(texto(t('El pronóstico para {cuando} sube al {p} de lluvia: ahora conviene apartar {nuevo}.', { cuando, p, nuevo: v(r.reserva, 'eur') })))
         bloques.push(tarjetaRiesgo(m, 'RG-1'))
       }
       return { bloques, sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?')], fuentes, reglas: REGLAS, noHecho: NO_HECHO }
@@ -241,16 +415,20 @@ export const riesgos = {
     if (pedido?.jornada != null) {
       const j = jornada(m, pedido.jornada)
       const hecha = HECHAS.find((h) => h.n === pedido.jornada)
+      // Se preguntó por un riesgo que no está en esa jornada, pero tiene otro.
+      const otro = j ? riesgoDeJornada(m, pedido.jornada) : null
       const rango = { a: v(m.proyecto.diaActual, 'num'), b: v(m.proyecto.diasRodaje, 'num') }
       return {
         bloques: [
           AVISO_EXPLORATORIO,
           texto(
-            j
-              ? t('Jornada {n} ({f}): {loc}, {tipo} de {franja}. No veo riesgos abiertos en esa jornada.', { n: v(j.n, 'num'), f: v(fechaLarga(j.fecha)), loc: v(j.localizacion), tipo: v(j.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j.franja.toLowerCase()) })
+            j && otro
+              ? t('Jornada {n}, {f}: {loc}, {tipo} de {franja}. Ese riesgo no la toca; el que sí tiene es otro: {titulo}.', { n: v(j.n, 'num'), f: v(fechaDia(j.fecha)), loc: v(j.localizacion), tipo: v(j.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j.franja.toLowerCase()), titulo: v(minuscula(renderTexto(otro.titulo))) })
+              : j
+              ? t('Jornada {n}, {f}: {loc}, {tipo} de {franja}. No vemos riesgos abiertos en esa jornada.', { n: v(j.n, 'num'), f: v(fechaDia(j.fecha)), loc: v(j.localizacion), tipo: v(j.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j.franja.toLowerCase()) })
               : hecha
-                ? t('La jornada {n} ya se rodó ({f}: {loc}, {tipo} de {franja}). Vigilo las que quedan, de la {a} a la {b}.', { n: v(hecha.n, 'num'), f: v(fechaLarga(hecha.fecha)), loc: v(hecha.localizacion), tipo: v(hecha.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(hecha.franja.toLowerCase()), ...rango })
-                : t('La jornada {n} está fuera del plan que vigilo: de la {a} a la {b}.', { n: v(pedido.jornada, 'num'), ...rango }),
+                ? t('La jornada {n} ya se rodó, el {f} ({loc}, {tipo} de {franja}). Vigilamos las que quedan, de la {a} a la {b}.', { n: v(hecha.n, 'num'), f: v(fechaDia(hecha.fecha)), loc: v(hecha.localizacion), tipo: v(hecha.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(hecha.franja.toLowerCase()), ...rango })
+                : t('La jornada {n} está fuera del plan que vigilamos: de la {a} a la {b}.', { n: v(pedido.jornada, 'num'), ...rango }),
           ),
         ],
         sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?')],
@@ -263,23 +441,14 @@ export const riesgos = {
     if (id) {
       const r = riesgoDe(m, id)
       const bloques = [AVISO_EXPLORATORIO]
-      if (det.entidades?.quiereEnviar) bloques.push(texto(r.aviso ? t('No envío avisos: te dejo el borrador para que lo revises y lo mandes tú.') : t('No envío nada: este riesgo no tiene un aviso para el equipo, sino una decisión.')))
-      bloques.push(
-        texto(
-          t('{titulo} ({j}, {f}, dentro de {d}). {porque}', {
-            titulo: r.titulo,
-            j: etiquetaJornadas(r),
-            f: v(fechaLarga(r.fecha)),
-            d: v(r.dias, 'dias'),
-            porque: r.porQue,
-          }),
-        ),
-      )
-      bloques.push(lista('Qué ha mirado el agente', r.senales.map((s) => ({ texto: s }))))
+      if (det.entidades?.quiereEnviar) bloques.push(texto(r.aviso ? t('No enviamos avisos: te dejamos el borrador para que lo revises y lo mandes tú.') : t('No enviamos nada: este riesgo no pide un aviso al equipo, sino una decisión.')))
+      bloques.push(texto(t('{titulo}. {porque}', { titulo: v(conCuando(r)), porque: r.porQue })))
+      bloques.push(lista('Lo que ha revisado', r.senales.map((s) => ({ texto: s }))))
+      if (id === 'RG-7' && r.estado !== 'mitigado') bloques.push(planBGrua(m))
       if (r.estado === 'mitigado') {
         bloques.push(texto(r.respuesta))
       } else if (r.decision || r.estado === 'aceptado' || r.estado === 'reservado') {
-        if (r.estado === 'reservado') bloques.push(texto(r.reservaCorta ? t('La reserva aprobada ({res}) se queda corta: el impacto esperado es {nuevo}.', { res: v(r.reservaAprobada, 'eur'), nuevo: v(r.reserva, 'eur') }) : t('Hay una reserva aprobada de {res} en la previsión.', { res: v(r.reservaAprobada, 'eur') })))
+        if (r.estado === 'reservado') bloques.push(texto(r.reservaCorta ? t('Lo apartado, {res}, se queda corto: ahora conviene apartar {nuevo}.', { res: v(r.reservaAprobada, 'eur'), nuevo: v(r.reserva, 'eur') }) : t('Ya hay {res} apartados en la previsión por si ocurre.', { res: v(r.reservaAprobada, 'eur') })))
         bloques.push(tarjetaRiesgo(m, id))
       } else if (r.aviso) {
         bloques.push(lista('Respuesta propuesta', [{ texto: r.respuesta }], 'propone'))
@@ -288,7 +457,7 @@ export const riesgos = {
       }
       return {
         bloques,
-        sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?'), sug(r.id === 'RG-1' ? PREGUNTA['RG-5'] : PREGUNTA['RG-1'])],
+        sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?')],
         fuentes,
         reglas: REGLAS,
         noHecho: NO_HECHO,
@@ -297,18 +466,16 @@ export const riesgos = {
 
     // Parte de riesgos.
     const evaluados = evaluarRiesgos(m)
-    const altos = evaluados.filter((r) => r.severidad === 'alta')
-    const medios = evaluados.filter((r) => r.severidad === 'media')
+    const top = evaluados[0]
     const bloques = [
       AVISO_EXPLORATORIO,
       texto(
-        t('He revisado las jornadas {a} a {b}: {n}. {altos} y {medios}. El más urgente: {top}.', {
+        t('De la jornada {a} a la {b} vemos {n}: {grupos}. El más urgente: {top}.', {
           a: v(m.proyecto.diaActual, 'num'),
           b: v(m.proyecto.diasRodaje, 'num'),
           n: cuenta(evaluados.length, 'riesgo', 'riesgos'),
-          altos: cuenta(altos.length, 'alto', 'altos'),
-          medios: cuenta(medios.length, 'medio', 'medios'),
-          top: evaluados[0].titulo,
+          grupos: v(porSeveridad(evaluados)),
+          top: v(minuscula(conCuando(top))),
         }),
       ),
       { tipo: 'riesgos' },

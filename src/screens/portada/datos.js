@@ -23,7 +23,7 @@ export const RODAJE = { titulo: 'La última función', dia: 7, jornadas: 20 }
 // Vista estática del informe semanal (no importa el motor para no cargarlo en la portada).
 // trabaja y acaba: cuándo empieza y termina cada agente en la toma, en ms.
 export const AGENTS_PREVIEW = [
-  { familia: 'documentacion', nombre: 'Facturas', tarea: 'Lee los cuatro documentos de la bandeja', estado: 'done', trabaja: 300, acaba: 1000 },
+  { familia: 'documentacion', nombre: 'Facturas', tarea: 'Lee los tres documentos de la bandeja', estado: 'done', trabaja: 300, acaba: 1000 },
   { familia: 'financiacion', nombre: 'Conciliación', tarea: 'Cuadra cada factura con su pedido', estado: 'done', trabaja: 1000, acaba: 1700 },
   { familia: 'presupuesto', nombre: 'Control de costes', tarea: 'Escenografía supera el umbral del 8 %', estado: 'done', trabaja: 1700, acaba: 2500 },
   { familia: 'financiacion', nombre: 'Excepciones', tarea: 'Una compra de más de 10.000 € espera tu aprobación', estado: 'review', trabaja: 1700, acaba: 2900 },
@@ -56,7 +56,7 @@ export const PLAN_RIESGO = {
 // Los mismos bloqueantes que enseña el agente de Cumplimiento.
 export const DOSSIER = [
   ['Certificado cultural ICAA', 'Productora · vence 05/06/2026'],
-  ['Justificantes de pago vinculados a facturas', 'Line producer · vence 14/06/2026 · faltan 6'],
+  ['Justificantes de pago vinculados a facturas', 'Line producer · vence 14/06/2026 · pagos sin justificante'],
   ['Coste reconocido por capítulos ICAA', 'Fiscalista · vence 20/06/2026'],
 ]
 

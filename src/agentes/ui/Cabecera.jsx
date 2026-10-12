@@ -1,165 +1,60 @@
-// Cabecera del prototipo y opciones de la demo. Todo lo que no es conversación
-// (quién mira, ritmo, recorrido, enlaces, reinicio) vive detrás de un solo botón.
+// Cabecera del prototipo. A la vista: el proyecto, el contador «Por revisar» y el equipo.
+// La demo se ve siempre como Marta y a ritmo normal: no hay opciones que cambiar.
 
-import { useState } from 'react'
-import { FilmpilotLogo, FilmpilotSymbol, FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconChevronDown, IconArrowLeft, IconPlay } from '../../components/icons.jsx'
-import { PERSONAS } from '../mundo.js'
-import { RITMOS } from '../useAgentes.js'
-import { LEYENDA_CAPACIDAD, RECORRIDO } from '../casos.js'
+import { FilmpilotLogo, FilmpilotSymbol } from '../../brand/Filmpilot.jsx'
+import { IconEquipo } from '../../components/icons.jsx'
 
-export function Cabecera({ s, persona, onPortada, onAgentes, onDemo }) {
+/** Contador global de lo que espera una decisión: la única cifra amarilla de la cabecera. */
+function ContadorRevisar({ n, onRevisar }) {
+  if (!n) return null
+  return (
+    <button type="button" className="ag-contador" onClick={onRevisar} aria-label={`Por revisar: ${n} ${n === 1 ? 'decisión' : 'decisiones'}. Pregunta qué tienes que revisar.`}>
+      <span className="ag-contador-chip">
+        <span>
+          <span className="hidden sm:inline">Por revisar · </span>
+          <span className="sm:hidden">Revisar · </span>
+          <span className="tnum">{n}</span>
+        </span>
+      </span>
+    </button>
+  )
+}
+
+export function Cabecera({ s, porRevisar, onPortada, onEquipo, onRevisar }) {
+  const p = s.mundo.proyecto
   return (
     <header className="ag-header">
-      <button type="button" className="ag-header-marca" onClick={onPortada} aria-label="Filmpilot, volver a la portada">
-        <span className="hidden sm:block">
-          <FilmpilotLogo width={128} decorative />
-        </span>
-        <span className="sm:hidden">
-          <FilmpilotSymbol size={28} />
-        </span>
-      </button>
-      <span className="ag-header-sep hidden md:block" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-sm font-medium text-flp-ink">
-          Agentes <span className="text-flp-muted">· {s.mundo.proyecto.titulo}</span>
-        </h1>
-        <p className="flp-mono truncate text-flp-muted">
-          <span className="hidden sm:inline">
-            Rodaje · día {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje}
+      <div className="ag-header-fila">
+        <button type="button" className="ag-header-marca" onClick={onPortada} aria-label="Filmpilot, volver a la portada">
+          <span className="hidden lg:block">
+            <FilmpilotLogo width={128} decorative />
           </span>
-          <span className="sm:hidden">
-            Día {s.mundo.proyecto.diaActual} de {s.mundo.proyecto.diasRodaje}
+          <span className="lg:hidden">
+            <FilmpilotSymbol size={28} />
           </span>
-        </p>
-      </div>
-      {/* En móvil no cabe el carril de agentes: se abre en una hoja. */}
-      <button type="button" className="ag-agentes-boton" aria-haspopup="dialog" aria-controls="ag-hoja-agentes" onClick={onAgentes}>
-        <FilmpilotSymbol size={16} />
-        Agentes
-      </button>
-      <button type="button" className="ag-demo-boton" aria-haspopup="dialog" aria-controls="ag-hoja-demo" onClick={onDemo} aria-label={`Opciones de la demo. Ahora la ves como ${persona.nombre}, ${persona.rol}`}>
-        <span className="ag-demo-etiqueta">Demo</span>
-        <span className="hidden min-w-0 text-left leading-tight md:block">
-          <span className="block text-sm">Opciones de la demo</span>
-          <span className="block truncate text-xs text-flp-muted">
-            Ves como {persona.nombre} · {persona.rol}
-          </span>
-        </span>
-        <IconChevronDown size={16} aria-hidden="true" />
-      </button>
-    </header>
-  )
-}
-
-/** Botón que, con conversación en marcha, pide confirmación antes de empezar de cero. */
-function ConConfirmacion({ hayConversacion, etiqueta, confirmar, aviso, onConfirmar, children }) {
-  const [preguntando, setPreguntando] = useState(false)
-  if (!preguntando) return children(() => (hayConversacion ? setPreguntando(true) : onConfirmar()))
-  return (
-    <div className="ag-confirmar" role="group" aria-label={etiqueta}>
-      <p className="text-sm font-medium text-flp-ink">{confirmar}</p>
-      <p className="mt-0.5 text-xs text-flp-muted">{aviso}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <FilmpilotButton size="sm" variant="carbon" onClick={onConfirmar} autoFocus>
-          Sí, empezar de cero
-        </FilmpilotButton>
-        <FilmpilotButton size="sm" variant="secondary" onClick={() => setPreguntando(false)}>
-          Cancelar
-        </FilmpilotButton>
-      </div>
-    </div>
-  )
-}
-
-/** Contenido de la hoja «Opciones de la demo». */
-export function OpcionesDemo({ s, despachar, ritmo, setRitmo, ocupado, onNavigate, onCerrar, avisar }) {
-  const hayConversacion = s.mensajes.length > 0
-  const avisoBorrado = 'Se cierran la conversación y las decisiones que has tomado.'
-  return (
-    <div className="space-y-6">
-      <section aria-labelledby="ag-demo-que">
-        <h3 id="ag-demo-que" className="flp-kicker mb-1.5 text-flp-muted">
-          Qué es esta pantalla
-        </h3>
-        <p className="text-sm leading-relaxed text-flp-muted">
-          Una demostración. Los agentes siguen guiones preparados sobre datos de ejemplo de «La última función» (Candilejas Films). No hay un modelo de lenguaje detrás, no se conecta a bancos y no se envía ningún correo.
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-flp-muted">{LEYENDA_CAPACIDAD}</p>
-      </section>
-
-      <fieldset>
-        <legend className="flp-kicker mb-1.5 text-flp-muted">Ver la demo como</legend>
-        <div className="ag-opciones">
-          {Object.values(PERSONAS).map((p) => (
-            <label key={p.id} className="ag-opcion-radio">
-              <input type="radio" name="ag-persona" value={p.id} checked={s.persona === p.id} onChange={() => despachar({ tipo: 'persona', persona: p.id })} />
-              <span>
-                <span className="block text-sm font-medium text-flp-ink">{p.nombre}</span>
-                <span className="block text-xs text-flp-muted">{p.rol}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        <p className="mt-1.5 text-xs text-flp-muted">Cada rol puede decidir cosas distintas: cambia para ver quién aprueba qué.</p>
-      </fieldset>
-
-      <fieldset>
-        <legend className="flp-kicker mb-1.5 text-flp-muted">Velocidad de los agentes</legend>
-        <div className="ag-segmentado">
-          {Object.entries(RITMOS).map(([k, r]) => (
-            <label key={k}>
-              <input type="radio" name="ag-ritmo" value={k} checked={ritmo === k} onChange={() => setRitmo(k)} />
-              <span>{r.etiqueta}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      {!s.tour && (
-        <ConConfirmacion
-          hayConversacion={hayConversacion}
-          etiqueta="Empezar el recorrido guiado"
-          confirmar="¿Empezar el recorrido desde cero?"
-          aviso={avisoBorrado}
-          onConfirmar={() => {
-            onCerrar()
-            despachar({ tipo: 'tour/iniciar' })
-          }}
-        >
-          {(pulsar) => (
-            <div>
-              <FilmpilotButton variant="secondary" icon={IconPlay} className="w-full" disabled={ocupado} onClick={pulsar}>
-                Empezar el recorrido guiado
-              </FilmpilotButton>
-              <p className="mt-1.5 text-xs text-flp-muted">{ocupado ? 'Disponible cuando terminen los agentes.' : `${RECORRIDO.length} pasos, unos cinco minutos. Empieza con la demo recién abierta.`}</p>
-            </div>
-          )}
-        </ConConfirmacion>
-      )}
-
-      <div className="flex flex-col gap-1 border-t border-flp-line pt-4">
-        <button type="button" className="ag-menu-item" onClick={() => onNavigate('landing')}>
-          <IconArrowLeft size={16} aria-hidden="true" /> Volver a la portada
         </button>
-        <ConConfirmacion
-          hayConversacion={hayConversacion}
-          etiqueta="Reiniciar la demo"
-          confirmar="¿Reiniciar la demo?"
-          aviso={avisoBorrado}
-          onConfirmar={() => {
-            onCerrar()
-            despachar({ tipo: 'reiniciar' })
-            avisar?.('Demo reiniciada: empieza de cero.')
-          }}
-        >
-          {(pulsar) => (
-            <button type="button" className="ag-menu-item ag-menu-item--peligro" onClick={pulsar}>
-              Reiniciar la demo
-            </button>
-          )}
-        </ConConfirmacion>
+        <span className="ag-header-sep hidden lg:block" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h1 className="ag-header-titulo">
+            <span className="hidden text-flp-muted lg:inline">Agentes · </span>
+            {p.titulo}
+          </h1>
+          <p className="ag-header-sub flp-mono truncate text-flp-muted">
+            <span className="hidden md:inline">
+              Rodaje · día <span className="tnum">{p.diaActual}</span> de <span className="tnum">{p.diasRodaje}</span>
+            </span>
+            <span className="md:hidden">
+              Día <span className="tnum">{p.diaActual}</span> de <span className="tnum">{p.diasRodaje}</span>
+            </span>
+          </p>
+        </div>
+        <ContadorRevisar n={porRevisar} onRevisar={onRevisar} />
+        {/* El equipo: quién es quién y cómo actúa. */}
+        <button type="button" className="ag-header-equipo" aria-haspopup="dialog" aria-controls="ag-hoja-equipo" onClick={onEquipo} aria-label="Equipo de agentes">
+          <IconEquipo size={20} className="sm:hidden" aria-hidden="true" />
+          <span className="hidden sm:inline">Equipo</span>
+        </button>
       </div>
-    </div>
+    </header>
   )
 }

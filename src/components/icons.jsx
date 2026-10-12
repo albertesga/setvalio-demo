@@ -262,3 +262,42 @@ export const IconClaqueta = ({ size = 22, className = '' }) => (
     />
   </svg>
 )
+
+// Canales por los que llega una factura (prototipo de agentes).
+export const IconMail = (p) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3.5 6.5l8.5 6.5 8.5-6.5" />
+  </Svg>
+)
+
+export const IconFormulario = (p) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9h18" />
+    <path d="M7 13h6" />
+    <path d="M7 16h10" />
+  </Svg>
+)
+
+export const IconChat = (p) => (
+  <Svg {...p}>
+    <path d="M20 11.5a8 8 0 0 1-11.6 7.1L4 20l1.4-4.2A8 8 0 1 1 20 11.5z" />
+  </Svg>
+)
+
+export const IconEquipo = (p) => (
+  <Svg {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8" />
+    <path d="M18 14.2a6.5 6.5 0 0 1 3.5 5.8" />
+  </Svg>
+)
+
+export const IconPlus = (p) => (
+  <Svg {...p}>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </Svg>
+)

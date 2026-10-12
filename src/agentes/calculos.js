@@ -198,7 +198,10 @@ export function conciliar(mundo, docId) {
   const o = mundo.ordenes[d.oc]
   if (!o) return { resultado: 'oc_desconocida', oc: d.oc }
   if (o.estado !== 'Aprobada' && o.estado !== 'Facturada') return { resultado: 'oc_no_aprobada', oc: o.id, orden: o }
-  const abierto = r2((o.importeAprobado ?? o.importe) - o.facturado)
+  // Una factura ya contabilizada está dentro de lo facturado del pedido: se concilia
+  // contra lo que estaba abierto antes de contabilizarla, no contra lo que queda.
+  const propio = d.estado === 'contabilizada' ? Math.min(d.base, o.facturado) : 0
+  const abierto = r2((o.importeAprobado ?? o.importe) - o.facturado + propio)
   const diferencia = r2(d.base - abierto)
   const ok = Math.abs(diferencia) <= POLITICAS.toleranciaConciliacion * Math.max(abierto, 1)
   return { resultado: ok ? 'ok' : 'diferencia', oc: o.id, orden: o, abierto, diferencia }
@@ -216,7 +219,7 @@ export function elegibilidad(mundo, docId) {
   const territorial = d.impuesto?.tipo === 'IGIC'
   if (territorial) {
     const revisada = mundo.revisiones[d.id]
-    criterios.push({ id: 'territorio', etiqueta: 'Validación territorial', ok: null, detalle: revisada ? 'Paquete preparado para el fiscalista' : 'IGIC: gasto en Canarias, lo valida el fiscalista' })
+    criterios.push({ id: 'territorio', etiqueta: 'Gasto en Canarias', ok: null, detalle: revisada ? 'Paquete preparado para el fiscalista' : 'Lleva IGIC, así que lo valida el fiscalista' })
   }
   const estado = criterios.some((c) => c.ok === false) ? 'revisar' : criterios.some((c) => c.ok === null) ? 'condicionado' : 'elegible'
   return { criterios, estado, territorio: territorial ? 'canarias' : 'comun' }
@@ -227,7 +230,10 @@ export function excepciones(mundo) {
   const out = []
   for (const d of Object.values(mundo.documentos)) {
     if (d.estado !== 'en_bandeja') continue
-    if (confianzaBaja(d)) {
+    // Lo que Conciliación contabilizó sola y se deshizo espera a que la persona lo revise.
+    if (d.revisionManual) {
+      out.push({ id: `ex-${d.id}`, tipo: 'manual', ref: { tipo: 'documento', id: d.id }, nivel: 'propone', rol: ROLES.revisionHumana, aplazado: !!d.aplazado, importe: d.base, titulo: `${d.proveedor}: la revisas tú`, entrada: `Procesa la factura ${d.id}` })
+    } else if (confianzaBaja(d)) {
       out.push({ id: `ex-${d.id}`, tipo: 'confianza', ref: { tipo: 'documento', id: d.id }, nivel: 'propone', rol: ROLES.revisionHumana, aplazado: !!d.aplazado, importe: d.base, titulo: `${d.proveedor}: partida dudosa`, entrada: '¿Qué gastos tengo que revisar?' })
     } else if (d.impuesto?.tipo === 'IGIC') {
       if (!mundo.revisiones[d.id]) out.push({ id: `ex-${d.id}`, tipo: 'fiscal', ref: { tipo: 'revision', id: d.id }, nivel: 'aprueba', rol: ROLES.fiscalista, importe: d.base, titulo: `${d.proveedor}: IGIC por validar`, entrada: `Revisa el IGIC de la factura ${d.id}` })
@@ -240,14 +246,37 @@ export function excepciones(mundo) {
     out.push({ id: `ex-${o.id}`, tipo: 'orden', ref: { tipo: 'orden', id: o.id }, nivel: imp.nivel, rol: imp.rol, importe: o.importe, titulo: `Compra a ${o.proveedor} (${o.id})`, entrada: `Revisa la orden de compra ${o.id}` })
   }
   for (const inc of incoherenciasPrevision(mundo)) {
-    out.push({ id: `ex-cef-${inc.codigo}`, tipo: 'prevision', ref: { tipo: 'cef', id: inc.codigo }, nivel: 'propone', rol: ROLES.lineProducer, importe: inc.exceso, titulo: `${inc.codigo} ${inc.nombre}: previsión por debajo de lo comprometido`, entrada: '¿Cómo cerraremos el proyecto?' })
+    out.push({ id: `ex-cef-${inc.codigo}`, tipo: 'prevision', ref: { tipo: 'cef', id: inc.codigo }, nivel: 'propone', rol: ROLES.lineProducer, importe: inc.exceso, titulo: `${inc.nombre}: más comprometido que previsto`, entrada: '¿Cuánto nos costará al final y llegamos de caja?' })
   }
   const peso = { aprueba: 0, propone: 1 }
   return out.sort((a, b) => peso[a.nivel] - peso[b.nivel] || b.importe - a.importe)
 }
 
+/** Facturas contabilizadas cuyo pago aún no está justificado: lo que pide DOS-02. */
+export function justificantesPendientes(mundo) {
+  return Object.values(mundo.documentos).filter((d) => d.estado === 'contabilizada' && d.pago === 'pendiente')
+}
+
+// Lo que dice cada bloqueante cuando ya hay un borrador preparado para resolverlo.
+const PREPARADO = { 'DOS-01': 'Solicitud al ICAA', 'DOS-02': 'Petición a administración' }
+
+/** El dossier con lo que se sabe hoy: días hasta el plazo, justificantes que faltan y lo preparado. */
 export function dossier(mundo) {
-  return mundo.dossier.map((d) => ({ ...d, dias: diasEntre(mundo.corte.fecha, d.deadline) }))
+  return mundo.dossier.map((d) => {
+    const x = { ...d, dias: diasEntre(mundo.corte.fecha, d.deadline) }
+    if (d.id === 'DOS-02') x.pendientes = justificantesPendientes(mundo).length
+    const bor = mundo.borradores?.[`BOR-${d.id}`]
+    if (bor && bor.estado !== 'descartado' && PREPARADO[d.id]) {
+      x.preparado = true
+      x.evidencia = `${PREPARADO[d.id]} ${bor.estado === 'listo' ? 'revisada' : 'preparada'}, sin enviar`
+    }
+    return x
+  })
+}
+
+/** Una fila de la checklist del dossier (la usan el guion y la tarjeta en vivo). */
+export function itemDossier(d) {
+  return { id: d.id, documento: d.documento, responsable: d.responsable, deadline: d.deadline, dias: d.dias, estado: d.estado, evidencia: d.pendientes && !d.preparado ? `${d.pendientes} ${d.evidencia.toLowerCase()}` : d.evidencia, razon: d.razon }
 }
 
 /** Estimación de deducción con el motor V2 (src/lib/incentivos.js). Exploratorio. */

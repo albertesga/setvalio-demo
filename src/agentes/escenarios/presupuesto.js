@@ -1,16 +1,24 @@
-// Guiones de la primera propuesta de presupuesto (caso por validar):
-// crear la propuesta, añadir costes y optimizar proveedores con llamadas.
+// Guiones de la primera propuesta de presupuesto de Itsasoa, otro proyecto (en
+// exploración): crear la propuesta, añadir costes y optimizar proveedores con llamadas.
 
 import { normalizar } from '../intenciones.js'
-import { cuenta } from '../texto.js'
+import { cuenta, formatear } from '../texto.js'
 import { totalesPropuesta, optimizacion, mejoresConfirmadas, PROTOCOLO_LLAMADA, REQUISITOS } from '../propuesta.js'
 import { t, v, paso, sug, texto, aviso } from './comun.js'
+import { REGLA_COMUN } from './conversacion.js'
 
-const AVISO_POR_VALIDAR = aviso(
-  'porvalidar',
-  'Sin validar',
-  t('Empezar un presupuesto desde cero aún está sin validar con productoras; lo previsto es importar uno ya hecho. Proveedores, tarifas y llamadas son de ejemplo.'),
-)
+// Tono interno 'porvalidar' (su texto no es el de riesgos); lo que se ve es «En exploración».
+const AVISO_POR_VALIDAR = aviso('porvalidar', 'En exploración', t('En exploración: hoy Filmpilot parte de un presupuesto que ya tienes. Proveedores, tarifas y llamadas son de ejemplo.'))
+
+/** Antetítulo de las respuestas de Itsasoa (turno.proyecto): no es La última función. */
+export function proyectoPropuesta(m) {
+  return { titulo: m.propuesta.proyecto.titulo, productora: m.propuesta.proyecto.productora, estado: 'en desarrollo' }
+}
+
+/** Sugerencia para volver al proyecto en rodaje. */
+export function sugVolver(m) {
+  return { etiqueta: `Volver a ${m.proyecto.titulo}`, texto: '¿Cómo vamos?' }
+}
 
 export function textoDiferencia(tot) {
   if (Math.abs(tot.diferencia) < 0.5) return t('justo en el objetivo de {obj}', { obj: v(tot.objetivo, 'eur') })
@@ -59,7 +67,7 @@ export const presupuestoNuevo = {
       bloques: [
         AVISO_POR_VALIDAR,
         texto(
-          t('Propuesta de {proy} ({prod}, en desarrollo). Con los {n} que ya tienes hablados y el resto estimado por capítulo, el total es {tot}, {dif}.', {
+          t('Propuesta de {proy} ({prod}, en desarrollo). Con los {n} que ya tienes hablados y el resto estimado por capítulo, sale {tot}, {dif}.', {
             proy: v(p.proyecto.titulo),
             prod: v(p.proyecto.productora),
             n: cuenta(tot.conProveedor, 'coste', 'costes'),
@@ -71,14 +79,15 @@ export const presupuestoNuevo = {
         { tipo: 'propuesta' },
         texto(
           conAlternativas
-            ? t('En el directorio hay alternativas más baratas para {n}. Si quieres, Proveedores las compara con tus requisitos y llama para confirmar el precio final.', { n: cuenta(conAlternativas, 'de tus costes', 'de tus costes') })
+            ? t('En el directorio hay alternativas más baratas para {n}. Si quieres, Proveedores las compara con tus requisitos y, con tu permiso, llama para confirmar el precio final.', { n: cuenta(conAlternativas, 'de tus costes', 'de tus costes') })
             : t('Añade los costes que tengas hablados; lo que no detalles se queda estimado por capítulo.'),
         ),
       ],
-      sugerencias: [sug('Optimiza los proveedores de la propuesta'), sug('Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €')],
+      sugerencias: [sug('Optimiza los proveedores de la propuesta'), sug('Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €'), sugVolver(m)],
       fuentes: ['Costes aportados por ti', 'Reparto ICAA del proyecto', 'Objetivo de presupuesto del proyecto'],
       reglas: [t('Lo que no está detallado se estima con el reparto por capítulos del proyecto'), t('Un capítulo con más detalle que su estimación no deja nada por detallar')],
       noHecho: [t('No ha cerrado el presupuesto ni ha pedido nada a nadie.')],
+      proyecto: proyectoPropuesta(m),
     }
   },
 }
@@ -144,13 +153,14 @@ export const anadirCoste = {
     if (!importe || !partida || !concepto) {
       return {
         bloques: [
-          texto(t('No he podido leer el coste completo. Escríbelo con concepto, proveedor e importe, por ejemplo «Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €», o usa el formulario de la propuesta.')),
+          texto(t('No hemos podido leer el coste completo. Escríbelo con concepto, proveedor e importe, por ejemplo «Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €», o usa el formulario de la propuesta.')),
           { tipo: 'propuesta', abrirFormulario: true },
         ],
-        sugerencias: [sug('Optimiza los proveedores de la propuesta')],
+        sugerencias: [sug('Optimiza los proveedores de la propuesta'), sugVolver(m)],
         fuentes: [],
         reglas: [],
         noHecho: [t('No ha añadido nada.')],
+        proyecto: proyectoPropuesta(m),
       }
     }
     const tot = totalesPropuesta(m)
@@ -166,10 +176,11 @@ export const anadirCoste = {
         kpisPropuesta(m, antes),
         { tipo: 'propuesta' },
       ],
-      sugerencias: [sug('Optimiza los proveedores de la propuesta')],
+      sugerencias: [sug('Optimiza los proveedores de la propuesta'), sugVolver(m)],
       fuentes: ['Costes aportados por ti'],
       reglas: [t('Un coste nuevo sustituye primero lo estimado por detallar en su capítulo')],
       noHecho: [t('No ha pedido presupuesto al proveedor.')],
+      proyecto: proyectoPropuesta(m),
     }
   },
 }
@@ -207,21 +218,23 @@ export const optimizarProveedores = {
   componer({ despues: m }) {
     const p = m.propuesta
     if (p.autorizacion === 'autorizada') {
-      return { ...componerComparacion(m), bloques: [texto(t('Las llamadas ya están hechas. Esto es lo que confirmó cada proveedor:')), ...componerComparacion(m).bloques] }
+      const comp = componerComparacion(m)
+      return { ...comp, bloques: [texto(t('Las llamadas ya están hechas. Esto es lo que confirmó cada proveedor:')), ...comp.bloques] }
     }
     const opt = optimizacion(m)
     const aLlamar = opt.filter((a) => a.llamar)
     if (p.autorizacion === 'rechazada') {
       return {
         bloques: [
-          texto(t('Dijiste que no llamara. Te dejo los proveedores y requisitos para que les pidas presupuesto tú:')),
+          texto(t('Dijiste que no llamáramos. Te dejamos los proveedores y tus requisitos para que les pidas presupuesto tú:')),
           tablaAlternativas(opt, { sinLlamadas: true }),
           ...(aLlamar.length ? [tarjetaLlamadas(m, aLlamar, { retomar: true })] : []),
         ],
-        sugerencias: [sug('Enséñame la propuesta de Itsasoa')],
+        sugerencias: [sug('Enséñame la propuesta de Itsasoa'), sugVolver(m)],
         fuentes: ['Directorio de proveedores (ejemplo)'],
-        reglas: [],
+        reglas: [t('{regla}.', { regla: v(REGLA_COMUN) })],
         noHecho: [t('No ha llamado a nadie.')],
+        proyecto: proyectoPropuesta(m),
       }
     }
     const ahorroMax = aLlamar.reduce((acc, a) => {
@@ -233,7 +246,7 @@ export const optimizarProveedores = {
       bloques: [
         AVISO_POR_VALIDAR,
         texto(
-          t('He encontrado {n} más baratas en el directorio. {d} no cumplen tus requisitos y las descarto sin llamar. Las otras {c} hay que confirmarlas por teléfono, porque la tarifa del directorio puede no incluir transporte ni extras. Con las tarifas de referencia, el ahorro podría llegar a {ahorro}, pero solo vale el precio que confirmen.', {
+          t('Hemos encontrado {n} más baratas en el directorio. {d} no cumplen tus requisitos y las descartamos sin llamar. Las otras {c} hay que confirmarlas por teléfono, porque la tarifa del directorio puede no incluir transporte ni extras. Con las tarifas de referencia, el ahorro podría llegar a {ahorro}, pero solo vale el precio que confirmen.', {
             n: cuenta(opt.length, 'alternativa', 'alternativas'),
             d: v(opt.filter((a) => a.descartada).length, 'num'),
             c: v(aLlamar.length, 'num'),
@@ -244,10 +257,11 @@ export const optimizarProveedores = {
         { tipo: 'lista', titulo: 'Cómo será la llamada', plegado: true, nivel: 'aprueba', numerada: true, items: PROTOCOLO_LLAMADA.map((x) => ({ texto: t('{x}', { x: v(x) }) })) },
         tarjetaLlamadas(m, aLlamar),
       ],
-      sugerencias: [sug('¿Qué hace el agente de Proveedores?')],
+      sugerencias: [sug('Enséñame la propuesta de Itsasoa'), sugVolver(m)],
       fuentes: ['Directorio de proveedores (ejemplo)', 'Requisitos que diste para cada coste'],
-      reglas: [t('Una alternativa que no cumple un requisito en su ficha se descarta sin llamar'), t('Llamar a un proveedor es comunicación externa: necesita tu permiso')],
+      reglas: [t('Una alternativa que no cumple un requisito en su ficha se descarta sin llamar'), t('{regla}: llamar a un proveedor también cuenta.', { regla: v(REGLA_COMUN) })],
       noHecho: [t('No ha llamado a nadie todavía.'), t('No ha cambiado ningún proveedor de la propuesta.')],
+      proyecto: proyectoPropuesta(m),
     }
   },
 }
@@ -255,8 +269,9 @@ export const optimizarProveedores = {
 /** Permiso para llamar. Tras decir que no, una tarjeta para cambiar de idea (solo autorizar). */
 function tarjetaLlamadas(m, aLlamar, { retomar = false } = {}) {
   const p = m.propuesta
-  const acciones = [{ id: 'aprobar', etiqueta: 'Autorizar las llamadas', variante: 'primary', accion: { tipo: 'propuesta/autorizarLlamadas' }, rol: 'Line producer' }]
-  if (!retomar) acciones.push({ id: 'rechazar', etiqueta: 'No llamar: lo pido yo', variante: 'secondary', accion: { tipo: 'propuesta/noLlamar' }, rol: 'Line producer' })
+  const quien = `${formatear(aLlamar.length, 'num')} ${aLlamar.length === 1 ? 'proveedor' : 'proveedores'}`
+  const acciones = [{ id: 'aprobar', etiqueta: 'Autorizar las llamadas', burbuja: `Autorizo que llaméis a ${quien}`, variante: 'primary', accion: { tipo: 'propuesta/autorizarLlamadas' }, rol: 'Line producer' }]
+  if (!retomar) acciones.push({ id: 'rechazar', etiqueta: 'No llamar: lo pido yo', burbuja: 'No llaméis: el precio lo pido yo', variante: 'secondary', accion: { tipo: 'propuesta/noLlamar' }, rol: 'Line producer' })
   return {
     tipo: 'aprobacion',
     id: retomar ? 'ap-llamadas-retomar' : 'ap-llamadas',
@@ -267,7 +282,7 @@ function tarjetaLlamadas(m, aLlamar, { retomar = false } = {}) {
     titulo: retomar
       ? t('¿Cambias de idea? Llamar a {n} en nombre de {prod}', { n: cuenta(aLlamar.length, 'proveedor', 'proveedores'), prod: v(p.proyecto.productora) })
       : t('Llamar a {n} en nombre de {prod}', { n: cuenta(aLlamar.length, 'proveedor', 'proveedores'), prod: v(p.proyecto.productora) }),
-    resumen: t('Solo pedirá el precio final y confirmará tus requisitos. No reserva, no firma y no negocia. En la demo las llamadas son simuladas: no se llama a nadie.'),
+    resumen: t('Proveedores no llamará hasta que digas que sí. {regla}. Solo pedirá el precio final y confirmará tus requisitos; no reserva ni negocia. En la demo, las llamadas son simuladas.', { regla: v(REGLA_COMUN) }),
     impactoTitulo: 'A quién llama',
     impacto: aLlamar.map((a) => ({ etiqueta: `${a.proveedor} · ${a.lineaConcepto.toLowerCase()} (ahora ${a.actual.proveedor})`, antes: a.actual.importe, despues: a.referencia, formato: 'eur' })),
     impactoColumnas: ['Ahora', 'Referencia'],
@@ -275,24 +290,44 @@ function tarjetaLlamadas(m, aLlamar, { retomar = false } = {}) {
   }
 }
 
+const enLista = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : xs.join(''))
+const minuscula = (s) => s.charAt(0).toLowerCase() + s.slice(1)
+
+/** Alternativas del directorio: una fila por coste (no se repite el proveedor actual),
+ *  plegada con «N alternativas · M descartadas». Si no se llama, va abierta: es la lista de trabajo. */
 function tablaAlternativas(opt, { sinLlamadas = false } = {}) {
+  const lineas = [...new Set(opt.map((a) => a.linea))].map((id) => opt.filter((a) => a.linea === id))
+  const descartadas = opt.filter((a) => a.descartada).length
+  const siguiente = sinLlamadas ? 'Pedir precio a' : 'Llamar a'
   return {
     tipo: 'tabla',
     titulo: 'Alternativas del directorio',
+    plegado: !sinLlamadas,
+    resumen: `${formatear(opt.length, 'num')} ${opt.length === 1 ? 'alternativa' : 'alternativas'} · ${formatear(descartadas, 'num')} ${descartadas === 1 ? 'descartada' : 'descartadas'}`,
     columnas: [
       { id: 'coste', etiqueta: 'Coste y proveedor actual' },
       { id: 'actual', etiqueta: 'Ahora', formato: 'eur', alinear: 'right' },
-      { id: 'alternativa', etiqueta: 'Alternativa y siguiente paso', texto: true },
-      { id: 'referencia', etiqueta: 'Referencia', formato: 'eur', alinear: 'right' },
+      { id: 'alternativa', etiqueta: 'Alternativas y siguiente paso', texto: true },
+      { id: 'referencia', etiqueta: 'Mejor referencia', formato: 'eur', alinear: 'right' },
     ],
-    filas: opt.map((a) => ({
-      id: a.id,
-      coste: `${a.lineaConcepto} · ${a.actual.proveedor}`,
-      actual: a.actual.importe,
-      alternativa: `${a.proveedor} (${a.tarifa}). ${a.descartada ? `Descartada: ${a.motivoDescarte}` : sinLlamadas ? 'Pedir precio y confirmar requisitos.' : 'Llamar para confirmar precio y requisitos.'}`,
-      referencia: a.referencia,
-      alerta: false,
-    })),
+    filas: lineas.map((alts) => {
+      const [a] = alts
+      const validas = alts.filter((x) => !x.descartada)
+      return {
+        id: a.linea,
+        coste: `${a.lineaConcepto} · ${a.actual.proveedor}`,
+        actual: a.actual.importe,
+        // Primero a quién llamar; después cada descartada con su motivo.
+        alternativa: [
+          validas.length ? `${siguiente} ${enLista(validas.map((x) => `${x.proveedor} (${x.tarifa})`))}.` : null,
+          ...alts.filter((x) => x.descartada).map((x) => `${x.proveedor}, descartada: ${minuscula(x.motivoDescarte)}`),
+        ]
+          .filter(Boolean)
+          .join(' '),
+        referencia: validas.length ? Math.min(...validas.map((x) => x.referencia)) : null,
+        alerta: false,
+      }
+    }),
   }
 }
 
@@ -305,10 +340,10 @@ export function componerComparacion(m) {
   const fallidas = llamadas.filter((id) => !p.llamadas[id].cumple).length
   const bloques = [
     texto(
-      t('{n}: {ok} confirman precio y requisitos y {ko} no cumple. Si eliges las mejores, la propuesta baja {ahorro}.', {
+      t(fallidas ? '{n}: {ok} precio y requisitos y {ko}. Si eliges las mejores, la propuesta baja {ahorro}.' : '{n}: todas confirman precio y requisitos. Si eliges las mejores, la propuesta baja {ahorro}.', {
         n: cuenta(llamadas.length, 'llamada hecha', 'llamadas hechas'),
-        ok: v(llamadas.length - fallidas, 'num'),
-        ko: v(fallidas, 'num'),
+        ok: cuenta(llamadas.length - fallidas, 'confirma', 'confirman'),
+        ko: cuenta(fallidas, 'no cumple', 'no cumplen'),
         ahorro: v(ahorroTotal, 'eur'),
       }),
     ),
@@ -337,10 +372,11 @@ export function componerComparacion(m) {
   ]
   return {
     bloques,
-    sugerencias: [sug('Enséñame la propuesta de Itsasoa')],
+    sugerencias: [sug('Enséñame la propuesta de Itsasoa'), sugVolver(m)],
     fuentes: ['Llamadas grabadas y transcritas', 'Directorio de proveedores (ejemplo)'],
-    reglas: [t('Solo se proponen las alternativas que confirman todos tus requisitos')],
+    reglas: [t('Solo se proponen las alternativas que confirman todos tus requisitos'), t('{regla}.', { regla: v(REGLA_COMUN) })],
     noHecho: [t('No ha reservado ni ha cambiado ningún proveedor: eso lo eliges tú.')],
+    proyecto: proyectoPropuesta(m),
   }
 }
 
@@ -363,8 +399,8 @@ export function tarjetaEleccion(m, x) {
       desc: v(x.descartadas.length ? ` ${x.descartadas.map((d) => `${d.proveedor} no cumple: ${d.motivo.toLowerCase()}`).join(' ')}` : ''),
     }),
     acciones: [
-      { id: 'aprobar', etiqueta: `Elegir ${x.mejor.proveedor}`, variante: 'primary', accion: { tipo: 'propuesta/elegir', lineaId: x.linea.id, altId: x.mejor.id }, rol: 'Line producer' },
-      { id: 'rechazar', etiqueta: `Mantener ${x.linea.proveedor}`, variante: 'secondary', accion: { tipo: 'propuesta/elegir', lineaId: x.linea.id, altId: null }, rol: 'Line producer' },
+      { id: 'aprobar', etiqueta: `Elegir ${x.mejor.proveedor}`, burbuja: `Elijo ${x.mejor.proveedor} para ${x.linea.concepto.toLowerCase()}`, variante: 'primary', accion: { tipo: 'propuesta/elegir', lineaId: x.linea.id, altId: x.mejor.id }, rol: 'Line producer' },
+      { id: 'rechazar', etiqueta: `Mantener ${x.linea.proveedor}`, burbuja: `Mantengo ${x.linea.proveedor} para ${x.linea.concepto.toLowerCase()}`, variante: 'secondary', accion: { tipo: 'propuesta/elegir', lineaId: x.linea.id, altId: null }, rol: 'Line producer' },
     ],
   }
 }

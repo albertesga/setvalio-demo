@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AgentGlyph, FilmpilotSymbol } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconClock, IconAlert, IconClose, IconChevronDown } from '../../components/icons.jsx'
 import { AGENTES, AUTONOMIA } from '../agentes.js'
+import { ETIQUETA_CAPACIDAD } from '../casos.js'
 import { segmentos } from '../texto.js'
 
 /** Texto de un agente: resalta las cifras. */
@@ -59,36 +60,26 @@ export function AgentAvatar({ id, size = 32, trabajando = false, revisar = false
   )
 }
 
-/** Avatar y nombre juntos: el glifo es de la familia, el nombre identifica al agente. */
-export function AgentLabel({ id, size = 24, trabajando = false, className = '' }) {
-  const a = AGENTES[id]
-  if (!a) return null
-  return (
-    <span className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
-      <AgentAvatar id={id} size={size} trabajando={trabajando} />
-      <span className="truncate text-sm font-medium text-flp-ink">{a.nombre}</span>
-    </span>
-  )
-}
-
-const NIVEL_SEGMENTOS = { ejecuta: 1, propone: 2, aprueba: 3 }
-const ETIQUETA_CORTA = { ejecuta: 'Ejecuta', propone: 'Propone', aprueba: 'Aprobación' }
-
-/** Cómo actúa el agente (no es un estado): Ejecuta · Propone · Pide aprobación. */
+/** Cómo actúa el agente (no es un estado): Lo hace solo · Te lo propone · Pide tu aprobación. */
 export function AutonomyBadge({ nivel, compacto = false }) {
   const a = AUTONOMIA[nivel]
   if (!a) return null
-  const n = NIVEL_SEGMENTOS[nivel]
   return (
     <span className="ag-autonomia" title={a.descripcion}>
       <span className="ag-autonomia-meter" aria-hidden="true">
         {[1, 2, 3].map((i) => (
-          <i key={i} className={i <= n ? 'is-on' : ''} />
+          <i key={i} className={i <= a.nivel ? 'is-on' : ''} />
         ))}
       </span>
-      <span>{compacto ? ETIQUETA_CORTA[nivel] : a.etiqueta}</span>
+      <span>{compacto ? a.corta : a.etiqueta}</span>
     </span>
   )
+}
+
+/** Alcance de lo que se enseña: una sola etiqueta, «En exploración». Lo decidido no lleva. */
+export function EtiquetaCapacidad({ capacidad = 'exploratoria', className = '' }) {
+  const etiqueta = ETIQUETA_CAPACIDAD[capacidad]
+  return etiqueta ? <span className={`ag-etiqueta-capacidad ${className}`}>{etiqueta}</span> : null
 }
 
 // Vocabulario de la marca: En espera · Trabajando · Por revisar · Completado.

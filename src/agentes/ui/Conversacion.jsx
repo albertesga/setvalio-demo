@@ -1,10 +1,12 @@
-// Redactor, sugerencias y barra del recorrido guiado.
+// Redactor y sugerencias de la conversación abierta.
 
-import { forwardRef, useEffect, useRef, useState } from 'react'
-import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconArrowUp, IconClock } from '../../components/icons.jsx'
+import { useEffect, useRef, useState } from 'react'
+import { IconArrowUp } from '../../components/icons.jsx'
 
-/** Sugerencias para seguir: van al final de la última respuesta, no en el pie fijo. */
+/**
+ * Sugerencias para seguir: van al final de la última respuesta, no en el pie fijo.
+ * items = sugerenciasDe(s); onElegir recibe la sugerencia entera (envía `entrada` si la trae).
+ */
 export function Sugerencias({ items, onElegir, deshabilitado }) {
   if (!items.length) return null
   return (
@@ -14,7 +16,7 @@ export function Sugerencias({ items, onElegir, deshabilitado }) {
       </h3>
       <div className="ag-sugerencias">
         {items.map((x) => (
-          <button key={x.texto} type="button" className="ag-sugerencia" onClick={() => onElegir(x.texto)} disabled={deshabilitado}>
+          <button key={x.texto} type="button" className="ag-sugerencia" onClick={() => onElegir(x)} disabled={deshabilitado} title={x.etiqueta !== x.texto ? x.texto : undefined}>
             {x.etiqueta}
           </button>
         ))}
@@ -23,7 +25,7 @@ export function Sugerencias({ items, onElegir, deshabilitado }) {
   )
 }
 
-export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
+export function Redactor({ ocupado, onEnviar, onEscribir, inputRef, placeholder = 'Escribe a los agentes…' }) {
   const [texto, setTexto] = useState('')
   const historial = useRef([])
   const ref = inputRef
@@ -32,6 +34,8 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    // La barra de desplazamiento, solo cuando el texto no cabe en el alto máximo.
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden'
   }, [texto, ref])
 
   const enviar = () => {
@@ -61,7 +65,7 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
       }}
     >
       <label htmlFor="ag-entrada" className="sr-only">
-        Pregunta a los agentes
+        {placeholder.replace('…', '')}
       </label>
       <textarea
         id="ag-entrada"
@@ -74,7 +78,7 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
         }}
         onFocus={() => onEscribir?.()}
         onKeyDown={onKeyDown}
-        placeholder="Pregunta a los agentes… por ejemplo, ¿por qué se desvía Viajes?"
+        placeholder={placeholder}
         className="ag-redactor-campo"
         autoComplete="off"
         enterKeyHint="send"
@@ -85,41 +89,3 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
     </form>
   )
 }
-
-/** Barra fija del recorrido: dice en qué paso estás y qué mirar, sin tener que subir a buscarlo. */
-export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, onSiguiente, onSalir }, ref) {
-  if (!tour) return null
-  const bloqueado = !tour.puedeAvanzar
-  const esperaDecision = bloqueado && tour.paso.espera
-  return (
-    <div ref={ref} tabIndex={-1} className="ag-tourbar flp-dark" role="region" aria-label="Recorrido guiado">
-      <div className="min-w-0 flex-1">
-        <span className="flp-kicker text-flp-muted">
-          Recorrido guiado · paso <span className="tnum">{tour.indice + 1}</span> de <span className="tnum">{tour.total}</span>
-        </span>
-        <span className="block text-sm font-medium text-flp-ink">{tour.paso.titulo}</span>
-        <span className="ag-tourbar-nota">{tour.paso.nota}</span>
-        {esperaDecision && (
-          <span id="ag-tour-espera" className="mt-1 flex items-center gap-1 text-xs font-medium text-flp-ink">
-            <IconClock size={13} aria-hidden="true" /> Decide en la tarjeta para continuar.
-          </span>
-        )}
-      </div>
-      <div className="flex flex-none gap-2">
-        <FilmpilotButton variant="ghost" onClick={onSalir}>
-          Salir
-        </FilmpilotButton>
-        {/* aria-disabled y no disabled: el foco se queda en el botón mientras los agentes terminan. */}
-        <FilmpilotButton
-          variant="primary"
-          aria-disabled={bloqueado || undefined}
-          aria-describedby={esperaDecision ? 'ag-tour-espera' : undefined}
-          className={bloqueado ? 'is-bloqueado' : ''}
-          onClick={() => !bloqueado && onSiguiente()}
-        >
-          {tour.ultimo ? 'Terminar' : 'Siguiente'}
-        </FilmpilotButton>
-      </div>
-    </div>
-  )
-})

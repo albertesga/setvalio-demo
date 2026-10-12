@@ -20,14 +20,16 @@ import { detectarIntencion } from '../src/agentes/intenciones.js'
 import { responder } from '../src/agentes/orquestador.js'
 import { ESCENARIOS } from '../src/agentes/escenarios/index.js'
 import { AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, ORDEN_AGENTES, agentesDeFamilia } from '../src/agentes/agentes.js'
-import { CASOS, RECORRIDO, CASO_DE_INTENCION } from '../src/agentes/casos.js'
-import { crearSesion, reducirSesion, estadoTour, conversacionIniciada } from '../src/agentes/sesion.js'
+import { CONVERSACIONES } from '../src/agentes/casos.js'
+import { crearSesion, reducirSesion, conversacionIniciada, EVENTOS, sugerenciasDe, mensajesDe, listaConversaciones, conversacionPara, porLeer } from '../src/agentes/sesion.js'
 import { agendaDelDia, PREGUNTAS_PARTE } from '../src/agentes/escenarios/saludo.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
 import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, SENALES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
-import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER } from '../src/screens/portada/datos.js'
+import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER, AGENTS_PREVIEW as AGENTES_PORTADA } from '../src/screens/portada/datos.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
+import { REGLA_COMUN } from '../src/agentes/escenarios/conversacion.js'
+import { decisionesAbiertas } from '../src/agentes/pendientes.js'
 import { CASHFLOW } from '../src/lib/data.js'
 import { diasEntre } from '../src/agentes/texto.js'
 import { eur } from '../src/lib/format.js'
@@ -129,7 +131,8 @@ const FRASES = [
   ['Ha llegado una factura de Grúas y Cámaras del Sur', 'factura_nueva', { documento: 'F-2026-078' }],
   ['¿Qué gastos tengo que revisar?', 'revisar_gasto'],
   ['revisa el ticket de la ferretería', 'revisar_gasto', { documento: 'G-004' }],
-  ['procesa el G-004', 'revisar_gasto', { documento: 'G-004' }],
+  // Antes de que entre (llega con EV-01), pedir el ticket trae la llegada de esta mañana.
+  ['procesa el G-004', 'factura_nueva', { documento: 'G-004' }],
   ['Pide a Ferretería El Tornillo la factura completa', 'pedir_documentacion', { documento: 'G-004' }],
   ['Pide a Hotel Cristina la documentación que falta', 'pedir_documentacion', { documento: 'F-2026-072' }],
   ['redacta un correo a la gestoría', 'pedir_documentacion', { documento: 'F-2026-069' }],
@@ -147,7 +150,11 @@ const FRASES = [
   ['Activa el Production Rescue', 'fuera_alcance', { motivo: 'fase_posterior' }],
   ['paga la factura de Grúas', 'fuera_alcance', { motivo: 'pagos' }],
   ['haz la transferencia al hotel', 'fuera_alcance', { motivo: 'pagos' }],
-  ['¿qué tiempo hará mañana?', 'no_entendido'],
+  ['¿qué tiempo hará mañana?', 'riesgos', { riesgo: 'RG-1' }],
+  ['Cambia el orden de las jornadas', 'riesgos'],
+  ['¿Qué ha pasado hoy?', 'saludo'],
+  ['¿Cuánto dinero tenemos?', 'prevision'],
+  ['¿Cuánto nos costará al final y llegamos de caja?', 'prevision'],
   ['¿Qué riesgos ves en las próximas jornadas?', 'riesgos'],
   ['¿Va a llover en la jornada 8?', 'riesgos', { riesgo: 'RG-1', jornada: 8 }],
   ['¿Está publicada la orden de rodaje de mañana?', 'riesgos', { riesgo: 'RG-4' }],
@@ -180,6 +187,8 @@ const FRASES = [
   ['', 'no_entendido'],
 ]
 const mundoBase = crearMundo()
+// Con lo de esta mañana ya en la bandeja (EV-01): las dos facturas y el ticket G-004.
+const conLlegada = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-01' })
 for (const [frase, esperada, ent = {}, ctx = {}] of FRASES) {
   test(`«${frase}» → ${esperada}`, () => {
     const det = { ...detectarIntencion(frase, mundoBase, ctx) }
@@ -194,10 +203,11 @@ for (const [frase, esperada, ent = {}, ctx = {}] of FRASES) {
     }
   })
 }
-test('cada caso de uso y cada ejemplo de guion se resuelven a su intención', () => {
-  for (const caso of CASOS) {
-    const r = responder(mundoBase, { tipo: 'texto', texto: caso.prompt })
-    assert.equal(r.turno.caso, caso.id, caso.prompt)
+test('cada conversación abre con su guion y cada ejemplo de guion se resuelve a su intención', () => {
+  const ESPERADA = { parte: 'saludo', facturas: 'factura_nueva', hotel: 'aprobar_oc', lluvia: 'riesgos', horas: 'riesgos', grua: 'riesgos', informe: 'informe_semanal', dossier: 'cumplimiento', itsasoa: 'presupuesto_nuevo' }
+  for (const cv of CONVERSACIONES) assert.equal(responder(mundoBase, cv.apertura).turno.intencion, ESPERADA[cv.id], cv.id)
+  for (const a of Object.values(AGENTES)) {
+    for (const q of a.preguntas ?? []) assert.ok(!['no_entendido', 'desambiguar'].includes(responder(mundoBase, { tipo: 'texto', texto: q }).turno.intencion), `${a.id}: ${q}`)
   }
   for (const e of Object.values(ESCENARIOS)) {
     for (const ej of e.ejemplos) assert.equal(responder(mundoBase, { tipo: 'texto', texto: ej }).turno.intencion, e.id, ej)
@@ -234,8 +244,17 @@ test('el informe semanal cuenta lo que dice data.js', () => {
   cerca(t.cef, TOTALES.cef)
   cerca(t.gastado, TOTALES.gastado + mundoBase.documentos['F-2026-067'].base)
   assert.ok(r.mundo.informes.R1, 'genera el informe')
-  const kpis = r.turno.bloques.find((b) => b.tipo === 'kpis')
-  cerca(kpis.items.find((k) => k.id === 'cef').valor, TOTALES.cef)
+  assert.ok(!r.turno.bloques.some((b) => b.tipo === 'kpis'), 'la hoja del informe ya lleva las cifras')
+  cerca(r.mundo.informes.R1.totales.cef, TOTALES.cef)
+  const doc = responder(r.mundo, { tipo: 'texto', texto: 'Procesa la factura F-2026-067' }).turno.bloques.find((b) => b.tipo === 'documento')
+  assert.equal(doc.conciliacion.resultado, 'ok', 'la factura del informe cuadra con su pedido')
+})
+test('la factura que llega sola (EV-01) cuadra con su pedido y el turno trae resumen', () => {
+  const r = responder(mundoBase, { tipo: 'evento', eventoId: 'EV-01' })
+  const doc = r.turno.bloques.find((b) => b.tipo === 'documento' && b.docId === 'F-2026-078')
+  assert.equal(doc.conciliacion.resultado, 'ok')
+  assert.equal(doc.conciliacion.diferencia, 0)
+  assert.ok(r.turno.resumen, 'resumen para la línea plegada')
 })
 
 // ── 4. Transiciones ──────────────────────────────────────────────────────────
@@ -287,9 +306,11 @@ test('la factura de Grúas casa con OC-101 y no cambia la previsión', () => {
   assert.equal(m.ordenes['OC-101'].estado, 'Facturada')
 })
 test('el ticket en 04.01 (sin margen) sube el CEF; en 05.04 no', () => {
-  const a = reducir(frio, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
+  const llegado = reducir(frio, { tipo: 'evento/recibir', eventoId: 'EV-01' })
+  assert.equal(reducir(frio, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' }), frio, 'antes de llegar no se contabiliza')
+  const a = reducir(llegado, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
   cerca(a.partidas['04.01'].cef, 140_127.44)
-  const b = reducir(frio, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
+  const b = reducir(llegado, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
   cerca(c.totales(b).cef, TOTALES.cef)
 })
 test('ajustar la previsión de 01.03 deja la desviación total en +35.000 €', () => {
@@ -370,17 +391,17 @@ test('las decisiones de cada tarjeta producen un turno válido', () => {
     for (const b of r.turno.bloques.filter((x) => x.tipo === 'aprobacion')) {
       for (const a of b.acciones) {
         const base = r.mundo
+        if (a.entrada) {
+          assert.notEqual(responder(base, a.entrada).turno.intencion, 'no_entendido', `${b.id}/${a.id}`)
+          continue
+        }
+        if (!a.accion) continue
         const res = responder(base, { tipo: 'accion', accion: { ...a.accion, por: 'Prueba' } })
         revisarTurno(res.turno, `${b.id}/${a.id}`)
       }
     }
   }
 })
-test('los casos de uso tienen intención y los del recorrido existen', () => {
-  for (const caso of CASOS) assert.ok(Object.values(CASO_DE_INTENCION).includes(caso.id), caso.id)
-  assert.equal(RECORRIDO.length, 13)
-})
-
 // ── 6. Sesión con reloj falso ────────────────────────────────────────────────
 console.log('Sesión')
 function correr(s, ms = 20_000, paso = 100) {
@@ -400,7 +421,6 @@ test('un turno se reproduce paso a paso y termina con el mismo mundo que el orqu
   assert.equal(msg().estado, 'hecho')
   assert.equal(msg().bloquesVisibles, msg().turno.bloques.length)
   assert.deepEqual(c.totales(s.mundo), c.totales(esperado))
-  assert.ok(s.casosVistos.includes('informe'))
 })
 test('mientras un turno corre, lo siguiente espera en cola', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
@@ -410,19 +430,22 @@ test('mientras un turno corre, lo siguiente espera en cola', () => {
   s = correr(s, 15_000)
   assert.equal(s.mensajes.filter((m) => m.rol === 'agentes' && m.estado === 'hecho').length, 2)
 })
-test('las novedades llegan solas tras empezar la conversación, y se pueden pausar', () => {
+test('la demo es reactiva: ninguna novedad ni historia llega sola', () => {
+  assert.deepEqual(EVENTOS.filter((e) => e.automatico), [])
   let s = crearSesion()
   s = correr(s, 40_000, 500)
   assert.equal(s.mensajes.length, 0, 'sin conversación no llega nada')
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
-  s = correr(s, 15_000, 250)
-  assert.ok(s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-RIESGOS'), 'llega primero el parte de riesgos')
-  s = correr(s, 30_000, 250)
-  assert.ok(s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-01'), 'después, la factura')
-  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'contabilizada')
-  s = reducirSesion(s, { tipo: 'pausarEventos', valor: true })
-  s = correr(s, 90_000, 500)
-  assert.ok(!s.mensajes.some((m) => m.eventoId === 'EV-CITACION' || m.eventoId === 'EV-02'), 'en pausa no llega nada más')
+  s = correr(s, 240_000, 500)
+  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'con la conversación quieta tampoco')
+  assert.ok(!s.mensajes.some((m) => m.rol === 'agentes' && m.origen === 'evento'), 'ninguna conversación se abre sola')
+})
+test('una novedad no llega dos veces aunque se pida durante su turno', () => {
+  let d = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  d = reducirSesion(d, { tipo: 'avanzar', ms: 300 })
+  d = reducirSesion(d, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  d = correr(d, 20_000)
+  assert.equal(d.mensajes.filter((m) => m.rol === 'novedad' && m.eventoId === 'EV-01').length, 1)
 })
 test('aprobar desde la tarjeta y deshacer', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
@@ -440,23 +463,12 @@ test('aprobar desde la tarjeta y deshacer', () => {
   cerca(c.totales(s.mundo).cef, TOTALES.cef)
   assert.equal(s.mundo.ordenes['OC-104'].estado, 'Pendiente', 'vuelve a pendiente, no a «por llegar»')
 })
-test('el recorrido guiado completa los diez pasos y espera la decisión', () => {
-  let s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
-  for (let i = 0; i < RECORRIDO.length; i++) {
-    s = correr(s, 12_000)
-    const et = estadoTour(s)
-    assert.equal(et.indice, i)
-    if (RECORRIDO[i].espera) {
-      assert.equal(et.puedeAvanzar, false, 'espera la decisión')
-      const tarjeta = s.mensajes.filter((m) => m.rol === 'agentes').at(-1).turno.bloques.find((b) => b.tipo === 'aprobacion')
-      s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: tarjeta.acciones.find((a) => a.id === 'rechazar').accion, etiqueta: 'Rechazar' } })
-      s = correr(s, 8_000)
-    }
-    assert.equal(estadoTour(s).puedeAvanzar, true, `paso ${i + 1}`)
-    s = reducirSesion(s, { tipo: 'tour/siguiente' })
-  }
-  assert.equal(s.tour, null)
-  for (const caso of CASOS) assert.ok(s.casosVistos.includes(caso.id), `visto ${caso.id}`)
+test('las sugerencias de «La última función» no saltan a Itsasoa', () => {
+  let l = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' } })
+  l = correr(l, 12_000)
+  const sug = sugerenciasDe(l)
+  assert.ok(sug.length > 0 && sug.length <= 3)
+  for (const x of sug) assert.ok(!['presupuesto_nuevo', 'anadir_coste', 'optimizar_proveedores'].includes(responder(l.mundo, x.entrada ?? { tipo: 'texto', texto: x.texto }).turno.intencion), x.texto)
 })
 test('el personaje sin permiso no puede decidir y la sesión lo anota', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'persona', persona: 'alvaro' })
@@ -476,7 +488,7 @@ test('una orden pedida a producción ejecutiva sigue abierta y Marta la puede ap
   assert.equal(c.estadoDecision(m, { tipo: 'orden', id: 'OC-104' }).estado, 'aprobada')
 })
 test('dejar un gasto en revisión no lo bloquea: se puede contabilizar después', () => {
-  let m = reducir(mundoBase, { tipo: 'documento/aplazar', docId: 'G-004' })
+  let m = reducir(conLlegada, { tipo: 'documento/aplazar', docId: 'G-004' })
   assert.equal(c.estadoDecision(m, { tipo: 'documento', id: 'G-004' }).estado, 'pendiente')
   m = reducir(m, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
   assert.equal(m.documentos['G-004'].estado, 'contabilizada')
@@ -504,12 +516,12 @@ test('no se pide documentación de una factura que casa con su pedido', () => {
   assert.equal(Object.keys(r.mundo.borradores).length, 0)
 })
 test('el ticket ya contabilizado sigue pudiendo pedir su factura completa', () => {
-  const m = reducir(mundoBase, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
+  const m = reducir(conLlegada, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
   const r = responder(m, { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' })
   assert.ok(r.mundo.borradores['BOR-G-004'])
 })
 test('la salida de Previsión tras contabilizar el ticket coincide con la partida', () => {
-  const r = responder(mundoBase, { tipo: 'accion', accion: { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01', por: 'Marta Cobo' } })
+  const r = responder(conLlegada, { tipo: 'accion', accion: { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01', por: 'Marta Cobo' } })
   const salida = renderTexto(r.turno.pasos.find((p) => p.agente === 'prevision').salida)
   assert.match(salida, /\+127\s€/)
 })
@@ -522,7 +534,8 @@ test('una novedad no llega dos veces', () => {
   assert.equal(s.mensajes.length, n)
 })
 test('deshacer conserva el borrador redactado después', () => {
-  let s = crearSesion()
+  let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  s = correr(s, 20_000)
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/aprobar', ocId: 'OC-106' }, etiqueta: 'Aprobar OC-106' } })
   s = correr(s, 6_000)
   const decision = s.mensajes.filter((m) => m.rol === 'agentes').at(-1)
@@ -617,7 +630,7 @@ test('cifras de los riesgos y severidad inicial', () => {
   cerca(r['RG-5'].reserva, 6_333)
   assert.equal(r['RG-3'].exposicion, null)
   assert.deepEqual(evaluarRiesgos(mundoBase).filter((x) => x.severidad === 'alta').map((x) => x.id), ['RG-1'])
-  assert.deepEqual(decisionesRiesgos(mundoBase).map((d) => d.ref.id), ['RG-1', 'RG-5'])
+  assert.deepEqual(decisionesRiesgos(mundoBase).map((d) => d.ref.id), ['RG-1', 'RG-7', 'RG-5'])
 })
 test('reservar RG-1: sube el CEF sin tocar capítulos ni caja, y el neto cuadra', () => {
   const m = reducir(frio, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880, por: 'Marta Cobo' })
@@ -668,7 +681,7 @@ test('acciones de riesgo que no proceden devuelven el mismo mundo', () => {
   assert.equal(reducir(frio, { tipo: 'riesgo/mitigar', riesgoId: 'RG-3' }), frio)
   assert.equal(reducir(frio, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 0 }), frio)
 })
-test('borradores y radar sin cifras escritas a mano; turnos con «Exploratorio» y sin envíos', () => {
+test('borradores y radar sin cifras escritas a mano; turnos «En exploración» y sin envíos', () => {
   const mundos = [mundoBase]
   let m = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-LLUVIA' })
   m = reducir(m, { tipo: 'evento/recibir', eventoId: 'EV-CITACION' })
@@ -681,6 +694,7 @@ test('borradores y radar sin cifras escritas a mano; turnos con «Exploratorio»
     revisarTurno(r.turno, texto)
     assert.equal(r.turno.bloques[0].tipo, 'aviso', `${texto}: empieza con el aviso`)
     assert.equal(r.turno.bloques[0].tono, 'exploratorio')
+    assert.match(renderTexto(r.turno.bloques[0].texto), /^En exploración/)
     assert.ok(r.turno.noHecho.some((n) => /No ha enviado/.test(renderTexto(n))))
     for (const b of Object.values(r.mundo.borradores)) for (const p of plantillas(b)) assert.ok(!/\d/.test(p.plantilla), `borrador: «${p.plantilla}»`)
   }
@@ -717,9 +731,11 @@ test('con una reserva aprobada, la tarjeta nueva enseña el coste final que de v
   const tj = r.turno.bloques.find((b) => b.tipo === 'aprobacion')
   const fila = (txt) => tj.impacto.find((f) => f.etiqueta.startsWith(txt))
   const tras = (accion) => c.totales(reducir(m, accion)).cef
-  cerca(fila('Reservar').despues, tras(tj.acciones.find((a) => a.id === 'reservar').accion))
+  cerca(fila('Apartar').despues, tras(tj.acciones.find((a) => a.id === 'reservar').accion))
   cerca(fila('Cambiar').despues, tras(tj.acciones.find((a) => a.id === 'aprobar').accion))
   cerca(fila('Asumir').despues, tras(tj.acciones.find((a) => a.id === 'rechazar').accion))
+  for (const f of tj.impacto) cerca(c.totales(m).cef + f.cambio, f.despues, f.etiqueta)
+  assert.ok(tj.acciones.every((a) => a.burbuja), 'cada botón dice qué contesta')
 })
 test('la tarjeta del parte caduca cuando cambia la previsión y no deja volver a un importe antiguo', () => {
   const parte = responder(mundoBase, { tipo: 'texto', texto: '¿Qué riesgos hay para las próximas jornadas?' })
@@ -757,7 +773,7 @@ test('tras cambiar el orden, RG-1 sigue hablando de la jornada 8 y dice que est�
   assert.deepEqual(r.jornadas, [8])
   assert.match(renderTexto(r.respuesta), /Orden cambiado/)
   const txt = responder(reducir(mundoBase, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880 }), { tipo: 'accion', accion: { tipo: 'riesgo/mitigar', riesgoId: 'RG-1', opcion: 'permutar', por: 'Prueba' } })
-  assert.match(txt.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /Se libera la reserva/)
+  assert.match(txt.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /Se libera lo apartado/)
 })
 test('el informe se desactualiza con reservas o riesgos altos nuevos, y las desviaciones nombran la reserva', () => {
   let m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
@@ -767,11 +783,11 @@ test('el informe se desactualiza con reservas o riesgos altos nuevos, y las desv
   const citacion = reducir(m, { tipo: 'evento/recibir', eventoId: 'EV-CITACION' })
   assert.equal(c.informeDesactualizado(citacion, 'R1'), true)
   const d = responder(conReserva, { tipo: 'texto', texto: '¿Qué capítulos están fuera de rango?' })
-  assert.match(d.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /reservas de riesgos/)
+  assert.match(d.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' '), /apartados por riesgos/)
 })
 test('preguntas por jornadas: la que tiene riesgo, una sin riesgo, una ya rodada y una fuera del plan', () => {
   const sin = responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 19?' })
-  assert.match(renderTexto(sin.turno.bloques.find((b) => b.tipo === 'texto').texto), /Jornada 19.*No veo riesgos/)
+  assert.match(renderTexto(sin.turno.bloques.find((b) => b.tipo === 'texto').texto), /Jornada 19.*No vemos riesgos/)
   const hecha = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 4?' }, { ultimaIntencion: 'riesgos' })
   assert.match(renderTexto(hecha.turno.bloques.find((b) => b.tipo === 'texto').texto), /ya se rodó/)
   const fuera = responder(mundoBase, { tipo: 'texto', texto: '¿Qué pasa con la jornada 25?' }, { ultimaIntencion: 'riesgos' })
@@ -828,6 +844,12 @@ test('la portada cuenta el día y el plan de rodaje del mundo de los agentes', (
   assert.equal(FLOW.find((f) => f.number === '05').value, `${c.dossier(m).length} bloqueantes`)
   assert.equal(DOSSIER.length, c.dossier(m).length)
 })
+test('la portada cuenta los documentos que lee Facturas en el informe', () => {
+  const r = responder(crearMundo(), { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' })
+  const n = Number(renderTexto(r.turno.pasos.find((p) => p.agente === 'facturas').titulo).match(/\d+/)[0])
+  const PALABRA = { 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco' }
+  assert.ok(AGENTES_PORTADA.some((a) => a.tarea === `Lee los ${PALABRA[n]} documentos de la bandeja`), `la portada debe decir ${PALABRA[n]}`)
+})
 test('la portada enseña las cifras del agente de riesgos', () => {
   const src = readFileSync(new URL('../src/screens/Landing.jsx', import.meta.url), 'utf8')
   const rs = evaluarRiesgos(crearMundo())
@@ -860,7 +882,7 @@ test('saludar abre la conversación con el parte, una sola vez, y se reproduce c
   assert.equal(inst.mensajes[0].estado, 'hecho')
   assert.equal(inst.activo, null)
 })
-test('el parte no cuenta como conversación: las novedades esperan a que pidas algo', () => {
+test('el parte no cuenta como conversación y nada llega solo', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'saludar' })
   s = correr(s, 60_000, 500)
   assert.equal(s.mensajes.length, 1, 'solo el parte')
@@ -868,14 +890,9 @@ test('el parte no cuenta como conversación: las novedades esperan a que pidas a
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
   s = correr(s, 30_000, 250)
   assert.ok(conversacionIniciada(s))
-  assert.ok(s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-01'), 'la primera novedad es la factura')
-  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-RIESGOS'))
+  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'tampoco después: todo llega porque lo pides')
 })
-test('el recorrido empieza con el parte ya leído y Álvaro recibe su propio saludo', () => {
-  const s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
-  assert.equal(s.mensajes[0].origen, 'saludo')
-  assert.equal(s.mensajes[0].estado, 'hecho')
-  assert.equal(s.mensajes[1].rol, 'guia')
+test('Álvaro recibe su propio saludo', () => {
   const a = reducirSesion(crearSesion({ persona: 'alvaro' }), { tipo: 'saludar' })
   assert.equal(a.mensajes[0].turno.entidades.persona, 'alvaro')
 })
@@ -884,32 +901,38 @@ test('el parte cuenta el día 7 de 20 con las cifras del mundo', () => {
   revisarTurno(r.turno, 'parte de la mañana')
   const lead = r.turno.bloques.find((b) => b.tipo === 'texto' && b.destacado)
   const txt = textoDe(lead)
-  assert.match(txt, /jornada 7 en Madrid centro/)
-  assert.match(txt, /van 6 de 20/)
+  assert.match(txt, /Hoy se rueda en Madrid centro/)
   assert.match(txt, /viernes 19 de junio/)
   assert.ok(txt.includes(eur(TOTALES.cef)), 'coste estimado final')
-  assert.match(txt, /solo Escenografía pasa del umbral/)
+  assert.match(txt, /solo Escenografía se pasa del límite/)
   assert.match(txt, /jornada 8 de mañana, un exterior con un 80\s%/)
-  const kpis = Object.fromEntries(r.turno.bloques.find((b) => b.tipo === 'kpis').items.map((k) => [k.id, k.valor]))
-  cerca(kpis.cef, TOTALES.cef)
-  cerca(kpis.gastado, TOTALES.gastado)
-  cerca(kpis.caja, SALDO_HOY)
-  assert.equal(kpis.revisar, 8)
-  for (const tipo of ['tira', 'agenda', 'equipo']) assert.ok(r.turno.bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
-  assert.ok(!r.turno.bloques.some((b) => b.tipo === 'semana'), 'sin la semana: la tira ya la enseña')
+  const bloques = r.turno.bloques
+  const kpis = bloques.find((b) => b.tipo === 'kpis')
+  assert.deepEqual(kpis.items.map((k) => k.id), ['cef', 'caja'], 'dos cifras: coste final y caja')
+  cerca(kpis.items[0].valor, TOTALES.cef)
+  cerca(kpis.items[1].valor, SALDO_HOY)
+  assert.equal(bloques[0], lead, 'el parte abre con la entradilla')
+  for (const tipo of ['hecho', 'agenda', 'tira']) assert.ok(bloques.some((b) => b.tipo === tipo), `bloque ${tipo}`)
+  for (const tipo of ['bienvenida', 'equipo', 'semana']) assert.ok(!bloques.some((b) => b.tipo === tipo), `sin bloque ${tipo}`)
+  const hecho = bloques.find((b) => b.tipo === 'hecho')
+  assert.ok(hecho.items.length <= 3)
+  assert.match(renderTexto(hecho.items[0].texto), /contabilizó 5 facturas que cuadran con su pedido · 76\.958\s€/)
+  assert.deepEqual(r.turno.sugerencias, [], 'el parte no lleva preguntas de cierre')
+  const vistos = JSON.stringify(bloques.map((b) => (b.tipo === 'agenda' ? b.items.map((i) => i.capacidad) : b)))
+  assert.equal((vistos.match(/exploratoria|En exploración/g) ?? []).length, 1, '«En exploración» una sola vez, en la lluvia')
 })
-test('«Para hoy»: lluvia de mañana, avisos, compras y certificado, en ese orden', () => {
+test('«Para hoy»: lluvia de mañana, compras y certificado; los avisos, aparte', () => {
   const ag = agendaDelDia(mundoBase)
-  assert.deepEqual(ag.items.map((i) => i.id), ['riesgo-RG-1', 'avisos', 'compras', 'dossier-DOS-01'])
-  assert.deepEqual(ag.items[1].subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
-  assert.deepEqual(ag.items[2].subitems.map((s) => s.id), ['OC-105', 'OC-106'])
-  assert.match(renderTexto(ag.items[0].cuando), /antes de publicar su orden del día/)
-  assert.match(renderTexto(ag.items[3].detalle), /620\.000\s€/)
-  assert.equal(ag.resto, 5)
+  assert.deepEqual(ag.items.map((i) => i.id), ['riesgo-RG-1', 'compras', 'dossier-DOS-01'])
+  assert.deepEqual(ag.items[1].subitems.map((s) => s.id), ['OC-105', 'OC-106'])
+  assert.deepEqual(ag.avisos.subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
+  assert.match(renderTexto(ag.items[0].cuando), /antes de publicar la orden del día de mañana/)
+  assert.match(renderTexto(ag.items[2].detalle), /620\.000\s€/)
+  assert.equal(ag.resto, 5, 'decisiones que no caben en «Para hoy» (con la grúa); los avisos no cuentan (el ticket aún no ha llegado)')
 })
 test('cada botón del parte lleva a un guion que lo resuelve', () => {
   const ag = agendaDelDia(mundoBase)
-  const entradas = ag.items.flatMap((i) => [...(i.acciones ?? []).map((a) => a.entrada), ...(i.subitems ?? []).map((s) => s.entrada), i.entrada])
+  const entradas = [...ag.items.flatMap((i) => [...(i.acciones ?? []).map((a) => a.entrada), ...(i.subitems ?? []).map((s) => s.entrada), i.entrada]), ...(ag.avisos?.subitems ?? []).map((s) => s.entrada)].filter(Boolean)
   for (const e of [...new Set(entradas), ...Object.values(PREGUNTAS_PARTE), '¿Qué tengo que revisar?']) {
     const r = responder(mundoBase, { tipo: 'texto', texto: e })
     assert.ok(!['no_entendido', 'desambiguar'].includes(r.turno.intencion), `${e} → ${r.turno.intencion}`)
@@ -923,12 +946,326 @@ test('lo decidido sale de «Para hoy» y el parte se rehace con lo que queda', (
   m = reducir(m, { tipo: 'orden/rechazar', ocId: 'OC-106', por: 'Marta Cobo' })
   const ag = agendaDelDia(m)
   assert.ok(!ag.items.some((i) => i.id === 'riesgo-RG-1' || i.id === 'compras'))
-  assert.equal(ag.items[0].id, 'avisos')
+  assert.deepEqual(ag.items.map((i) => i.id), ['dossier-DOS-01'])
+  assert.ok(ag.avisos, 'los avisos siguen aparte')
   const r = responder(m, { tipo: 'texto', texto: 'Ponme al día' })
   revisarTurno(r.turno, 'parte pedido')
   assert.equal(r.turno.intencion, 'saludo')
   assert.match(textoDe(r.turno.bloques[0]), /El parte del día 7 de rodaje/)
-  assert.match(textoDe(r.turno.bloques.find((b) => b.destacado)), /Lo primero hoy: preparar 3 avisos/)
+  assert.match(textoDe(r.turno.bloques.find((b) => b.destacado)), /Lo primero hoy: tener listo el certificado cultural ICAA, que vence el viernes 5 de junio/)
+})
+
+// ── 12. Vocabulario y casos simplificados ────────────────────────────────────
+console.log('Vocabulario y casos')
+function textosVisibles(x, out = []) {
+  if (Array.isArray(x)) x.forEach((y) => textosVisibles(y, out))
+  else if (esPlantilla(x)) out.push(renderTexto(x))
+  else if (typeof x === 'string') out.push(x)
+  else if (x && typeof x === 'object') Object.values(x).forEach((y) => textosVisibles(y, out))
+  return out
+}
+// Valores internos que no se enseñan (tono del aviso, id del estado del informe).
+const INTERNOS = new Set(['exploratorio', 'exploratoria', 'consolidado'])
+const PALABRAS_VIEJAS = /umbral|consolidad|Exploratorio|Sin validar|Fase posterior/i
+test('ningún turno enseña «umbral», «consolidado», «Exploratorio», «Sin validar» ni «Fase posterior»', () => {
+  let avanzado = mundoBase
+  for (const a of [{ tipo: 'evento/recibir', eventoId: 'EV-01' }, { tipo: 'evento/recibir', eventoId: 'EV-02' }, { tipo: 'documento/contabilizar', docId: 'G-004' }, { tipo: 'informe/generar' }]) avanzado = reducir(avanzado, a)
+  const malos = []
+  const revisar = (tu, origen) => {
+    for (const s of textosVisibles([tu.titulo, tu.pasos.map((p) => [p.titulo, p.salida]), tu.bloques, tu.reglas, tu.noHecho, tu.sugerencias, tu.resumen])) {
+      if (!INTERNOS.has(s) && PALABRAS_VIEJAS.test(s)) malos.push(`${origen}: ${s}`)
+    }
+  }
+  for (const m of [mundoBase, avanzado]) {
+    for (const [id, esc] of Object.entries(ESCENARIOS)) for (const texto of esc.ejemplos ?? []) revisar(responder(m, { tipo: 'texto', texto }).turno, `${id} · ${texto}`)
+  }
+  for (const e of ['EV-01', 'EV-02', 'EV-03', 'EV-LLUVIA', 'EV-CITACION']) revisar(responder(mundoBase, { tipo: 'evento', eventoId: e }).turno, e)
+  revisar(responder(mundoBase, { tipo: 'saludo', persona: 'marta' }).turno, 'parte')
+  assert.deepEqual([...new Set(malos)], [])
+})
+test('compras: la prosa nombra el cargo con artículo, sin tabla y cada botón dice qué contesta', () => {
+  const m = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-02' })
+  for (const texto of ['Revisa la orden de compra OC-104', 'Revisa la orden de compra OC-105', '¿Qué órdenes de compra tengo pendientes?']) {
+    const r = responder(m, { tipo: 'texto', texto })
+    const prosa = r.turno.bloques.filter((b) => b.tipo === 'texto').map((b) => renderTexto(b.texto)).join(' ')
+    assert.ok(!/(la aprueba|visto bueno de) (Producción|Line)|de line producer/.test(prosa), `${texto}: ${prosa}`)
+    assert.ok(!r.turno.bloques.some((b) => b.tipo === 'tabla'), `${texto}: sin tabla`)
+    for (const tj of r.turno.bloques.filter((b) => b.tipo === 'aprobacion')) {
+      assert.ok(tj.acciones.filter((a) => a.accion).every((a) => a.burbuja), `${tj.id}: burbuja`)
+      if (texto.startsWith('Revisa')) assert.equal(tj.motivos?.length ?? 0, 0, `${tj.id}: la frase de encima ya da los motivos`)
+    }
+  }
+})
+test('Itsasoa es otro proyecto: el turno lo nombra y ofrece volver a La última función', () => {
+  for (const texto of ['Ayúdame a preparar la primera propuesta de presupuesto de Itsasoa', 'Optimiza los proveedores de la propuesta', 'Añade 2 jornadas de dron con Dron Services Madrid por 3.200 €']) {
+    const r = responder(mundoBase, { tipo: 'texto', texto })
+    assert.equal(r.turno.proyecto?.titulo, 'Itsasoa', texto)
+    assert.ok(r.turno.sugerencias.some((s) => s.etiqueta === 'Volver a La última función'), `${texto}: volver`)
+  }
+  const o = responder(mundoBase, { tipo: 'texto', texto: 'Optimiza los proveedores de la propuesta' })
+  const ap = o.turno.bloques.find((b) => b.tipo === 'aprobacion')
+  assert.ok(textosVisibles(ap).some((s) => s.includes(REGLA_COMUN)), 'la tarjeta de llamadas recuerda la regla común')
+})
+test('la interfaz no enseña el vocabulario retirado', () => {
+  const dir = new URL('../src/agentes/ui/', import.meta.url)
+  const VIEJOS = ['Fuera de umbral', 'Cerca del umbral', 'Consolidada', 'Exploratorio', 'Sin validar', 'Fase posterior', 'Descargar (no disponible', 'como se explica más arriba']
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.jsx'))) {
+    const src = readFileSync(new URL(f, dir), 'utf8')
+    for (const v of VIEJOS) assert.ok(!src.includes(v), `${f}: «${v}»`)
+  }
+})
+
+// ── 13. Regresiones de la revisión final ─────────────────────────────────────
+console.log('Revisión final')
+const avanza = (s, ms, paso = 50) => {
+  for (let t = 0; t < ms; t += paso) s = reducirSesion(s, { tipo: 'avanzar', ms: paso })
+  return s
+}
+test('detener una novedad antes de recibirla deja volver a pedirla y su historia sigue sin ver', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
+  s = avanza(s, 400)
+  s = reducirSesion(s, { tipo: 'detener' })
+  assert.equal(s.mundo.ordenes['OC-104'].estado, 'Por llegar')
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
+  s = avanza(s, 20_000, 100)
+  assert.equal(s.mundo.ordenes['OC-104'].estado, 'Pendiente', 'la novedad llega al volver a pedirla')
+})
+test('detener un turno que ya cambió el mundo invalida el deshacer anterior', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/rechazar', ocId: 'OC-105' }, etiqueta: 'Rechazo OC-105' } })
+  s = avanza(s, 10_000, 100)
+  assert.ok(s.ultimaMutacion)
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/aprobar', ocId: 'OC-106' }, etiqueta: 'Apruebo OC-106' } })
+  const msg = () => s.mensajes.filter((m) => m.rol === 'agentes').at(-1)
+  while (msg().estado === 'en_curso' && !msg().estadoPasos.some((e, i) => e === 'hecho' && msg().turno.pasos[i].acciones.some((a) => a.tipo === 'orden/aprobar'))) s = reducirSesion(s, { tipo: 'avanzar', ms: 50 })
+  assert.equal(msg().estado, 'en_curso', 'se detiene a medias, con la aprobación ya registrada')
+  s = reducirSesion(s, { tipo: 'detener' })
+  assert.equal(s.ultimaMutacion, null, 'no se puede deshacer lo anterior sin revertir lo detenido')
+})
+test('«Ya hecho» solo cuenta lo que Conciliación contabilizó sola con su pedido', () => {
+  let m = reducir(conLlegada, { tipo: 'documento/contabilizar', docId: 'G-004', partida: mundoBase.documentos['G-004'].partida, por: 'Marta Cobo' })
+  m = reducir(m, { tipo: 'documento/contabilizar', docId: 'F-2026-069', por: 'Marta Cobo' })
+  const h = responder(m, { tipo: 'texto', texto: 'Ponme al día' }).turno.bloques.find((b) => b.tipo === 'hecho')
+  assert.match(renderTexto(h.items[0].texto), /contabilizó 5 facturas/)
+})
+test('deshacer lo que contabilizó Conciliación sola lo deja para que lo revises tú', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  s = avanza(s, 20_000, 100)
+  const antes = decisionesAbiertas(s.mundo).length
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: s.mensajes.filter((m) => m.rol === 'agentes').at(-1).id })
+  for (const id of ['F-2026-078', 'F-2026-079']) assert.equal(s.mundo.documentos[id].estado, 'en_bandeja', id)
+  assert.equal(decisionesAbiertas(s.mundo).length, antes + 2, 'las dos entran en «Por revisar»')
+  assert.match(s.mensajes.at(-1).texto, /F-2026-078 y F-2026-079 quedan en la bandeja para que las revises tú/)
+  const hoy = responder(s.mundo, { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' })
+  assert.ok(hoy.turno.bloques.some((b) => b.tipo === 'llegadas'), 'cuenta cómo han llegado')
+  assert.equal(hoy.turno.bloques.find((b) => b.tipo === 'acciones').acciones.length, 3, 'un botón por cada una que espera')
+  const r = responder(s.mundo, { tipo: 'texto', texto: 'Procesa la factura F-2026-078' })
+  assert.ok(r.turno.bloques.some((b) => b.tipo === 'aprobacion' && b.ref.id === 'F-2026-078'), 'trae su tarjeta')
+  assert.equal(r.mundo.documentos['F-2026-078'].estado, 'en_bandeja', 'no la vuelve a contabilizar sola')
+  const inf = responder(s.mundo, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' })
+  assert.equal(inf.mundo.documentos['F-2026-078'].estado, 'en_bandeja', 'el informe tampoco')
+})
+test('el informe por aprobar cuenta en «Por revisar» y «Dejar en revisión» no se repite', () => {
+  const m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
+  assert.ok(decisionesAbiertas(m).some((d) => d.ref.tipo === 'informe'))
+  const aplazado = reducir(conLlegada, { tipo: 'documento/aplazar', docId: 'G-004', por: 'Marta Cobo' })
+  const tj = responder(aplazado, { tipo: 'texto', texto: '¿Qué gastos tengo que revisar?' }).turno.bloques.find((b) => b.tipo === 'aprobacion')
+  assert.ok(!tj.acciones.some((a) => a.id === 'aplazar'))
+})
+test('deshacer guarda qué decisión vuelve a estar abierta', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/rechazar', ocId: 'OC-105' }, etiqueta: 'Rechazo OC-105' } })
+  s = avanza(s, 10_000, 100)
+  const id = s.ultimaMutacion.mensajeId
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: id })
+  assert.deepEqual(s.mensajes.find((m) => m.id === id).deshechoRefs, [{ tipo: 'orden', id: 'OC-105' }])
+})
+
+// ── 14. Lo que se pide ───────────────────────────────────────────────────────
+console.log('Lo que se pide')
+test('lo que se pide nunca lleva la marca de «llegó sola»', () => {
+  let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
+  s = avanza(s, 60_000, 250)
+  assert.ok(!s.mensajes.some((m) => m.llegoSola), 'nada llega solo')
+  const p = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
+  assert.equal(p.mensajes.find((m) => m.rol === 'agentes').llegoSola, false, 'la pedida no se pliega')
+})
+
+// ── 15. La grúa de la jornada 17 (RG-7) ──────────────────────────────────────
+console.log('Grúa de la jornada 17')
+test('la grúa es el alquiler diario más caro y sus cifras salen de los datos', () => {
+  const r = riesgoDe(mundoBase, 'RG-7')
+  const g = SENALES.grua
+  const tarifa = mundoBase.ordenes[g.oc].importe / g.diasFactura
+  // Los alquileres por semana de la semana 1 (cámara, eléctrico, camiones) salen a menos por día.
+  for (const id of ['F-2026-052', 'F-2026-053', 'F-2026-061']) assert.ok(mundoBase.documentos[id].base / 5 < tarifa, id)
+  const alargadas = HECHAS.filter((h) => h.ampliada || g && SENALES.noches.anteriores.includes(h.n)).length
+  cerca(r.probabilidad, alargadas / HECHAS.length)
+  const exp = Math.round((g.horas / g.horasJornada) * (CASHFLOW.find((s) => s.semana === 'Rodaje 4').pagos / 5) + tarifa)
+  assert.equal(r.exposicion, exp)
+  assert.equal(r.reserva, Math.round(r.probabilidad * exp))
+  assert.equal(r.severidad, 'media')
+  assert.deepEqual(r.jornadas, [g.jornada])
+})
+test('montar la grúa la víspera cabe en 06.02, la deja controlada y no se repite', () => {
+  const m = reducir(mundoBase, { tipo: 'riesgo/mitigar', riesgoId: 'RG-7', opcion: 'premontar', por: 'Prueba' })
+  cerca(c.totales(m).cef, TOTALES.cef)
+  assert.equal(riesgoDe(m, 'RG-7').severidad, 'controlado')
+  assert.equal(reducir(m, { tipo: 'riesgo/mitigar', riesgoId: 'RG-7', opcion: 'premontar' }), m)
+  assert.match(renderTexto(riesgoDe(m, 'RG-7').respuesta), /quedan 8 horas de grúa/)
+})
+test('la conversación de la grúa trae lo revisado, el plan B y una tarjeta con tres opciones', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: PREGUNTA['RG-7'] })
+  revisarTurno(r.turno, 'grúa')
+  assert.equal(r.turno.entidades.riesgo, 'RG-7')
+  assert.ok(r.turno.bloques.some((b) => b.tipo === 'lista' && b.titulo === 'Plan B por recurso'))
+  const tj = r.turno.bloques.find((b) => b.tipo === 'aprobacion')
+  assert.deepEqual(tj.acciones.map((a) => a.id), ['aprobar', 'reservar', 'rechazar'])
+  for (const f of tj.impacto) cerca(c.totales(mundoBase).cef + f.cambio, f.despues, f.etiqueta)
+})
+test('la grúa como riesgo no le quita sus frases a proveedores ni a facturas', () => {
+  const de = (texto, m = mundoBase) => responder(m, { tipo: 'texto', texto })
+  for (const texto of ['¿Qué pasa si falla la grúa de la jornada 17?', 'Plan B si falla la grúa', '¿Llega a tiempo la Technocrane?', '¿Cuál es el recurso más caro?', 'Necesito una grúa de respaldo']) {
+    for (const m of [mundoBase, conLlegada]) {
+      const r = de(texto, m)
+      assert.equal(r.turno.intencion, 'riesgos', texto)
+      assert.equal(r.turno.entidades.riesgo, 'RG-7', texto)
+    }
+  }
+  assert.equal(de('¿hay mejores precios para la grúa?').turno.intencion, 'optimizar_proveedores')
+  assert.equal(de('Ha llegado una factura de Grúas y Cámaras del Sur').turno.intencion, 'factura_nueva')
+})
+test('preguntar por un riesgo en una jornada que tiene otro dice cuál tiene', () => {
+  const txt = renderTexto(responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 13?' }).turno.bloques.find((b) => b.tipo === 'texto').texto)
+  assert.ok(!/No vemos riesgos/.test(txt), txt)
+  assert.match(txt, /permiso de vía pública/)
+})
+
+// ── 16. El dossier fiscal al día ─────────────────────────────────────────────
+console.log('Dossier fiscal al día')
+test('el dossier propone sus pasos y los borradores nunca se envían', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: '¿Cómo va la adecuación fiscal?' })
+  assert.equal(r.turno.intencion, 'cumplimiento')
+  const pasos = r.turno.bloques.find((b) => b.tipo === 'pasos')
+  assert.deepEqual(pasos.items.slice(0, 2).map((i) => i.id), ['DOS-01', 'DOS-02'])
+  for (const i of pasos.items.filter((x) => x.entrada)) assert.notEqual(responder(mundoBase, { tipo: 'texto', texto: i.entrada }).turno.intencion, 'no_entendido', i.entrada)
+  for (const [texto, id] of [['Prepara la solicitud del certificado cultural al ICAA', 'BOR-DOS-01'], ['Pide a administración los justificantes de pago', 'BOR-DOS-02']]) {
+    const x = responder(mundoBase, { tipo: 'texto', texto })
+    revisarTurno(x.turno, texto)
+    assert.equal(x.turno.intencion, 'cumplimiento', texto)
+    assert.equal(x.mundo.borradores[id].estado, 'borrador', 'queda en borrador: no se envía')
+    for (const p of plantillas(x.mundo.borradores[id])) assert.ok(!/\d/.test(p.plantilla), `borrador: «${p.plantilla}»`)
+    assert.equal(c.dossier(x.mundo).length, 3, 'el dossier sigue con sus tres bloqueantes')
+    assert.match(c.dossier(x.mundo).find((d) => `BOR-${d.id}` === id).evidencia, /preparada, sin enviar/)
+  }
+})
+test('los justificantes que faltan salen de las facturas contabilizadas sin pago', () => {
+  const dos2 = c.dossier(mundoBase).find((d) => d.id === 'DOS-02')
+  assert.equal(dos2.pendientes, Object.values(mundoBase.documentos).filter((d) => d.estado === 'contabilizada' && d.pago === 'pendiente').length)
+  const x = responder(mundoBase, { tipo: 'texto', texto: 'Pide a administración los justificantes de pago' })
+  assert.equal(x.mundo.borradores['BOR-DOS-02'].cuerpo.length, 3 + dos2.pendientes, 'una línea por factura')
+})
+test('un paso del dossier solo se prepara con verbo; preguntar por el plazo solo lee', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: '¿cuándo vence el certificado cultural?' })
+  assert.equal(r.turno.entidades.dossierPaso, undefined)
+  assert.equal(Object.keys(r.mundo.borradores).length, 0)
+})
+
+// ── 17. Conversaciones ───────────────────────────────────────────────────────
+console.log('Conversaciones')
+const iniciada = () => reducirSesion(crearSesion(), { tipo: 'conversaciones/iniciar' })
+test('al abrir, cada conversación trae ya el mensaje de su agente, sin burbuja ni novedad', () => {
+  const s = iniciada()
+  assert.equal(reducirSesion(s, { tipo: 'conversaciones/iniciar' }), s, 'idempotente')
+  assert.deepEqual(Object.keys(s.conversaciones).sort(), CONVERSACIONES.map((c) => c.id).sort())
+  for (const c of CONVERSACIONES) {
+    const ms = mensajesDe(s, c.id)
+    assert.deepEqual(ms.map((m) => m.rol), ['agentes'], c.id)
+    assert.equal(ms[0].estado, 'hecho', c.id)
+    assert.ok(ms[0].apertura, c.id)
+    assert.equal(ms[0].hora, c.hora, c.id)
+    revisarTurno(ms[0].turno, `apertura ${c.id}`)
+  }
+  assert.equal(s.actual, 'parte')
+  assert.equal(c.informeDesactualizado(s.mundo, 'R1'), false, 'el informe se escribe después de las facturas')
+  assert.equal(s.mensajes.find((m) => m.id === s.ultimaMutacion?.mensajeId)?.conv, 'facturas', 'se puede deshacer lo de facturas')
+  assert.equal(conversacionIniciada(s), false, 'lo ya escrito no cuenta como conversación')
+  const lista = listaConversaciones(s)
+  assert.equal(lista[0].id, 'parte', 'la más reciente arriba')
+  assert.ok(lista.filter((x) => x.id !== 'parte').every((x) => x.noLeida), 'las demás, sin leer')
+})
+test('el número de la lista son los mensajes sin leer y desaparece al ver la conversación', () => {
+  let s = iniciada()
+  // En el móvil se empieza por la lista: ninguna se está viendo y todas tienen su mensaje por leer.
+  assert.ok(listaConversaciones(s, null).every((x) => x.sinLeer === 1), 'una por conversación, el parte incluido')
+  assert.equal(listaConversaciones(s).find((x) => x.id === 'parte').sinLeer, 0, 'la que se ve no cuenta')
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'grua' })
+  assert.equal(porLeer(s, 'grua'), 0, 'abrirla la deja leída')
+  assert.equal(porLeer(s, 'parte'), 1, 'el parte no se vio: sigue por leer')
+  s = reducirSesion(s, { tipo: 'conversacion/leida', id: 'parte' })
+  assert.equal(porLeer(s, 'parte'), 0)
+  assert.equal(reducirSesion(s, { tipo: 'conversacion/leida', id: 'parte' }), s, 'leída dos veces no cambia nada')
+  // Lo que escribes tú no cuenta como por leer; la respuesta, sí.
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué órdenes de compra tengo pendientes?', conv: 'parte' } })
+  s = avanza(s, 20_000, 100)
+  assert.equal(porLeer(s, 'parte'), 1, 'solo la respuesta')
+})
+test('cada conversación de riesgos enseña solo su tarjeta', () => {
+  const s = iniciada()
+  for (const [conv, rg] of [['lluvia', 'RG-1'], ['horas', 'RG-5'], ['grua', 'RG-7']]) {
+    const tarjetas = mensajesDe(s, conv)[0].turno.bloques.filter((b) => b.tipo === 'aprobacion')
+    assert.deepEqual(tarjetas.map((b) => b.ref.id), [rg], conv)
+  }
+})
+test('deshacer lo de facturas después de abrir otras conversaciones', () => {
+  let s = iniciada()
+  const id = s.ultimaMutacion.mensajeId
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'grua' })
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'facturas' })
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: id })
+  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'en_bandeja')
+  assert.equal(s.mundo.documentos['F-2026-067'].estado, 'contabilizada', 'lo que hizo el informe se conserva')
+  assert.ok(s.mundo.informes.R1, 'el informe sigue')
+  assert.equal(s.mensajes.at(-1).conv, 'facturas', 'la nota va en su conversación')
+  assert.ok(!/ha deshecho «Pedido/.test(s.mensajes.at(-1).texto), 'no cita lo de otra conversación')
+})
+test('cambiar con trabajo en marcha lo termina; cada conversación tiene su contexto', () => {
+  let s = iniciada()
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'hotel' })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué órdenes de compra tengo pendientes?' } })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
+  assert.ok(s.activo && s.cola.length === 1)
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'lluvia' })
+  assert.ok(!s.activo && !s.cola.length, 'nada a medias')
+  assert.ok(mensajesDe(s, 'hotel').filter((m) => m.rol === 'agentes').every((m) => m.estado === 'hecho'))
+  assert.equal(s.contextos.hotel.ultimaIntencion, 'resumen')
+  assert.equal(s.contexto.ultimaIntencion ?? 'riesgos', 'riesgos', 'el de la lluvia no hereda el del hotel')
+})
+test('una conversación nueva toma título y etiqueta de su primera respuesta, y vacía desaparece', () => {
+  let s = reducirSesion(iniciada(), { tipo: 'conversacion/nueva' })
+  const vacia = s.actual
+  assert.equal(reducirSesion(s, { tipo: 'conversacion/nueva' }).actual, vacia, 'no se crean dos vacías')
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'parte' })
+  assert.ok(!s.conversaciones[vacia], 'la vacía se descarta')
+  s = reducirSesion(s, { tipo: 'conversacion/nueva' })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cuánto nos costará al final y llegamos de caja?' } })
+  s = avanza(s, 20_000, 100)
+  const cv = s.conversaciones[s.actual]
+  assert.equal(cv.etiqueta, 'Caja')
+  assert.ok(cv.titulo && cv.titulo.length <= 34, cv.titulo)
+})
+test('los botones van a la conversación de lo que piden; lo escrito se responde donde estás', () => {
+  const s = iniciada()
+  const ir = (texto) => conversacionPara(s, { tipo: 'texto', texto })
+  assert.deepEqual(ir(PREGUNTA['RG-1']), { conv: 'lluvia', esApertura: true })
+  assert.deepEqual(ir('Revisa la orden de compra OC-104'), { conv: 'hotel', esApertura: true })
+  assert.equal(ir('Revisa la orden de compra OC-105'), null)
+  assert.deepEqual(ir('¿Qué bloquea el dossier fiscal?'), { conv: 'dossier', esApertura: true })
+  assert.deepEqual(ir('Prepara la solicitud del certificado cultural al ICAA'), { conv: 'dossier', esApertura: false })
+  assert.equal(ir('¿Qué riesgos hay para las próximas jornadas?'), null)
+  for (const f of FLOW) if (f.pregunta) assert.notEqual(responder(mundoBase, { tipo: 'texto', texto: f.pregunta }).turno.intencion, 'no_entendido', f.pregunta)
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

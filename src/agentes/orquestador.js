@@ -7,7 +7,6 @@ import { detectarIntencion } from './intenciones.js'
 import { reducirVarias } from './acciones.js'
 import { confianzaBaja } from './politicas.js'
 import { AGENTES, DURACIONES } from './agentes.js'
-import { CASO_DE_INTENCION } from './casos.js'
 import { t, v } from './texto.js'
 
 const EVENTOS = {
@@ -19,7 +18,10 @@ const EVENTOS = {
   'EV-LLUVIA': 'riesgos',
 }
 
-/** Entrada → detección: { intencion, entidades, eventoId?, accion?, texto? }. */
+/**
+ * Entrada → detección: { intencion, entidades, eventoId?, accion?, texto? }.
+ * Entradas: { tipo: 'texto' | 'evento' | 'accion' | 'saludo' }.
+ */
 export function interpretar(mundo, entrada, contexto = {}) {
   if (entrada.tipo === 'evento') return { intencion: EVENTOS[entrada.eventoId] ?? 'no_entendido', entidades: {}, eventoId: entrada.eventoId }
   if (entrada.tipo === 'accion') return { intencion: 'accion', entidades: {}, accion: entrada.accion }
@@ -89,7 +91,6 @@ export function responder(mundo, entrada, contexto = {}) {
   const comp = esc.componer({ antes: mundo, despues: m, det, contexto, pasos })
   const turno = {
     intencion: det.intencion,
-    caso: CASO_DE_INTENCION[det.intencion] ?? null,
     titulo: typeof esc.titulo === 'function' ? esc.titulo(det) : esc.titulo,
     origen: entrada.tipo,
     entidades: det.entidades,
@@ -102,6 +103,9 @@ export function responder(mundo, entrada, contexto = {}) {
     fuentes: comp.fuentes ?? [],
     reglas: comp.reglas ?? [],
     noHecho: comp.noHecho ?? [],
+    // Opcionales: una línea para plegar el turno (novedades) y el proyecto si no es La última función.
+    resumen: comp.resumen ?? null,
+    proyecto: comp.proyecto ?? null,
   }
   const nuevoContexto =
     entrada.tipo === 'texto' && det.intencion !== 'no_entendido' && det.intencion !== 'desambiguar'
