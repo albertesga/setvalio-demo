@@ -2,7 +2,7 @@
 // detalle de un riesgo y avisos que llegan solos (orden del día, lluvia).
 
 import { cuenta, fecha as fechaLarga, fechaDia, formatear, renderTexto } from '../texto.js'
-import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, UMBRALES, TIPOS, PREGUNTA, HECHAS, SENALES } from '../rodaje.js'
+import { evaluarRiesgos, riesgo as riesgoDe, jornada, jornadaOriginal, riesgoDeJornada, datosGrua, UMBRALES, TIPOS, PREGUNTA, HECHAS, SENALES } from '../rodaje.js'
 import { PERSONAS } from '../mundo.js'
 import { reducir } from '../acciones.js'
 import { t, v, c, paso, sug, texto, aviso, lista } from './comun.js'
@@ -34,6 +34,7 @@ const JORNADAS_RIESGO = {
   'RG-4': [SENALES.citacion.jornada],
   'RG-5': SENALES.noches.jornadas,
   'RG-6': [SENALES.cambio.jornada],
+  'RG-7': [SENALES.grua.jornada],
 }
 
 // Título de la respuesta por riesgo: lo que pasa, sin códigos.
@@ -44,6 +45,7 @@ const TITULO_RIESGO = {
   'RG-4': 'Orden del día sin publicar',
   'RG-5': 'Horas extra de noche',
   'RG-6': 'Aviso a transportes',
+  'RG-7': 'La grúa de la jornada 17',
 }
 
 const FIRMA = () => `${PERSONAS.alvaro.nombre} · ${PERSONAS.alvaro.rol} · La última función`
@@ -144,6 +146,57 @@ export const OPCIONES_RIESGO = {
         ? t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: lo apartado, {res}, se mantiene y Riesgos lo sigue vigilando.', { por: v(por), res: v(mantenida, 'eur') })
         : t('Noches replanificadas por {por} con una citación más tardía. Reduce las horas extra, pero no las elimina: Riesgos lo sigue vigilando.', { por: v(por) }),
   },
+  'RG-7': {
+    opcion: 'premontar',
+    plan: () => ({ etiqueta: `Montar la grúa al cerrar la jornada ${SENALES.grua.vispera}`, burbuja: `Monto la grúa al cerrar la jornada ${SENALES.grua.vispera}`, fila: 'Montar la grúa la víspera (un día más de grúa)' }),
+    porSi: 'por si se retrasa',
+    filaReserva: (r) => `Apartar ${eur(r.reserva)} por si se retrasa (${formatear(r.probabilidad, 'pct0')} de lo que costaría repetir las secuencias)`,
+    siOcurre: (r) => `si no da tiempo, podría costar unos ${eur(r.exposicion)} más`,
+    resumen: (m) => {
+      const g = datosGrua(m)
+      return t('La jornada {n} necesita la grúa {h} horas. Con el montaje quedan {sin}, pero si la {vis} se alarga solo quedarían {con}. Montarla al cerrar la {vis}, en el mismo decorado, cuesta un día más de grúa, {tar}, y deja {pre} aunque haya retraso.', {
+        n: v(g.jornada, 'num'),
+        h: v(g.horas, 'num'),
+        sin: v(`${g.sinRetraso} horas`),
+        vis: v(g.vispera, 'num'),
+        con: v(`${g.conRetraso} horas`),
+        tar: v(g.tarifa, 'eur'),
+        pre: v(`${g.horasJornada - g.retraso} horas`),
+      })
+    },
+    recomendacion: t('Recomendamos montarla la víspera: asegura sus horas aunque la jornada anterior se alargue.'),
+    pasoMitigar: (m) => t('Monta la grúa al cerrar la jornada {v}', { v: v(m.rodaje.senales.grua.vispera, 'num') }),
+    textoMitigado: ({ por, antes, despues }) => {
+      const g = datosGrua(despues)
+      const sube = c.totales(despues).cef - c.totales(antes).cef
+      return t('Grúa montada al cerrar la jornada {vis} por decisión de {por}: aunque la citación de la {n} se retrase, quedan {quedan} de grúa y hacen falta {h}. {coste}', {
+        vis: v(g.vispera, 'num'),
+        por: v(por),
+        n: v(g.jornada, 'num'),
+        quedan: v(`${g.conRetraso} horas`),
+        h: v(g.horas, 'num'),
+        coste:
+          sube > 0.004
+            ? t('El día más de grúa sube el coste estimado final {dif}.', { dif: v(sube, 'eurSigned') })
+            : t('El día más de grúa, {tar}, cabe en lo previsto para {p}: el coste final no cambia.', { tar: v(g.tarifa, 'eur'), p: v(g.partida, 'id') }),
+      })
+    },
+  },
+}
+
+/** Plan B de la jornada de la grúa: qué hacer si falla cada recurso. */
+function planBGrua(m) {
+  const g = datosGrua(m)
+  const r = g.respaldo
+  return lista(
+    'Plan B por recurso',
+    [
+      { texto: t('Si la grúa falla o no llega: {prov}, en Madrid, tiene una grúa telescópica por {tar} al día más {tr} de transporte.', { prov: v(r.proveedor), tar: v(r.tarifa, 'eur'), tr: v(r.transporte, 'eur') }) },
+      { texto: t('Si se retrasa el transporte desde {origen}: montarla al cerrar la jornada {vis} lo absorbe.', { origen: v(g.origen), vis: v(g.vispera, 'num') }) },
+      { texto: t('Si nada de eso basta: las secuencias con grúa pasan a la jornada {alt}, en el mismo decorado.', { alt: v(g.alternativa, 'num') }) },
+    ],
+    'propone',
+  )
 }
 
 /** Tarjeta de decisión de un riesgo con impacto económico (los de OPCIONES_RIESGO).
@@ -270,7 +323,7 @@ export const riesgos = {
               ? (TITULO_RIESGO[det.entidades.riesgo] ?? 'Riesgo de rodaje')
               : 'Jornada de rodaje'
             : 'Riesgos de las próximas jornadas',
-  ejemplos: ['¿Qué riesgos hay para las próximas jornadas?', PREGUNTA['RG-1'], PREGUNTA['RG-5'], PREGUNTA['RG-4']],
+  ejemplos: ['¿Qué riesgos hay para las próximas jornadas?', PREGUNTA['RG-1'], PREGUNTA['RG-5'], PREGUNTA['RG-4'], PREGUNTA['RG-7'], '¿Qué pasa si falla la grúa de la jornada 17?'],
 
   planificar(m, det) {
     // Alertas que llegan solas.
@@ -362,12 +415,16 @@ export const riesgos = {
     if (pedido?.jornada != null) {
       const j = jornada(m, pedido.jornada)
       const hecha = HECHAS.find((h) => h.n === pedido.jornada)
+      // Se preguntó por un riesgo que no está en esa jornada, pero tiene otro.
+      const otro = j ? riesgoDeJornada(m, pedido.jornada) : null
       const rango = { a: v(m.proyecto.diaActual, 'num'), b: v(m.proyecto.diasRodaje, 'num') }
       return {
         bloques: [
           AVISO_EXPLORATORIO,
           texto(
-            j
+            j && otro
+              ? t('Jornada {n}, {f}: {loc}, {tipo} de {franja}. Ese riesgo no la toca; el que sí tiene es otro: {titulo}.', { n: v(j.n, 'num'), f: v(fechaDia(j.fecha)), loc: v(j.localizacion), tipo: v(j.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j.franja.toLowerCase()), titulo: v(minuscula(renderTexto(otro.titulo))) })
+              : j
               ? t('Jornada {n}, {f}: {loc}, {tipo} de {franja}. No vemos riesgos abiertos en esa jornada.', { n: v(j.n, 'num'), f: v(fechaDia(j.fecha)), loc: v(j.localizacion), tipo: v(j.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(j.franja.toLowerCase()) })
               : hecha
                 ? t('La jornada {n} ya se rodó, el {f} ({loc}, {tipo} de {franja}). Vigilamos las que quedan, de la {a} a la {b}.', { n: v(hecha.n, 'num'), f: v(fechaDia(hecha.fecha)), loc: v(hecha.localizacion), tipo: v(hecha.tipo === 'EXT' ? 'exterior' : 'interior'), franja: v(hecha.franja.toLowerCase()), ...rango })
@@ -387,6 +444,7 @@ export const riesgos = {
       if (det.entidades?.quiereEnviar) bloques.push(texto(r.aviso ? t('No enviamos avisos: te dejamos el borrador para que lo revises y lo mandes tú.') : t('No enviamos nada: este riesgo no pide un aviso al equipo, sino una decisión.')))
       bloques.push(texto(t('{titulo}. {porque}', { titulo: v(conCuando(r)), porque: r.porQue })))
       bloques.push(lista('Lo que ha revisado', r.senales.map((s) => ({ texto: s }))))
+      if (id === 'RG-7' && r.estado !== 'mitigado') bloques.push(planBGrua(m))
       if (r.estado === 'mitigado') {
         bloques.push(texto(r.respuesta))
       } else if (r.decision || r.estado === 'aceptado' || r.estado === 'reservado') {
@@ -399,7 +457,7 @@ export const riesgos = {
       }
       return {
         bloques,
-        sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?'), sug(r.id === 'RG-1' ? PREGUNTA['RG-5'] : PREGUNTA['RG-1'])],
+        sugerencias: [sug('¿Qué riesgos hay para las próximas jornadas?')],
         fuentes,
         reglas: REGLAS,
         noHecho: NO_HECHO,

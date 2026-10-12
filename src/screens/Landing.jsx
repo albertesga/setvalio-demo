@@ -17,9 +17,10 @@ import { Pie } from './portada/Pie.jsx'
 
 // Agente de Riesgos de producción en «Cómo funciona». Las cifras son las de evaluarRiesgos()
 // sobre el mundo de los agentes (check:agentes lo comprueba): en juego, la exposición de los
-// riesgos con importe (lluvia en la jornada 8, la actriz sin billete y las horas extra de
-// noche); ahorrado, la reserva por lluvia que no hace falta si se aprueba cambiar el orden.
-const RIESGO = { enJuego: 119133, ahorrado: 26880 }
+// riesgos con importe (lluvia en la jornada 8, la actriz sin billete, las horas extra de
+// noche y la grúa de la jornada 17); ahorrado, la reserva por lluvia que no hace falta si se
+// aprueba cambiar el orden.
+const RIESGO = { enJuego: 143453, ahorrado: 26880 }
 const CASO_RIESGO = {
   texto: '80 % de lluvia en el exterior de la jornada 8: propone cambiarla por la 9, un interior con el decorado montado, sin coste en la previsión.',
   pregunta: '¿Va a llover en la jornada 8?',

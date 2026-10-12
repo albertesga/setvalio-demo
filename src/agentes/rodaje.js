@@ -26,7 +26,7 @@ export const HECHAS = [
   J(3, '2026-05-27', 'Rodaje 1', APOLO, 'INT', 'Noche'),
   J(4, '2026-05-28', 'Rodaje 1', APOLO, 'INT', 'Noche'),
   J(5, '2026-05-29', 'Rodaje 1', MADRID, 'INT', 'Día', { nota: 'Citación tardía tras las noches' }),
-  J(6, '2026-06-01', 'Rodaje 2', MADRID, 'INT', 'Día', { nota: 'Jornada ampliada (refuerzo de catering, OC-109)' }),
+  J(6, '2026-06-01', 'Rodaje 2', MADRID, 'INT', 'Día', { nota: 'Jornada ampliada (refuerzo de catering, OC-109)', ampliada: true }),
 ]
 
 // Plan que vigila el agente de riesgos: de hoy al cierre.
@@ -64,6 +64,25 @@ export const SENALES = {
   cambio: { jornada: 10, de: EXTERIORES, a: MADRID, avisados: ['Dirección', 'Arte'], sinAvisar: 'Transportes Madrid Film S.L.' },
   // OC-106 (28/05) paga las horas extra de las noches del Teatro Apolo, jornadas 2 a 4.
   noches: { jornadas: [14, 15], anteriores: [2, 3, 4], oc: 'OC-106', partida: '03.03' },
+  // El recurso más caro del plan: la Technocrane de la jornada 17 (Teatro Apolo). Su tarifa
+  // sale del pedido OC-101 (tres días). Horas de la jornada, montaje y retraso esperado de la
+  // víspera en horas; el respaldo es un proveedor de Madrid (ejemplo).
+  grua: {
+    jornada: 17,
+    vispera: 16,
+    alternativa: 20,
+    recurso: 'Technocrane',
+    proveedor: 'Grúas y Cámaras del Sur S.L.',
+    oc: 'OC-101',
+    diasFactura: 3,
+    partida: '06.02',
+    horas: 6,
+    horasJornada: 10,
+    montaje: 3,
+    retraso: 2,
+    origen: 'Sevilla',
+    respaldo: { proveedor: 'Telegrúa Centro', tarifa: 2_450, transporte: 450 },
+  },
 }
 
 // Límites de severidad (se citan en las reglas de cada respuesta).
@@ -76,6 +95,7 @@ export const TIPOS = {
   'RG-4': { tipo: 'Orden del día', agente: 'riesgos' },
   'RG-5': { tipo: 'Horas extra', agente: 'riesgos' },
   'RG-6': { tipo: 'Coordinación', agente: 'riesgos' },
+  'RG-7': { tipo: 'Recurso crítico', agente: 'riesgos' },
 }
 
 export function crearRodaje() {
@@ -120,7 +140,22 @@ function severidad({ alerta, probabilidad, dias, exposicion }) {
 const PESO = { alta: 0, media: 1, baja: 2, controlado: 3 }
 const etiquetaJ = (ns) => (ns.length > 1 ? `jornadas ${ns.join(' y ')}` : `jornada ${ns[0]}`)
 
-/** Evalúa los seis riesgos con el estado actual del mundo. */
+/** La grúa de la jornada 17: tarifa diaria (del pedido), horas que quedan y probabilidad de que la víspera se alargue. */
+export function datosGrua(m) {
+  const g = m.rodaje.senales.grua
+  const o = m.ordenes[g.oc]
+  const tarifa = o ? r2(o.importe / g.diasFactura) : 0
+  // Jornadas rodadas que se alargaron: las noches con horas extra y las ampliadas.
+  const alargadas = HECHAS.filter((h) => h.ampliada || m.rodaje.senales.noches.anteriores.includes(h.n)).length
+  const probabilidad = alargadas / HECHAS.length
+  const premontada = !!g.premontada
+  // Sin montaje en la jornada, solo resta el retraso; con montaje, montaje y retraso.
+  const sinRetraso = g.horasJornada - (premontada ? 0 : g.montaje)
+  const conRetraso = sinRetraso - g.retraso
+  return { ...g, tarifa, alargadas, total: HECHAS.length, probabilidad, premontada, sinRetraso, conRetraso }
+}
+
+/** Evalúa los siete riesgos con el estado actual del mundo. */
 export function evaluarRiesgos(m) {
   const { meteo, senales } = m.rodaje
   const hoy = m.corte.fecha
@@ -265,6 +300,32 @@ export function evaluarRiesgos(m) {
     aviso: 'BOR-RG-6',
   })
 
+  // RG-7 · que dé tiempo a usar la grúa, el recurso más caro, las horas que hacen falta.
+  const gr = datosGrua(m)
+  const jg = jornada(m, gr.jornada)
+  const exp7 = Math.round((gr.horas / gr.horasJornada) * costeJornada(jg.semana) + gr.tarifa)
+  const mitigado7 = dec['RG-7']?.estado === 'mitigado'
+  out.push({
+    id: 'RG-7',
+    jornadas: [gr.jornada],
+    fecha: jg.fecha,
+    probabilidad: gr.probabilidad,
+    exposicion: exp7,
+    reserva: Math.round(gr.probabilidad * exp7),
+    titulo: t('La grúa de la jornada {n}, el recurso más caro', { n: v(gr.jornada, 'num') }),
+    senales: [
+      t('Jornada {n}: {loc}, interior. La {rec} de {prov} cuesta {tar} al día: es el alquiler diario más caro del plan', { n: v(gr.jornada, 'num'), loc: v(jg.localizacion), rec: v(gr.recurso), prov: v(gr.proveedor), tar: v(gr.tarifa, 'eur') }),
+      t('La jornada necesita la grúa {h} horas de {hj}; el montaje lleva {mon}', { h: v(gr.horas, 'num'), hj: v(gr.horasJornada, 'num'), mon: v(`${gr.montaje} horas`) }),
+      t('{k} de las {tot} jornadas rodadas se alargaron. Si se alarga la {vis}, la víspera, la citación se retrasa unas {ret} horas y quedarían {quedan} de grúa', { k: v(gr.alargadas, 'num'), tot: v(gr.total, 'num'), vis: v(gr.vispera, 'num'), ret: v(gr.retraso, 'num'), quedan: v(`${gr.conRetraso} horas`) }),
+      t('La grúa viene de {origen}: sale la víspera con su operador', { origen: v(gr.origen) }),
+    ],
+    porQue: t('Si no da tiempo a usar la grúa las horas que hacen falta, hay que repetir esas secuencias otro día y volver a pagarla.'),
+    respuesta: mitigado7
+      ? t('Grúa montada al cerrar la jornada {vis}: aunque la citación se retrase, quedan {quedan} de grúa y hacen falta {h}.', { vis: v(gr.vispera, 'num'), quedan: v(`${gr.conRetraso} horas`), h: v(gr.horas, 'num') })
+      : t('Montar la grúa al cerrar la jornada {vis}, en el mismo decorado, para que no dependa del retraso de la víspera.', { vis: v(gr.vispera, 'num') }),
+    decision: true,
+  })
+
   return out
     .map((r) => {
       const d = dec[r.id]
@@ -272,8 +333,9 @@ export function evaluarRiesgos(m) {
       const borrador = r.aviso ? m.borradores?.[r.aviso] : null
       const estado = d?.estado ?? (borrador && borrador.estado !== 'descartado' ? 'aviso' : 'abierto')
       const base = severidad({ ...r, dias })
-      // Cambiar el orden elimina la lluvia; replanificar las noches solo la reduce; asumir no cambia la severidad.
-      const sev = estado === 'mitigado' ? (r.id === 'RG-1' ? 'controlado' : 'baja') : base
+      // Cambiar el orden elimina la lluvia y montar la grúa la víspera asegura sus horas;
+      // replanificar las noches solo las reduce; asumir no cambia la severidad.
+      const sev = estado === 'mitigado' ? (r.id === 'RG-1' || r.id === 'RG-7' ? 'controlado' : 'baja') : base
       const reservaCorta = d?.estado === 'reservado' && r.reserva != null && Math.abs(d.importe - r.reserva) > 0.5
       return {
         ...r,
@@ -322,6 +384,7 @@ export const PREGUNTA = {
   'RG-4': '¿Está publicada la orden de rodaje de mañana?',
   'RG-5': '¿Qué riesgo hay con las horas extra de noche?',
   'RG-6': 'Prepara el aviso a transportes por el cambio de localización de la jornada 10',
+  'RG-7': '¿Llegamos a tiempo con la grúa de la jornada 17?',
 }
 
 // Jornada → riesgo («¿y la jornada 13?»).

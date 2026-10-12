@@ -675,7 +675,7 @@ test('cifras de los riesgos y severidad inicial', () => {
   cerca(r['RG-5'].reserva, 6_333)
   assert.equal(r['RG-3'].exposicion, null)
   assert.deepEqual(evaluarRiesgos(mundoBase).filter((x) => x.severidad === 'alta').map((x) => x.id), ['RG-1'])
-  assert.deepEqual(decisionesRiesgos(mundoBase).map((d) => d.ref.id), ['RG-1', 'RG-5'])
+  assert.deepEqual(decisionesRiesgos(mundoBase).map((d) => d.ref.id), ['RG-1', 'RG-7', 'RG-5'])
 })
 test('reservar RG-1: sube el CEF sin tocar capítulos ni caja, y el neto cuadra', () => {
   const m = reducir(frio, { tipo: 'riesgo/reservar', riesgoId: 'RG-1', importe: 26_880, por: 'Marta Cobo' })
@@ -977,7 +977,7 @@ test('«Para hoy»: lluvia de mañana, compras y certificado; los avisos, aparte
   assert.deepEqual(ag.avisos.subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
   assert.match(renderTexto(ag.items[0].cuando), /antes de publicar la orden del día de mañana/)
   assert.match(renderTexto(ag.items[2].detalle), /620\.000\s€/)
-  assert.equal(ag.resto, 4, 'decisiones que no caben en «Para hoy»; los avisos no cuentan (el ticket aún no ha llegado)')
+  assert.equal(ag.resto, 5, 'decisiones que no caben en «Para hoy» (con la grúa); los avisos no cuentan (el ticket aún no ha llegado)')
 })
 test('cada botón del parte lleva a un guion que lo resuelve', () => {
   const ag = agendaDelDia(mundoBase)
@@ -1179,6 +1179,56 @@ test('lo que se pide nunca lleva la marca de «llegó sola»', () => {
   assert.ok(!s.mensajes.some((m) => m.llegoSola), 'nada llega solo')
   const p = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
   assert.equal(p.mensajes.find((m) => m.rol === 'agentes').llegoSola, false, 'la pedida no se pliega')
+})
+
+// ── 15. La grúa de la jornada 17 (RG-7) ──────────────────────────────────────
+console.log('Grúa de la jornada 17')
+test('la grúa es el alquiler diario más caro y sus cifras salen de los datos', () => {
+  const r = riesgoDe(mundoBase, 'RG-7')
+  const g = SENALES.grua
+  const tarifa = mundoBase.ordenes[g.oc].importe / g.diasFactura
+  // Los alquileres por semana de la semana 1 (cámara, eléctrico, camiones) salen a menos por día.
+  for (const id of ['F-2026-052', 'F-2026-053', 'F-2026-061']) assert.ok(mundoBase.documentos[id].base / 5 < tarifa, id)
+  const alargadas = HECHAS.filter((h) => h.ampliada || g && SENALES.noches.anteriores.includes(h.n)).length
+  cerca(r.probabilidad, alargadas / HECHAS.length)
+  const exp = Math.round((g.horas / g.horasJornada) * (CASHFLOW.find((s) => s.semana === 'Rodaje 4').pagos / 5) + tarifa)
+  assert.equal(r.exposicion, exp)
+  assert.equal(r.reserva, Math.round(r.probabilidad * exp))
+  assert.equal(r.severidad, 'media')
+  assert.deepEqual(r.jornadas, [g.jornada])
+})
+test('montar la grúa la víspera cabe en 06.02, la deja controlada y no se repite', () => {
+  const m = reducir(mundoBase, { tipo: 'riesgo/mitigar', riesgoId: 'RG-7', opcion: 'premontar', por: 'Prueba' })
+  cerca(c.totales(m).cef, TOTALES.cef)
+  assert.equal(riesgoDe(m, 'RG-7').severidad, 'controlado')
+  assert.equal(reducir(m, { tipo: 'riesgo/mitigar', riesgoId: 'RG-7', opcion: 'premontar' }), m)
+  assert.match(renderTexto(riesgoDe(m, 'RG-7').respuesta), /quedan 8 horas de grúa/)
+})
+test('la conversación de la grúa trae lo revisado, el plan B y una tarjeta con tres opciones', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: PREGUNTA['RG-7'] })
+  revisarTurno(r.turno, 'grúa')
+  assert.equal(r.turno.entidades.riesgo, 'RG-7')
+  assert.ok(r.turno.bloques.some((b) => b.tipo === 'lista' && b.titulo === 'Plan B por recurso'))
+  const tj = r.turno.bloques.find((b) => b.tipo === 'aprobacion')
+  assert.deepEqual(tj.acciones.map((a) => a.id), ['aprobar', 'reservar', 'rechazar'])
+  for (const f of tj.impacto) cerca(c.totales(mundoBase).cef + f.cambio, f.despues, f.etiqueta)
+})
+test('la grúa como riesgo no le quita sus frases a proveedores ni a facturas', () => {
+  const de = (texto, m = mundoBase) => responder(m, { tipo: 'texto', texto })
+  for (const texto of ['¿Qué pasa si falla la grúa de la jornada 17?', 'Plan B si falla la grúa', '¿Llega a tiempo la Technocrane?', '¿Cuál es el recurso más caro?', 'Necesito una grúa de respaldo']) {
+    for (const m of [mundoBase, conLlegada]) {
+      const r = de(texto, m)
+      assert.equal(r.turno.intencion, 'riesgos', texto)
+      assert.equal(r.turno.entidades.riesgo, 'RG-7', texto)
+    }
+  }
+  assert.equal(de('¿hay mejores precios para la grúa?').turno.intencion, 'optimizar_proveedores')
+  assert.equal(de('Ha llegado una factura de Grúas y Cámaras del Sur').turno.intencion, 'factura_nueva')
+})
+test('preguntar por un riesgo en una jornada que tiene otro dice cuál tiene', () => {
+  const txt = renderTexto(responder(mundoBase, { tipo: 'texto', texto: '¿Va a llover en la jornada 13?' }).turno.bloques.find((b) => b.tipo === 'texto').texto)
+  assert.ok(!/No vemos riesgos/.test(txt), txt)
+  assert.match(txt, /permiso de vía pública/)
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

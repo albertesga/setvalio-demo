@@ -38,6 +38,26 @@ const MITIGAR = {
     }
     return [{ ambito: 'plan', id: 'noches', campo: 'franja', antes: 'Noche', despues: 'Tarde-noche' }]
   },
+  'RG-7': (n, accion) => {
+    // Montar la grúa al cerrar la víspera, en el mismo decorado: un día más de grúa en su
+    // partida. Su montaje sale de la jornada y el retraso de la víspera ya no la deja corta.
+    const g = n.rodaje.senales.grua
+    const o = n.ordenes[g.oc]
+    if (!o || g.premontada) return null
+    const tarifa = r2(o.importe / g.diasFactura)
+    const efectos = []
+    aplicarCoste(n, g.partida, tarifa, 'comprometido', efectos)
+    g.premontada = true
+    const v = n.rodaje.jornadas.find((j) => j.n === g.vispera)
+    if (v) v.nota = 'Montaje de la grúa al cerrar'
+    efectos.push({ ambito: 'plan', id: `J${g.vispera}`, campo: 'nota', antes: '', despues: 'Montaje de la grúa al cerrar' })
+    // El riesgo queda cubierto: se libera lo apartado si lo había.
+    if (n.reservas[accion.riesgoId]) {
+      efectos.push({ ambito: 'reserva', id: accion.riesgoId, campo: 'importe', antes: n.reservas[accion.riesgoId].importe, despues: 0 })
+      delete n.reservas[accion.riesgoId]
+    }
+    return efectos
+  },
 }
 
 function clonar(m) {

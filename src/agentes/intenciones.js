@@ -176,6 +176,22 @@ export function extraerEntidades(texto, mundo) {
   ]
   const r = RIESGO.find(([re]) => re.test(norm))
   if (r) e.riesgo = r[1]
+  // RG-7 · la grúa de la jornada 17. «Grúa» también es un proveedor (Grúas y Cámaras del Sur):
+  // solo cuenta con una palabra de riesgo y sin hablar de precios, facturas o Itsasoa.
+  const GRUA = /\b(grua|technocrane)/
+  const PELIGRO_GRUA = /(falla|fallar|falle|averi|retras|tarde|a tiempo|montaj|montar|respaldo|plan b|jornada 17|horas)/
+  const NO_ES_RIESGO = /(precio|presupuest|factur|\bpag|propuesta|itsasoa|anad|\d+\s*(€|e\b|eur))/
+  if (!e.riesgo && ((GRUA.test(norm) && PELIGRO_GRUA.test(norm)) || /recurso (mas caro|critico)|grua de respaldo/.test(norm)) && !NO_ES_RIESGO.test(norm)) {
+    e.riesgo = 'RG-7'
+    // Lo que se dedujo del nombre del proveedor no aplica: se habla del rodaje, no de su factura.
+    if (!/\bf[\s-]*2026|\bg-\d/.test(norm)) delete e.documento
+    if (!/\boc[\s-]*\d/.test(norm)) {
+      delete e.oc
+      delete e.ocConocida
+    }
+    delete e.proveedor
+    delete e.capitulo
+  }
 
   if (/\b(envia|enviar|enviale|envialo|enviala|manda|mandar|mandale|mandalo)\b/.test(norm)) e.accionExterna = 'enviar'
   if (/\b(paga|pagar|pagale|pagala|pagues|abona|abonar|transfiere|transferir|haz la transferencia)\b/.test(norm)) e.accionExterna = 'pagar'
@@ -227,7 +243,7 @@ export const LEXICO = {
     entidades: { porcentaje: 1, territorio: 1 },
   },
   riesgos: {
-    frases: ['que riesgos', 'riesgos de rodaje', 'riesgos del rodaje', 'parte de riesgos', 'radar de riesgos', 'que puede salir mal', 'proximas jornadas', 'prevision del tiempo', 'va a llover', 'orden del dia', 'orden de rodaje', 'call sheet', 'hoja de citacion', 'horas extra de noche', 'via publica', 'cambio de localizacion', 'aviso a transportes', 'informe de riesgos', 'cambia el orden', 'cambiar el orden', 'cambio de orden', 'orden de las jornadas', 'orden de jornadas', 'que tiempo hara', 'tiempo hara', 'que tiempo va a hacer'],
+    frases: ['que riesgos', 'riesgos de rodaje', 'riesgos del rodaje', 'parte de riesgos', 'radar de riesgos', 'que puede salir mal', 'recurso critico', 'recurso mas caro', 'grua de respaldo', 'plan b', 'proximas jornadas', 'prevision del tiempo', 'va a llover', 'orden del dia', 'orden de rodaje', 'call sheet', 'hoja de citacion', 'horas extra de noche', 'via publica', 'cambio de localizacion', 'aviso a transportes', 'informe de riesgos', 'cambia el orden', 'cambiar el orden', 'cambio de orden', 'orden de las jornadas', 'orden de jornadas', 'que tiempo hara', 'tiempo hara', 'que tiempo va a hacer'],
     raices: { riesg: 3, radar: 3, lluv: 3, llov: 3, llue: 3, meteo: 3, citacion: 2, jornad: 1 },
     entidades: { riesgo: 2, jornada: 2 },
   },
@@ -297,6 +313,8 @@ function puntuar(norm, tokens, entidades, mundo) {
   // «Aprueba las horas extra de Eléctricos Prado» es una orden de compra, no un riesgo.
   if (entidades.oc && !/riesg/.test(norm)) out.riesgos = 0
   if (/riesgo fiscal|riesgos fiscales/.test(norm)) out.riesgos = 0
+  // La grúa como riesgo de rodaje no es buscar proveedores para Itsasoa.
+  if (entidades.riesgo === 'RG-7') out.optimizar_proveedores = 0
   // «Cambia el orden de las jornadas / del día» habla del plan de rodaje, no de una orden de compra.
   if (!entidades.oc && /\b(cambia|cambiar|cambio de) (el )?orden\b|\borden (de las|de|del) (jornadas?|dia|rodaje)\b/.test(norm)) out.aprobar_oc = Math.max(0, out.aprobar_oc - 2)
   if (Object.entries(out).some(([id, s]) => id !== 'saludo' && s >= 3)) out.saludo = 0
