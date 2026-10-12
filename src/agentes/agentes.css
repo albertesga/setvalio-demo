@@ -421,3 +421,16 @@
 /* La marca no pasa de 600: las <strong> sin clase de peso heredan «bolder» (700). Especificidad
    mínima para no pisar .font-medium ni las reglas de cada bloque. */
 :where(.ag-app) :where(strong, b) { font-weight: 600; }
+
+/* Cómo han llegado las facturas de esta mañana: canal, quién las sube y su estado. */
+.ag-llegadas { display: grid; margin-top: 8px; }
+.ag-llegada { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--flp-border); }
+.ag-llegada:first-child { border-top: 0; }
+.ag-llegada-icono { display: inline-flex; width: 32px; height: 32px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--flp-border); border-radius: 50%; color: var(--flp-carbon); background: var(--flp-chalk); }
+.ag-llegada-doc { color: var(--flp-carbon); font-size: 14px; font-weight: 500; line-height: 1.4; }
+.ag-llegada-canal { margin-top: 2px; color: var(--flp-muted); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.ag-llegada-estado { flex: none; padding-top: 2px; }
+@media (max-width: 639px) {
+  .ag-llegada { flex-wrap: wrap; }
+  .ag-llegada-estado { flex-basis: 100%; padding-left: 44px; padding-top: 0; }
+}

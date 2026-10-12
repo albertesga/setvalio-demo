@@ -1,4 +1,4 @@
-// Carril: lo que puedes ver (las seis historias y el epílogo), cómo actúan los
+// Carril: lo que puedes ver (las historias y el epílogo), cómo actúan los
 // agentes y el equipo (el Orquestador y las tres familias), y el detalle de cada agente.
 
 import { useId, useRef } from 'react'
@@ -13,9 +13,9 @@ import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
 // Qué agente sostiene cada tipo de decisión pendiente.
 const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', manual: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores', riesgo: 'riesgos', informe: 'informes' }
 
-// Historias cuyo arco ya dice su nivel («Lo hace solo», «Te lo propone», «Te pide
+// Historias cuyo arco ya dice su nivel («Lo hace solo o te lo propone», «Pide tu
 // aprobación»): no repiten la insignia. Las demás la llevan (el parte, la lluvia, el informe).
-const ARCO_DICE_NIVEL = new Set(['solo', 'propone', 'aprueba'])
+const ARCO_DICE_NIVEL = new Set(['solo', 'aprueba'])
 
 export function estadoAgentes(s) {
   const out = Object.fromEntries(ORDEN_AGENTES.map((id) => [id, { estado: 'disponible', detalle: null, espera: 0 }]))

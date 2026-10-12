@@ -9,6 +9,9 @@ import { crearMundo } from './mundo.js'
 import { ALTERNATIVAS_POR_ID, resultadoLlamada } from './propuesta.js'
 import { riesgosAltos, riesgo as riesgoDe, jornadaOriginal } from './rodaje.js'
 
+// Lo que entra con EV-01, en el orden en que llegó esta mañana.
+export const LLEGAN_CON_EV01 = ['F-2026-078', 'F-2026-079', 'G-004']
+
 function clonar(m) {
   return JSON.parse(JSON.stringify(m))
 }
@@ -40,9 +43,14 @@ export function reducir(m, accion) {
       if (!m.entrantes.includes(accion.eventoId)) return m
       const n = clonar(m)
       n.entrantes = n.entrantes.filter((e) => e !== accion.eventoId)
+      // EV-01: las tres de esta mañana (correo, formulario web y WhatsApp) entran en la bandeja.
       if (accion.eventoId === 'EV-01') {
-        n.documentos['F-2026-078'].estado = 'en_bandeja'
-        n.documentos['F-2026-078'].recibida = n.corte.fecha
+        for (const id of LLEGAN_CON_EV01) {
+          const d = n.documentos[id]
+          if (d?.estado !== 'por_llegar') continue
+          d.estado = 'en_bandeja'
+          d.recibida = n.corte.fecha
+        }
       }
       if (accion.eventoId === 'EV-02') n.ordenes['OC-104'].estado = 'Pendiente'
       if (accion.eventoId === 'EV-03') n.avisos.push({ id: 'DOS-01', tipo: 'vencimiento' })

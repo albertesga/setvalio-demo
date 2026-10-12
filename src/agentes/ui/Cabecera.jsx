@@ -1,6 +1,6 @@
 // Cabecera del prototipo y opciones de la demo. A la vista: el proyecto, el contador
 // «Por revisar», las historias (sin carril) y el recorrido. Detrás de «Opciones», lo
-// que cambia la demo: quién mira, el ritmo, las novedades automáticas y el reinicio.
+// que cambia la demo: quién mira, el ritmo y el reinicio.
 
 import { useState } from 'react'
 import { FilmpilotLogo, FilmpilotSymbol, FilmpilotButton } from '../../brand/Filmpilot.jsx'
@@ -171,17 +171,6 @@ export function OpcionesDemo({ s, despachar, ritmo, setRitmo, onCerrar, avisar }
           ))}
         </div>
       </fieldset>
-
-      <label className="ag-interruptor">
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-flp-ink">Novedades automáticas</span>
-          <span className="block text-xs text-flp-muted">Una factura y una compra llegan solas cuando dejas la pantalla quieta. Nunca durante el recorrido.</span>
-        </span>
-        <span className="ag-interruptor-estado" aria-hidden="true">
-          {s.eventosPausados ? 'Pausadas' : 'Activadas'}
-        </span>
-        <input type="checkbox" role="switch" checked={!s.eventosPausados} onChange={(e) => despachar({ tipo: 'pausarEventos', valor: !e.target.checked })} />
-      </label>
 
       <div className="border-t border-flp-line pt-4">
         <ConConfirmacion

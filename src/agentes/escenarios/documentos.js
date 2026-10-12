@@ -1,9 +1,9 @@
 // Guiones de documentos: factura entrante, gasto dudoso y petición de documentación.
 
-import { reducir } from '../acciones.js'
+import { reducir, LLEGAN_CON_EV01 } from '../acciones.js'
 import { PERSONAS } from '../mundo.js'
 import { confianzaBaja, ROLES } from '../politicas.js'
-import { cuenta, fecha } from '../texto.js'
+import { cuenta, fecha, unir } from '../texto.js'
 import { t, v, c, POLITICAS, paso, sug, texto, aviso, kpisPartida, bloqueDocumento, nombrePartida, minuscula, articulo } from './comun.js'
 
 const enBandeja = (m) => Object.values(m.documentos).filter((d) => d.estado === 'en_bandeja')
@@ -16,15 +16,126 @@ function confianzaMinima(d) {
   return d.confianza ? Math.min(...Object.values(d.confianza)) : null
 }
 
+// ── Lo que ha llegado esta mañana (EV-01) ────────────────────────────────────
+
+/** Las que han entrado hoy con EV-01, en el orden en que llegaron. */
+const llegadasDeHoy = (m) => LLEGAN_CON_EV01.map((id) => m.documentos[id]).filter((d) => d && d.estado !== 'por_llegar')
+
 /** Elige el documento del que habla la petición. */
 export function documentoObjetivo(m, det) {
-  if (det.eventoId === 'EV-01') return 'F-2026-078'
   const id = det.entidades?.documento
-  if (id && m.documentos[id]) return id
-  // Sin documento concreto, «¿ha llegado algo?» se responde con lo que de verdad está por llegar.
-  const llegada = m.documentos['F-2026-078']
-  if (llegada.estado === 'por_llegar' || (llegada.estado === 'en_bandeja' && llegada.revisionManual)) return 'F-2026-078'
-  return null
+  return id && m.documentos[id] ? id : null
+}
+
+/** ¿Trae esta petición lo de esta mañana? La novedad, o preguntar por una de las tres antes de que entre. */
+function traeLaLlegada(m, det) {
+  if (!m.entrantes.includes('EV-01')) return false
+  if (det.eventoId === 'EV-01') return true
+  const id = documentoObjetivo(m, det)
+  return !!id && LLEGAN_CON_EV01.includes(id)
+}
+
+/** Pasos de la llegada: recoger los tres canales, leer, cuadrar lo que cuadra y proponer lo dudoso. */
+function planLlegada(m) {
+  const recibir = { tipo: 'evento/recibir', eventoId: 'EV-01' }
+  const m1 = reducir(m, recibir)
+  const docs = llegadasDeHoy(m1)
+  const solas = docs.filter((d) => casable(m1, d))
+  const dudosos = docs.filter((d) => confianzaBaja(d))
+  const pasos = [
+    paso('facturas', t('Recoge lo que ha entrado por correo, formulario web y WhatsApp'), { tipo: 'lectura', acciones: [recibir], salida: t('{n}', { n: cuenta(docs.length, 'documento', 'documentos') }) }),
+    paso('facturas', t('Lee cada documento con OCR'), {
+      tipo: 'ocr',
+      salida: dudosos.length ? t('{ok} claros; {dud} con confianza baja', { ok: v(docs.length - dudosos.length, 'num'), dud: v(dudosos.length, 'num') }) : t('Todos claros'),
+    }),
+  ]
+  for (const d of solas) {
+    const conc = c.conciliar(m1, d.id)
+    pasos.push(
+      paso('conciliacion', t('Cuadra {id} con el pedido {oc}', { id: v(d.id, 'id'), oc: v(conc.oc, 'id') }), {
+        tipo: 'conciliacion',
+        acciones: [{ tipo: 'documento/contabilizar', docId: d.id, por: 'Conciliación' }],
+        salida: t('Cuadra con su pedido: contabilizada'),
+      }),
+    )
+  }
+  for (const d of dudosos) {
+    pasos.push(
+      paso('facturas', t('Compara dónde puede ir el gasto de {prov}', { prov: v(d.proveedor) }), {
+        autonomia: 'propone',
+        salida: t('{a} o {b}', { a: v(nombrePartida(m1, d.partida)), b: v(nombrePartida(m1, d.alternativa)) }),
+      }),
+    )
+  }
+  // Comprobar es rutinario: lo hace solo, no propone nada.
+  pasos.push(paso('cumplimiento', t('Comprueba si los gastos son elegibles'), { tipo: 'revision', autonomia: 'ejecuta', paralelo: true, salida: t('Revisado') }))
+  if (dudosos.length) pasos.push(paso('excepciones', t('Te trae lo dudoso para decidir'), { tipo: 'revision', autonomia: 'propone', salida: t('No se contabiliza sin tu confirmación') }))
+  return pasos
+}
+
+const REGLAS_FACTURAS = () => [
+  t('Se contabiliza sola si la confianza de cada campo es de al menos {u} y cuadra con un pedido aprobado', { u: v(POLITICAS.umbralConfianza, 'pct0') }),
+  t('Tolerancia de conciliación: {tol}', { tol: v(POLITICAS.toleranciaConciliacion, 'pct0') }),
+]
+
+/** Respuesta a la llegada: cómo han entrado, el detalle de cada una y la tarjeta de lo dudoso. */
+function componerLlegada(antes, despues) {
+  const docs = llegadasDeHoy(despues)
+  const solas = docs.filter((d) => d.estado === 'contabilizada' && d.contabilizadaPor === 'Conciliación')
+  const dudoso = docs.find((d) => d.estado === 'en_bandeja' && confianzaBaja(d))
+  const mismoCoste = Math.abs(c.totales(antes).cef - c.totales(despues).cef) < 0.005
+  const lead = [
+    t('Esta mañana han entrado {n}, cada uno por un canal.', { n: cuenta(docs.length, 'documento', 'documentos') }),
+    solas.length && t('Conciliación ha contabilizado sola {k} que cuadran con su pedido{coste}', { k: cuenta(solas.length, 'factura', 'facturas'), coste: v(mismoCoste ? `: el coste final no cambia, ${solas.length === 1 ? 'ese gasto ya estaba previsto' : 'esos gastos ya estaban previstos'}.` : '.') }),
+    dudoso && t('El ticket de {prov} no está claro: Facturas te propone dónde va.', { prov: v(dudoso.proveedor) }),
+  ]
+  const bloques = [texto(unir(lead)), { tipo: 'llegadas', docIds: docs.map((d) => d.id) }, ...solas.map((d) => bloqueDocumento(despues, d.id))]
+  if (dudoso) {
+    const p = propuestaPartida(despues, dudoso)
+    bloques.push(texto(p.explicacion), ...p.bloques)
+  }
+  return {
+    bloques,
+    // Una línea por si se pliega, y la cita de deshacer.
+    resumen: solas.length ? t('Conciliación contabilizó sola {ids} · {cuadra} con su pedido', { ids: v(enLista(solas.map((d) => d.id))), cuadra: v(solas.length === 1 ? 'cuadra' : 'cuadran') }) : null,
+    sugerencias: [sug('Prepárame el informe semanal de coste'), sug('¿Qué bloquea el dossier fiscal?')],
+    fuentes: ['Correo de facturas', 'Formulario web de proveedores', 'WhatsApp de producción', 'Órdenes de compra', 'Presupuesto por partidas'],
+    reglas: [...REGLAS_FACTURAS(), t('Por debajo del {u} de confianza, Facturas propone y una persona confirma', { u: v(POLITICAS.umbralConfianza, 'pct0') })],
+    noHecho: [dudoso ? t('No ha contabilizado el ticket: espera tu decisión.') : null, t('No ha pagado ninguna factura.')].filter(Boolean),
+  }
+}
+
+/** «¿Han llegado facturas nuevas?» sin documento concreto: antes de la llegada, nada; después, cómo están las de hoy. */
+function componerBandeja(m) {
+  const sugerencias = [sug('¿Qué gastos tengo que revisar?'), sug('Prepárame el informe semanal de coste')]
+  if (m.entrantes.includes('EV-01')) {
+    return {
+      bloques: [
+        texto(t('Todavía no ha entrado nada hoy. Las facturas llegan por correo, por el formulario web o por WhatsApp; las que cuadran con su pedido, Conciliación las contabiliza sola.')),
+        { tipo: 'acciones', texto: t('En la demo puedes hacer que lleguen las de esta mañana.'), acciones: [{ id: 'ver', etiqueta: 'Ver cómo llegan', variante: 'primary', entrada: { tipo: 'evento', eventoId: 'EV-01' } }] },
+      ],
+      sugerencias,
+      fuentes: ['Bandeja de documentos'],
+      reglas: [],
+      noHecho: [t('No ha contabilizado nada.')],
+    }
+  }
+  const hoy = llegadasDeHoy(m)
+  const hechas = hoy.filter((d) => d.estado === 'contabilizada').length
+  const pendientes = hoy.filter((d) => d.estado === 'en_bandeja')
+  const estado = [hechas && cuenta(hechas, 'contabilizado', 'contabilizados'), pendientes.length && cuenta(pendientes.length, 'por revisar', 'por revisar')].filter(Boolean)
+  const bloques = [
+    texto(estado.length > 1 ? t('Esta mañana han entrado {n}: {a} y {b}.', { n: cuenta(hoy.length, 'documento', 'documentos'), a: estado[0], b: estado[1] }) : t('Esta mañana han entrado {n}: {a}.', { n: cuenta(hoy.length, 'documento', 'documentos'), a: estado[0] })),
+    { tipo: 'llegadas', docIds: hoy.map((d) => d.id) },
+  ]
+  if (pendientes.length) {
+    bloques.push({
+      tipo: 'acciones',
+      texto: pendientes.length === 1 ? t('Uno espera tu decisión.') : t('{n} esperan tu decisión.', { n: v(pendientes.length, 'num') }),
+      acciones: pendientes.map((d) => ({ id: d.id, etiqueta: `Revisar ${d.id}`, variante: 'secondary', entrada: { tipo: 'texto', texto: confianzaBaja(d) ? '¿Qué gastos tengo que revisar?' : `Procesa la factura ${d.id}` } })),
+    })
+  }
+  return { bloques, sugerencias, fuentes: ['Correo de facturas', 'Formulario web de proveedores', 'WhatsApp de producción'], reglas: [], noHecho: [t('No ha cambiado nada.')] }
 }
 
 // ── Factura entrante ─────────────────────────────────────────────────────────
@@ -33,43 +144,26 @@ const tituloDocumento = (id) => `${/^G-/.test(id) ? 'Ticket' : 'Factura'} ${id}`
 
 export const facturaNueva = {
   id: 'factura_nueva',
-  titulo: (det) => (det.eventoId === 'EV-01' ? 'Factura entrante' : det.entidades?.documento ? tituloDocumento(det.entidades.documento) : 'Bandeja de facturas'),
+  titulo: (det) => (det.eventoId === 'EV-01' ? 'Facturas de esta mañana' : det.entidades?.documento ? tituloDocumento(det.entidades.documento) : 'Bandeja de facturas'),
   ejemplos: ['¿Han llegado facturas nuevas?', 'Ha llegado una factura de Grúas y Cámaras del Sur', 'procesa la F-2026-078', 'nueva factura en el buzón', 'Procesa la factura F-2026-069'],
 
   planificar(m, det) {
+    if (traeLaLlegada(m, det)) return planLlegada(m)
     const id = documentoObjetivo(m, det)
-    if (!id) return [paso('facturas', t('Revisa la bandeja de entrada'), { tipo: 'lectura', salida: t('No hay documentos nuevos') })]
+    if (!id) {
+      return [paso('facturas', t('Revisa la bandeja de entrada'), { tipo: 'lectura', salida: m.entrantes.includes('EV-01') ? t('Nada nuevo desde esta mañana') : t('{n} hoy', { n: cuenta(llegadasDeHoy(m).length, 'documento', 'documentos') }) })]
+    }
     const d0 = m.documentos[id]
+    if (d0.estado === 'por_llegar') return [paso('facturas', t('Revisa la bandeja de entrada'), { tipo: 'lectura', salida: t('Nada nuevo desde esta mañana') })]
+    if (d0.estado === 'contabilizada') return [paso('facturas', t('Busca {id}', { id: v(id, 'id') }), { tipo: 'lectura', salida: t('Ya está contabilizada') })]
 
-    if (d0.estado === 'por_llegar' && det.eventoId !== 'EV-01') {
-      return [paso('facturas', t('Revisa la bandeja de entrada'), { tipo: 'lectura', salida: t('Nada nuevo desde esta mañana') })]
-    }
-    if (d0.estado === 'contabilizada') {
-      return [paso('facturas', t('Busca {id}', { id: v(id, 'id') }), { tipo: 'lectura', salida: t('Ya está contabilizada') })]
-    }
-
-    const pasos = []
-    let m1 = m
-    if (d0.estado === 'por_llegar') {
-      const recibir = { tipo: 'evento/recibir', eventoId: 'EV-01' }
-      m1 = reducir(m, recibir)
-      pasos.push(
-        paso('facturas', t('Recibe {id} de {prov} y la lee con OCR', { id: v(id, 'id'), prov: v(d0.proveedor) }), {
-          tipo: 'ocr',
-          acciones: [recibir],
-          salida: t('Proveedor {a}, importe {b}, partida {c}', { a: v(d0.confianza.proveedor, 'pct0'), b: v(d0.confianza.importe, 'pct0'), c: v(d0.confianza.partida, 'pct0') }),
-        }),
-      )
-    } else {
-      pasos.push(
-        paso('facturas', d0.origen === 'Factura-e XML' ? t('Lee la factura electrónica {id}', { id: v(id, 'id') }) : t('Lee {id} con OCR', { id: v(id, 'id') }), {
-          tipo: d0.origen === 'Factura-e XML' ? 'lectura' : 'ocr',
-          salida: t('{prov} · {total} · partida {p}', { prov: v(d0.proveedor), total: v(d0.total, 'eurCents'), p: v(d0.partida, 'id') }),
-        }),
-      )
-    }
-
-    const conc = c.conciliar(m1, id)
+    const pasos = [
+      paso('facturas', d0.origen === 'Factura-e XML' ? t('Lee la factura electrónica {id}', { id: v(id, 'id') }) : t('Lee {id} con OCR', { id: v(id, 'id') }), {
+        tipo: d0.origen === 'Factura-e XML' ? 'lectura' : 'ocr',
+        salida: t('{prov} · {total} · partida {p}', { prov: v(d0.proveedor), total: v(d0.total, 'eurCents'), p: v(d0.partida, 'id') }),
+      }),
+    ]
+    const conc = c.conciliar(m, id)
     if (conc.resultado === 'ok' && d0.revisionManual) {
       // Deshiciste lo que hizo sola: ahora no la contabiliza sin ti.
       pasos.push(paso('conciliacion', t('Cuadra {id} con el pedido {oc}', { id: v(id, 'id'), oc: v(conc.oc, 'id') }), { tipo: 'conciliacion', salida: t('Cuadra con su pedido') }))
@@ -82,78 +176,38 @@ export const facturaNueva = {
           salida: t('Cuadra con su pedido: contabilizada'),
         }),
       )
-      pasos.push(
-        // Comprobar es rutinario: lo hace solo, no propone nada.
-        paso('cumplimiento', t('Comprueba si el gasto es elegible'), {
-          tipo: 'revision',
-          autonomia: 'ejecuta',
-          paralelo: true,
-          salida: (_, d) => {
-            const el = c.elegibilidad(d, id)
-            return el.estado === 'elegible' ? t('Elegible') : t('Elegible cuando se pague: falta el justificante de pago')
-          },
-        }),
-      )
+      pasos.push(paso('cumplimiento', t('Comprueba si el gasto es elegible'), { tipo: 'revision', autonomia: 'ejecuta', paralelo: true, salida: (_, d) => (c.elegibilidad(d, id).estado === 'elegible' ? t('Elegible') : t('Elegible cuando se pague: falta el justificante de pago')) }))
     } else {
-      pasos.push(
-        paso('conciliacion', t('Busca el pedido de {id}', { id: v(id, 'id') }), {
-          tipo: 'conciliacion',
-          salida: d0.contrato ? t('Sin pedido; el proveedor tiene contrato marco') : t('Sin pedido ni contrato'),
-        }),
-      )
+      pasos.push(paso('conciliacion', t('Busca el pedido de {id}', { id: v(id, 'id') }), { tipo: 'conciliacion', salida: d0.contrato ? t('Sin pedido; el proveedor tiene contrato marco') : t('Sin pedido ni contrato') }))
       pasos.push(paso('excepciones', t('Lo lleva a quien puede contabilizarla'), { tipo: 'revision', autonomia: 'aprueba', salida: t('Decide: {rol}', { rol: v(minuscula(ROLES.lineProducer)) }) }))
     }
     return pasos
   },
 
   componer({ antes, despues, det }) {
+    if (traeLaLlegada(antes, det)) return componerLlegada(antes, despues)
     const id = documentoObjetivo(antes, det)
-    const reglas = [
-      t('Se contabiliza sola si la confianza de cada campo es de al menos {u} y cuadra con un pedido aprobado', { u: v(POLITICAS.umbralConfianza, 'pct0') }),
-      t('Tolerancia de conciliación: {tol}', { tol: v(POLITICAS.toleranciaConciliacion, 'pct0') }),
-    ]
-    // La que Conciliación contabilizó sola hoy se cuenta así, no como «ya estaba contabilizada».
-    const solaHoy = (d) => d.estado === 'contabilizada' && d.contabilizadaPor === 'Conciliación' && d.oc
-    const yaSola = (d) => ({
-      bloques: [
-        texto(
-          d.id === 'F-2026-078'
-            ? t('{id} de {prov} entró hoy y Conciliación la contabilizó sola: cuadra con {oc}.', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') })
-            : t('{id} de {prov} ya está contabilizada: Conciliación la contabilizó sola porque cuadra con {oc}.', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') }),
-        ),
-        bloqueDocumento(despues, d.id, { elegibilidad: true }),
-      ],
-      sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('Prepárame el informe semanal de coste')],
-      fuentes: ['Bandeja de documentos'],
-      reglas,
-      noHecho: [t('No ha cambiado nada.')],
-    })
-
-    if (!id || (antes.documentos[id].estado === 'por_llegar' && det.eventoId !== 'EV-01')) {
-      const llegada = antes.documentos['F-2026-078']
-      if (!id && solaHoy(llegada)) return yaSola(llegada)
-      const pendiente = despues.entrantes.includes('EV-01')
-      const bloques = [
-        texto(
-          pendiente
-            ? t('Desde esta mañana no ha entrado ninguna factura. Cuando entra una que cuadra con su pedido, Conciliación la contabiliza sola.')
-            : t('Desde esta mañana no ha entrado ninguna factura nueva. En la bandeja quedan {n}.', { n: cuenta(enBandeja(despues).length, 'documento', 'documentos') }),
-        ),
-      ]
-      if (pendiente) {
-        bloques.push({ tipo: 'acciones', texto: t('En la demo puedes hacer que entre una ahora.'), acciones: [{ id: 'ver', etiqueta: 'Ver cómo se contabiliza una', variante: 'primary', entrada: { tipo: 'evento', eventoId: 'EV-01' } }] })
-      }
-      return { bloques, sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('Prepárame el informe semanal de coste')], fuentes: ['Bandeja de documentos'], reglas: [], noHecho: [t('No ha contabilizado nada.')] }
-    }
-
+    if (!id || antes.documentos[id].estado === 'por_llegar') return componerBandeja(despues)
+    const reglas = REGLAS_FACTURAS()
     const d = despues.documentos[id]
+
     if (antes.documentos[id].estado === 'contabilizada') {
-      if (solaHoy(d)) return yaSola(d)
+      // La que Conciliación contabilizó sola se cuenta así, no como «ya estaba contabilizada».
+      const sola = d.contabilizadaPor === 'Conciliación' && d.oc
       return {
-        bloques: [texto(t('{id} de {prov} ya está contabilizada en {p}.', { id: v(id, 'id'), prov: v(d.proveedor), p: v(nombrePartida(despues, d.partida)) })), bloqueDocumento(despues, id, { elegibilidad: true })],
+        bloques: [
+          texto(
+            sola
+              ? d.recibida === despues.corte.fecha
+                ? t('{id} de {prov} entró hoy y Conciliación la contabilizó sola: cuadra con {oc}.', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') })
+                : t('{id} de {prov} ya está contabilizada: Conciliación la contabilizó sola porque cuadra con {oc}.', { id: v(d.id, 'id'), prov: v(d.proveedor), oc: v(d.oc, 'id') })
+              : t('{id} de {prov} ya está contabilizada en {p}.', { id: v(id, 'id'), prov: v(d.proveedor), p: v(nombrePartida(despues, d.partida)) }),
+          ),
+          bloqueDocumento(despues, id, { elegibilidad: true }),
+        ],
         sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('¿Qué gastos tengo que revisar?')],
         fuentes: ['Bandeja de documentos'],
-        reglas: [],
+        reglas: sola ? reglas : [],
         noHecho: [t('No ha cambiado nada.')],
       }
     }
@@ -173,7 +227,6 @@ export const facturaNueva = {
           bloqueDocumento(despues, id, { elegibilidad: true }),
           kpisPartida(antes, despues, d.partida),
         ],
-        // Una línea para plegar la novedad cuando llega sola.
         // Base sin IVA, como el parte y la partida.
         resumen: t('Conciliación contabilizó sola {id} · {total} · cuadra con {oc}', { id: v(id, 'id'), total: v(d.base, 'eur'), oc: v(d.oc, 'id') }),
         sugerencias: [sug('¿Qué gastos tengo que revisar?'), sug('¿Qué bloquea el dossier fiscal?'), sug('Prepárame el informe semanal de coste')],
@@ -282,7 +335,7 @@ export const revisarGasto = {
     const dudosos = enBandeja(m).filter((d) => confianzaBaja(d))
     if (!dudosos.length) {
       return {
-        bloques: [texto(t('No queda ningún gasto por clasificar. Estas son las decisiones abiertas:')), { tipo: 'decisiones' }],
+        bloques: [texto(t('No tienes gastos por revisar. Estas son las decisiones que siguen abiertas:')), { tipo: 'decisiones' }],
         sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('Prepárame el informe semanal de coste')],
         fuentes: ['Bandeja de documentos'],
         reglas: [],
@@ -290,30 +343,41 @@ export const revisarGasto = {
       }
     }
     const d = dudosos[0]
-    const a = c.impactoNuevoCoste(m, d.partida, d.base, 'gastado')
-    const b = c.impactoNuevoCoste(m, d.alternativa, d.base, 'gastado')
-    const pa = nombrePartida(m, d.partida)
-    const pb = nombrePartida(m, d.alternativa)
-    const acciones = [
-      { id: 'confirmar', etiqueta: `Imputar a ${pa}`, burbuja: `Lo imputo a ${pa}`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.partida }, rol: ROLES.revisionHumana },
-      { id: 'alternativa', etiqueta: `Imputar a ${pb}`, burbuja: `Lo imputo a ${pb}`, variante: 'secondary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.alternativa }, rol: ROLES.revisionHumana },
-      { id: 'aplazar', etiqueta: 'Dejar en revisión', burbuja: 'Lo dejo en revisión', variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: d.id }, rol: ROLES.revisionHumana },
-    ].filter((x) => x.id !== 'aplazar' || !d.aplazado)
-    // Sin factura completa no vale para el dossier: se pide desde la misma tarjeta (guion pedir_documentacion).
-    // Esta acción no decide nada: lleva `entrada` en lugar de `accion`.
-    if (faltaDocumentacion(d)) {
-      acciones.push({ id: 'pedir', etiqueta: d.tipo === 'ticket' ? 'Pedir la factura completa' : 'Pedir la documentación', variante: 'secondary', entrada: { tipo: 'texto', texto: d.tipo === 'ticket' ? `Pide a ${d.proveedor} la factura completa` : `Pide a ${d.proveedor} la documentación que falta` }, rol: ROLES.revisionHumana })
+    const p = propuestaPartida(m, d)
+    const cuantos = dudosos.length === 1 ? t('Solo tienes un gasto por revisar.') : t('Tienes {n} por revisar; empiezo por el de {prov}.', { n: cuenta(dudosos.length, 'gasto', 'gastos'), prov: v(d.proveedor) })
+    return {
+      bloques: [texto(unir([cuantos, p.explicacion])), ...p.bloques],
+      sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('¿Qué bloquea el dossier fiscal?')],
+      fuentes: ['Bandeja de documentos', 'Presupuesto por partidas'],
+      reglas: [t('Por debajo del {u} de confianza, Facturas propone y una persona confirma', { u: v(POLITICAS.umbralConfianza, 'pct0') })],
+      noHecho: [t('No ha contabilizado el gasto.'), t('No ha pedido nada al proveedor.')],
     }
-    const bloques = [
-      texto(
-        t('No lo tenemos claro: confianza del {conf}, por debajo del {u} que hace falta para decidir solos. Sus líneas dicen {lineas}: encaja en {pa}, pero también podría ir a {pb}.', {
-          conf: v(confianzaMinima(d), 'pct0'),
-          u: v(POLITICAS.umbralConfianza, 'pct0'),
-          lineas: v(enLista(d.lineas.map((l) => `«${l}»`))),
-          pa: v(pa),
-          pb: v(pb),
-        }),
-      ),
+  },
+}
+
+/**
+ * Lo dudoso (confianza baja): Facturas no decide la partida y te propone dos, con lo que
+ * cada una hace al coste. La usan «Gastos por revisar» y la llegada de esta mañana.
+ * Devuelve la frase que lo explica y los bloques: el documento y la tarjeta.
+ */
+function propuestaPartida(m, d) {
+  const a = c.impactoNuevoCoste(m, d.partida, d.base, 'gastado')
+  const b = c.impactoNuevoCoste(m, d.alternativa, d.base, 'gastado')
+  const pa = nombrePartida(m, d.partida)
+  const pb = nombrePartida(m, d.alternativa)
+  const acciones = [
+    { id: 'confirmar', etiqueta: `Imputar a ${pa}`, burbuja: `Lo imputo a ${pa}`, variante: 'primary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.partida }, rol: ROLES.revisionHumana },
+    { id: 'alternativa', etiqueta: `Imputar a ${pb}`, burbuja: `Lo imputo a ${pb}`, variante: 'secondary', accion: { tipo: 'documento/contabilizar', docId: d.id, partida: d.alternativa }, rol: ROLES.revisionHumana },
+    { id: 'aplazar', etiqueta: 'Dejar en revisión', burbuja: 'Lo dejo en revisión', variante: 'secondary', accion: { tipo: 'documento/aplazar', docId: d.id }, rol: ROLES.revisionHumana },
+  ].filter((x) => x.id !== 'aplazar' || !d.aplazado)
+  // Sin factura completa no vale para el dossier: se pide desde la misma tarjeta (guion pedir_documentacion).
+  // Esta acción no decide nada: lleva `entrada` en lugar de `accion`.
+  if (faltaDocumentacion(d)) {
+    acciones.push({ id: 'pedir', etiqueta: d.tipo === 'ticket' ? 'Pedir la factura completa' : 'Pedir la documentación', variante: 'secondary', entrada: { tipo: 'texto', texto: d.tipo === 'ticket' ? `Pide a ${d.proveedor} la factura completa` : `Pide a ${d.proveedor} la documentación que falta` }, rol: ROLES.revisionHumana })
+  }
+  return {
+    explicacion: t('Sus líneas dicen {lineas}: encaja en {pa}, pero también podría ir a {pb}.', { lineas: v(enLista(d.lineas.map((l) => `«${l}»`))), pa: v(pa), pb: v(pb) }),
+    bloques: [
       bloqueDocumento(m, d.id, { conciliacion: false }),
       {
         tipo: 'aprobacion',
@@ -336,15 +400,8 @@ export const revisarGasto = {
         acciones,
         nota: d.tipo === 'ticket' ? 'Es un ticket simplificado: para el dossier fiscal hace falta una factura a nombre de la productora.' : undefined,
       },
-    ]
-    return {
-      bloques,
-      sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('¿Qué bloquea el dossier fiscal?')],
-      fuentes: ['Bandeja de documentos', 'Presupuesto por partidas'],
-      reglas: [t('Por debajo del {u} de confianza, Facturas propone y una persona confirma', { u: v(POLITICAS.umbralConfianza, 'pct0') })],
-      noHecho: [t('No ha contabilizado el gasto.'), t('No ha pedido nada al proveedor.')],
-    }
-  },
+    ],
+  }
 }
 
 // ── Pedir documentación ──────────────────────────────────────────────────────

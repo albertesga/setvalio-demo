@@ -4,7 +4,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconPlay, IconClock } from '../../components/icons.jsx'
+import { IconCheck, IconClose, IconChevronRight, IconChevronDown, IconAlert, IconPlay, IconClock, IconMail, IconFormulario, IconChat } from '../../components/icons.jsx'
 import { formatear, renderTexto, esPlantilla, fecha as fechaLarga } from '../texto.js'
 import * as c from '../calculos.js'
 import { puedeDecidir } from '../politicas.js'
@@ -378,11 +378,78 @@ function Confianza({ valor }) {
   )
 }
 
+// ── Cómo ha llegado cada documento ────────────────────────────────────────────
+
+const CANAL = {
+  email: { Icono: IconMail, prefijo: 'Por correo a', verbo: 'envía' },
+  web: { Icono: IconFormulario, prefijo: 'Por', verbo: 'sube' },
+  whatsapp: { Icono: IconChat, prefijo: 'Por', verbo: 'manda' },
+}
+
+/** «Por correo a facturas@… · la envía Administración de… · 08:12». */
+export function textoLlegada(d) {
+  const l = d.llegada
+  const c0 = l && CANAL[l.canal]
+  if (!c0) return null
+  return `${c0.prefijo} ${l.via} · ${d.tipo === 'ticket' ? 'lo' : 'la'} ${c0.verbo} ${l.por} · ${l.hora}`
+}
+
+/** Estado de un documento recién llegado: contabilizado (solo o por alguien), por revisar o en revisión. */
+function EstadoLlegada({ d }) {
+  if (d.estado === 'contabilizada') {
+    return (
+      <Tono tono="positive">
+        <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />
+        {d.contabilizadaPor === 'Conciliación' ? 'Contabilizada sola' : 'Contabilizada'}
+      </Tono>
+    )
+  }
+  if (d.aplazado) return <Tono tono="neutral">En revisión</Tono>
+  return <StatusChip estado="pendiente" />
+}
+
+/** Lo que ha entrado esta mañana: por qué canal, quién lo sube, a qué hora y cómo está. */
+function BloqueLlegadas({ b }) {
+  const { mundo } = useCtx()
+  const id = useId()
+  const docs = (b.docIds ?? []).map((x) => mundo.documentos[x]).filter(Boolean)
+  if (!docs.length) return null
+  return (
+    <section className="ag-panel" aria-labelledby={`${id}-t`}>
+      <h4 id={`${id}-t`} className="flp-kicker text-flp-muted">
+        Cómo han llegado
+      </h4>
+      <ol className="ag-llegadas">
+        {docs.map((d) => {
+          const Icono = CANAL[d.llegada?.canal]?.Icono
+          return (
+            <li key={d.id} className="ag-llegada">
+              <span className="ag-llegada-icono" aria-hidden="true">
+                {Icono && <Icono size={18} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="ag-llegada-doc">
+                  {d.tipo === 'ticket' ? 'Ticket' : 'Factura'} {d.id} · {d.proveedor} · <span className="tnum">{formatear(d.total, 'eurCents')}</span>
+                </p>
+                <p className="ag-llegada-canal">{textoLlegada(d)}</p>
+              </div>
+              <span className="ag-llegada-estado">
+                <EstadoLlegada d={d} />
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
 function BloqueDocumento({ b }) {
   const { mundo } = useCtx()
   const d = mundo.documentos[b.docId]
   if (!d) return null
   const conc = b.conciliacion
+  const llegada = textoLlegada(d)
   return (
     <div className="ag-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -392,6 +459,7 @@ function BloqueDocumento({ b }) {
           </div>
           <div className="mt-0.5 text-base font-semibold text-flp-ink">{d.proveedor}</div>
           <div className="text-sm text-flp-muted">{d.concepto}</div>
+          {llegada && <div className="mt-1 text-xs text-flp-muted">{llegada}</div>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Tono tono="neutral">{d.origen}</Tono>
@@ -1506,6 +1574,7 @@ const SEVERIDAD_ORDEN = { alta: 0, media: 1, baja: 2, controlado: 3 }
 
 const REGISTRO = {
   texto: BloqueTexto,
+  llegadas: BloqueLlegadas,
   aviso: BloqueAviso,
   lista: BloqueLista,
   kpis: BloqueKpis,

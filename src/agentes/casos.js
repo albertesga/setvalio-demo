@@ -1,16 +1,15 @@
 // Historias de la demo: una sola fuente para la lista de historias, el recorrido
 // guiado, las sugerencias y lo que cuenta como visto. La demo cuenta una idea,
-// «los agentes preparan, tú decides», en seis historias cortas; cada una enseña un
-// solo nivel de autonomía. Lo que no está aquí sigue respondiendo por texto (dossier,
-// incentivo, caja, desviación…), pero no se ofrece en el camino principal.
+// «los agentes preparan, tú decides», en cinco historias cortas, en orden de autonomía
+// (la de las facturas enseña dos: lo que hacen solos y lo que te proponen). Lo que no
+// está aquí sigue respondiendo por texto (dossier, incentivo, caja, desviación…), pero
+// no se ofrece en el camino principal. Ninguna se abre sola: todo empieza porque lo pides.
 //
 // Que cada entrada y cada pregunta resuelvan a su intención lo comprueba
 // scripts/check-agentes.mjs.
 
-import { crearMundo } from './mundo.js'
 import { AUTONOMIA } from './agentes.js'
 import { PREGUNTA } from './rodaje.js'
-import { formatear } from './texto.js'
 
 // Etiqueta única de lo que aún no es producto. No «En estudio»: en cine, un estudio es un plató.
 // Contrato: ETIQUETA_CAPACIDAD[capacidad] → etiqueta visible; 'decidida' no lleva etiqueta.
@@ -21,15 +20,12 @@ export const LEYENDA_CAPACIDAD = 'En exploración: ideas que aún no están en F
 // salen de AUTONOMIA (agentes.js), que lleva también su descripción.
 export const ETIQUETA_NIVEL = { lee: 'Solo leen', ...Object.fromEntries(Object.values(AUTONOMIA).map((a) => [a.id, a.etiqueta])) }
 
-// Cifras de las notas: salen del mundo, no se escriben a mano.
-const MUNDO = crearMundo()
-const CONFIANZA_TICKET = formatear(Math.min(...Object.values(MUNDO.documentos['G-004'].confianza)), 'pct0')
 
 const texto = (tx) => ({ tipo: 'texto', texto: tx })
 const evento = (eventoId) => ({ tipo: 'evento', eventoId })
 
 /**
- * Contrato HISTORIAS: seis, en el orden del arco.
+ * Contrato HISTORIAS: cinco, en el orden del arco.
  * { id, arco, titulo, unaLinea, nivel ('lee'|'ejecuta'|'propone'|'aprueba'),
  *   capacidad ('decidida'|'exploratoria'), autonomia (frase de cómo actúan),
  *   agentes, prompt (la pregunta visible), entrada (texto o evento; la pantalla la
@@ -57,31 +53,17 @@ export const HISTORIAS = [
   },
   {
     id: 'solo',
-    arco: 'Lo hace solo',
-    titulo: 'Una factura que cuadra',
-    unaLinea: 'Entra una factura que cuadra con su pedido. Conciliación la contabiliza sin preguntar, porque es rutinario y reversible, y queda registrada.',
+    arco: 'Lo hace solo o te lo propone',
+    titulo: 'Las facturas de esta mañana',
+    unaLinea: 'Entran tres por correo, formulario web y WhatsApp. Conciliación contabiliza sola las dos que cuadran con su pedido; el ticket que no está claro, Facturas te lo propone.',
     nivel: 'ejecuta',
     capacidad: 'decidida',
-    autonomia: 'Lo hace solo: es rutinario y reversible.',
-    agentes: ['facturas', 'conciliacion', 'cumplimiento'],
+    autonomia: 'Lo rutinario lo hacen solos; lo dudoso te lo proponen.',
+    agentes: ['facturas', 'conciliacion', 'cumplimiento', 'excepciones'],
     prompt: '¿Han llegado facturas nuevas?',
     entrada: evento('EV-01'),
-    nota: 'Entra una factura que cuadra con su pedido: Conciliación la contabiliza sola. Queda registrada y se puede deshacer.',
+    nota: 'Entran tres facturas por tres canales. Las dos que cuadran con su pedido se contabilizan solas y se pueden deshacer; el ticket dudoso te lo proponen y eliges tú.',
     intenciones: ['factura_nueva'],
-  },
-  {
-    id: 'propone',
-    arco: 'Te lo propone',
-    titulo: 'Un ticket que no sabe dónde va',
-    unaLinea: 'Con un ticket dudoso, Facturas no decide: te propone dos partidas, con lo que cada una hace al coste, y espera tu sí.',
-    nivel: 'propone',
-    capacidad: 'decidida',
-    autonomia: 'Te lo propone: lo deja preparado y espera tu sí.',
-    agentes: ['facturas', 'excepciones', 'cumplimiento'],
-    prompt: '¿Qué gastos tengo que revisar?',
-    entrada: texto('¿Qué gastos tengo que revisar?'),
-    nota: `Con un ${CONFIANZA_TICKET} de confianza, Facturas no decide: te propone dos partidas y eliges tú.`,
-    intenciones: ['revisar_gasto', 'pedir_documentacion'],
   },
   {
     id: 'aprueba',
@@ -152,7 +134,7 @@ export const HISTORIAS_POR_ID = Object.fromEntries([...HISTORIAS, EPILOGO].map((
 // como vista. Lo que no está (resumen, ayuda, fuera_alcance…) no cuenta.
 export const CASO_DE_INTENCION = Object.fromEntries([...HISTORIAS, EPILOGO].flatMap((h) => h.intenciones.map((i) => [i, h.id])))
 
-// Contrato RECORRIDO: seis pasos, uno por historia y en su orden; nunca el epílogo.
+// Contrato RECORRIDO: un paso por historia y en su orden; nunca el epílogo.
 // { id, historia, arco, titulo, nota, entrada (null = no envía nada), espera?, decisionDePrueba? }
 export const RECORRIDO = HISTORIAS.map((h) => ({
   id: h.id,

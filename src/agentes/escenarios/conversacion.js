@@ -80,15 +80,17 @@ export const ayuda = {
 
 /** Lo que se ha visto de cada nivel, con el estado real del mundo. */
 function lineasCierre(m) {
-  const factura = m.documentos['F-2026-078']
+  const solas = ['F-2026-078', 'F-2026-079'].map((id) => m.documentos[id]).filter((d) => d?.estado === 'contabilizada' && d.contabilizadaPor === 'Conciliación')
   const ticket = m.documentos['G-004']
   const orden = m.ordenes['OC-104']
   const confianza = Math.min(...Object.values(ticket.confianza ?? { x: 0 }))
   const lineas = []
   lineas.push(
-    factura?.estado === 'contabilizada'
-      ? t('Lo hace solo: Conciliación contabilizó {doc} porque cuadra con su pedido, {oc}.', { doc: v(factura.id, 'id'), oc: v(factura.oc, 'id') })
-      : t('Lo hace solo: Conciliación contabiliza sola la factura que cuadra con su pedido.'),
+    solas.length > 1
+      ? t('Lo hace solo: Conciliación contabilizó {a} y {b} porque cuadran con su pedido.', { a: v(solas[0].id, 'id'), b: v(solas[1].id, 'id') })
+      : solas.length
+        ? t('Lo hace solo: Conciliación contabilizó {doc} porque cuadra con su pedido, {oc}.', { doc: v(solas[0].id, 'id'), oc: v(solas[0].oc, 'id') })
+        : t('Lo hace solo: Conciliación contabiliza sola las facturas que cuadran con su pedido.'),
   )
   const decTicket = c.estadoDecision(m, { tipo: 'documento', id: ticket.id })
   const datosTicket = { p: v(confianza, 'pct0'), prov: v(ticket.proveedor) }
@@ -126,7 +128,7 @@ export const cierreRecorrido = {
       bloques: [
         texto(t('Así trabaja Filmpilot: los agentes preparan, tú decides. Lo has visto en sus tres formas de actuar.')),
         lista('Tres formas de actuar', lineasCierre(antes).map((x) => ({ texto: x }))),
-        // Las seis historias ya están en el carril con su marca: aquí solo lo que queda por ver.
+        // Las historias ya están en el carril con su marca: aquí solo lo que queda por ver.
         { tipo: 'acciones', texto: t('Para después: otro proyecto, antes del rodaje. Está en exploración.'), acciones: [{ id: 'itsasoa', etiqueta: EPILOGO.titulo, variante: 'secondary', historia: EPILOGO.id, entrada: EPILOGO.entrada ?? { tipo: 'texto', texto: EPILOGO.prompt } }] },
       ],
       sugerencias: ['¿Por qué se desvía Escenografía?', '¿Qué bloquea el dossier fiscal?', '¿Cuánto nos costará al final y llegamos de caja?'].map(sug),

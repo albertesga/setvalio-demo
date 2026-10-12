@@ -134,8 +134,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const cerrarHoja = useCallback(() => setHoja(null), [])
   const cerrarAgente = useCallback(() => setAgenteAbierto(null), [])
   const escribir = useCallback(() => despachar({ tipo: 'actividad' }), [despachar])
-  // Leer, desplazarse o pulsar también es actividad: las novedades que llegan solas
-  // esperan a que la persona deje la pantalla quieta, no la interrumpen mientras lee.
+  // Leer, desplazarse o pulsar también es actividad: si alguna novedad volviera a llegar sola,
+  // esperaría a que la persona dejara la pantalla quieta, sin interrumpirla mientras lee.
   const ultimaActividad = useRef(0)
   const marcarActividad = useCallback(() => {
     const ahora = Date.now()

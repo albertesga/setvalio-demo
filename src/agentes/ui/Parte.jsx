@@ -366,9 +366,9 @@ export function BloqueAgenda({ b }) {
 
 // ── Historias ────────────────────────────────────────────────────────────────
 
-// Historias cuyo arco ya dice su nivel («Lo hace solo», «Te lo propone», «Pide tu
+// Historias cuyo arco ya dice su nivel («Lo hace solo o te lo propone», «Pide tu
 // aprobación»): no repiten la insignia, como en el carril.
-const ARCO_DICE_NIVEL = new Set(['solo', 'propone', 'aprueba'])
+const ARCO_DICE_NIVEL = new Set(['solo', 'aprueba'])
 
 /**
  * Índice de historias («¿Qué puedes hacer?»): una tarjeta por historia, también el parte

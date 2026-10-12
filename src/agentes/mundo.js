@@ -73,16 +73,48 @@ function crearDocumentos() {
     docs[f.id] = documentoDesdeFactura(f, extra)
   }
 
-  // FACTURA_DEMO: llega durante la sesión (evento EV-01), escaneada.
+  // Las tres que llegan con EV-01, cada una por un canal y subida por alguien distinto
+  // (`llegada`): dos cuadran con su pedido y Conciliación las contabiliza sola; el ticket
+  // no está claro y Facturas te propone la partida.
+  // FACTURA_DEMO, escaneada, llega al correo de facturas.
   docs[FACTURA_DEMO.id] = documentoDesdeFactura(FACTURA_DEMO, {
     origen: 'PDF escaneado',
     confianza: { proveedor: FACTURA_DEMO.confianza.proveedor, importe: FACTURA_DEMO.confianza.importe, partida: FACTURA_DEMO.confianza.capitulo },
     estado: 'por_llegar',
     recibida: null,
+    llegada: { canal: 'email', via: 'facturas@candilejasfilm.com', por: 'Administración de Grúas y Cámaras del Sur', hora: '08:12' },
   })
+
+  // F-2026-079: la factura del pedido OC-107 (ya aprobado y dentro del comprometido de 04.02),
+  // subida por el proveedor desde el formulario web.
+  docs['F-2026-079'] = {
+    id: 'F-2026-079',
+    tipo: 'factura',
+    proveedor: 'Atrezzo Norte',
+    cif: 'B-95412377',
+    concepto: 'Reposición decoración escena teatro',
+    fecha: '2026-06-01',
+    recibida: null,
+    vencimiento: '2026-07-01',
+    base: 4_750,
+    impuesto: { tipo: 'IVA', tasa: 21, importe: 997.5 },
+    total: 5_747.5,
+    capitulo: '04',
+    partida: '04.02',
+    oc: 'OC-107',
+    ocLegacy: null,
+    contrato: CONTRATOS.has('Atrezzo Norte'),
+    origen: 'PDF',
+    confianza: { proveedor: 0.98, importe: 0.99, partida: 0.96 },
+    estado: 'por_llegar',
+    motivo: null,
+    pago: 'pendiente',
+    llegada: { canal: 'web', via: 'el formulario web de proveedores', por: 'Nerea Gil, de Atrezzo Norte', hora: '09:05' },
+  }
 
   // Copia de g-004 de src/screens/Facturas.jsx (allí fechado el 10/06; aquí el
   // 30/05, antes del corte). Base e IVA con la misma regla que crearGasto (21 %).
+  // Lo pagó en la tienda el jefe de construcción y llega por WhatsApp con EV-01.
   docs['G-004'] = {
     id: 'G-004',
     tipo: 'ticket',
@@ -91,7 +123,7 @@ function crearDocumentos() {
     concepto: 'Tornillería, pintura mate y material de refuerzo de decorado',
     lineas: ['Tornillería y pintura mate', 'Material refuerzo decorado'],
     fecha: '2026-05-30',
-    recibida: '2026-05-30',
+    recibida: null,
     vencimiento: null,
     base: 127.44,
     impuesto: { tipo: 'IVA', tasa: 21, importe: 26.76 },
@@ -104,9 +136,10 @@ function crearDocumentos() {
     contrato: false,
     origen: 'OCR PDF',
     confianza: { proveedor: 0.71, importe: 0.71, partida: 0.71 },
-    estado: 'en_bandeja',
+    estado: 'por_llegar',
     motivo: 'Ticket simplificado: no lleva los datos fiscales de la productora.',
     pago: 'pagado',
+    llegada: { canal: 'whatsapp', via: 'el WhatsApp de producción', por: 'Pablo Ruiz, jefe de construcción', hora: '09:41' },
   }
   return docs
 }
@@ -191,7 +224,7 @@ export function crearMundo() {
     borradores: {},
     revisiones: {},
     ajustesCef: {},
-    // Novedades por llegar. Cuáles llegan solas y en qué orden lo decide EVENTOS (sesion.js).
+    // Novedades por llegar. Las trae su historia, una pregunta o un botón; ninguna llega sola (EVENTOS, sesion.js).
     entrantes: ['EV-RIESGOS', 'EV-01', 'EV-CITACION', 'EV-02', 'EV-LLUVIA', 'EV-03'],
     // Plan de rodaje y señales que vigila el agente de riesgos (exploratorio).
     rodaje: crearRodaje(),

@@ -131,7 +131,8 @@ const FRASES = [
   ['Ha llegado una factura de Grúas y Cámaras del Sur', 'factura_nueva', { documento: 'F-2026-078' }],
   ['¿Qué gastos tengo que revisar?', 'revisar_gasto'],
   ['revisa el ticket de la ferretería', 'revisar_gasto', { documento: 'G-004' }],
-  ['procesa el G-004', 'revisar_gasto', { documento: 'G-004' }],
+  // Antes de que entre (llega con EV-01), pedir el ticket trae la llegada de esta mañana.
+  ['procesa el G-004', 'factura_nueva', { documento: 'G-004' }],
   ['Pide a Ferretería El Tornillo la factura completa', 'pedir_documentacion', { documento: 'G-004' }],
   ['Pide a Hotel Cristina la documentación que falta', 'pedir_documentacion', { documento: 'F-2026-072' }],
   ['redacta un correo a la gestoría', 'pedir_documentacion', { documento: 'F-2026-069' }],
@@ -186,6 +187,8 @@ const FRASES = [
   ['', 'no_entendido'],
 ]
 const mundoBase = crearMundo()
+// Con lo de esta mañana ya en la bandeja (EV-01): las dos facturas y el ticket G-004.
+const conLlegada = reducir(mundoBase, { tipo: 'evento/recibir', eventoId: 'EV-01' })
 for (const [frase, esperada, ent = {}, ctx = {}] of FRASES) {
   test(`«${frase}» → ${esperada}`, () => {
     const det = { ...detectarIntencion(frase, mundoBase, ctx) }
@@ -306,9 +309,11 @@ test('la factura de Grúas casa con OC-101 y no cambia la previsión', () => {
   assert.equal(m.ordenes['OC-101'].estado, 'Facturada')
 })
 test('el ticket en 04.01 (sin margen) sube el CEF; en 05.04 no', () => {
-  const a = reducir(frio, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
+  const llegado = reducir(frio, { tipo: 'evento/recibir', eventoId: 'EV-01' })
+  assert.equal(reducir(frio, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' }), frio, 'antes de llegar no se contabiliza')
+  const a = reducir(llegado, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
   cerca(a.partidas['04.01'].cef, 140_127.44)
-  const b = reducir(frio, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
+  const b = reducir(llegado, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
   cerca(c.totales(b).cef, TOTALES.cef)
 })
 test('ajustar la previsión de 01.03 deja la desviación total en +35.000 €', () => {
@@ -400,8 +405,8 @@ test('las decisiones de cada tarjeta producen un turno válido', () => {
     }
   }
 })
-test('seis historias con su intención y un recorrido de un paso por historia', () => {
-  assert.deepEqual(HISTORIAS.map((h) => h.id), ['parte', 'solo', 'propone', 'aprueba', 'adelanta', 'equipo'])
+test('cinco historias con su intención y un recorrido de un paso por historia', () => {
+  assert.deepEqual(HISTORIAS.map((h) => h.id), ['parte', 'solo', 'aprueba', 'adelanta', 'equipo'])
   for (const h of [...HISTORIAS, EPILOGO]) assert.ok(Object.values(CASO_DE_INTENCION).includes(h.id), h.id)
   assert.equal(RECORRIDO.length, HISTORIAS.length)
   assert.ok(!RECORRIDO.some((p) => p.historia === EPILOGO.id), 'el epílogo no está en el recorrido')
@@ -437,22 +442,15 @@ test('mientras un turno corre, lo siguiente espera en cola', () => {
   s = correr(s, 15_000)
   assert.equal(s.mensajes.filter((m) => m.rol === 'agentes' && m.estado === 'hecho').length, 2)
 })
-test('solo llegan solas la factura y la compra, en ese orden, y se pueden pausar', () => {
+test('la demo es reactiva: ninguna novedad ni historia llega sola', () => {
+  assert.deepEqual(EVENTOS.filter((e) => e.automatico), [])
   let s = crearSesion()
   s = correr(s, 40_000, 500)
   assert.equal(s.mensajes.length, 0, 'sin conversación no llega nada')
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
-  s = correr(s, 30_000, 250)
-  const novedades = () => s.mensajes.filter((m) => m.rol === 'novedad').map((m) => m.eventoId)
-  assert.deepEqual(novedades(), ['EV-01'], 'primero la factura')
-  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'contabilizada')
-  s = reducirSesion(s, { tipo: 'pausarEventos', valor: true })
-  s = correr(s, 90_000, 500)
-  assert.deepEqual(novedades(), ['EV-01'], 'en pausa no llega nada más')
-  s = reducirSesion(s, { tipo: 'pausarEventos', valor: false })
-  s = correr(s, 120_000, 500)
-  assert.deepEqual(novedades(), ['EV-01', 'EV-02'], 'después, la compra; el resto nunca llega solo')
-  assert.deepEqual(EVENTOS.filter((e) => e.automatico).map((e) => e.id), ['EV-01', 'EV-02'])
+  s = correr(s, 240_000, 500)
+  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'con la conversación quieta tampoco')
+  assert.deepEqual(vistosDe(s), [], 'ninguna historia se abre sola')
 })
 test('una novedad no llega sola si su historia ya se ha visto, ni dos veces aunque se pida durante su turno', () => {
   let s = crearSesion()
@@ -535,7 +533,7 @@ test('una orden pedida a producción ejecutiva sigue abierta y Marta la puede ap
   assert.equal(c.estadoDecision(m, { tipo: 'orden', id: 'OC-104' }).estado, 'aprobada')
 })
 test('dejar un gasto en revisión no lo bloquea: se puede contabilizar después', () => {
-  let m = reducir(mundoBase, { tipo: 'documento/aplazar', docId: 'G-004' })
+  let m = reducir(conLlegada, { tipo: 'documento/aplazar', docId: 'G-004' })
   assert.equal(c.estadoDecision(m, { tipo: 'documento', id: 'G-004' }).estado, 'pendiente')
   m = reducir(m, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '05.04' })
   assert.equal(m.documentos['G-004'].estado, 'contabilizada')
@@ -563,12 +561,12 @@ test('no se pide documentación de una factura que casa con su pedido', () => {
   assert.equal(Object.keys(r.mundo.borradores).length, 0)
 })
 test('el ticket ya contabilizado sigue pudiendo pedir su factura completa', () => {
-  const m = reducir(mundoBase, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
+  const m = reducir(conLlegada, { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01' })
   const r = responder(m, { tipo: 'texto', texto: 'Pide a Ferretería El Tornillo la factura completa' })
   assert.ok(r.mundo.borradores['BOR-G-004'])
 })
 test('la salida de Previsión tras contabilizar el ticket coincide con la partida', () => {
-  const r = responder(mundoBase, { tipo: 'accion', accion: { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01', por: 'Marta Cobo' } })
+  const r = responder(conLlegada, { tipo: 'accion', accion: { tipo: 'documento/contabilizar', docId: 'G-004', partida: '04.01', por: 'Marta Cobo' } })
   const salida = renderTexto(r.turno.pasos.find((p) => p.agente === 'prevision').salida)
   assert.match(salida, /\+127\s€/)
 })
@@ -581,7 +579,8 @@ test('una novedad no llega dos veces', () => {
   assert.equal(s.mensajes.length, n)
 })
 test('deshacer conserva el borrador redactado después', () => {
-  let s = crearSesion()
+  let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
+  s = correr(s, 20_000)
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/aprobar', ocId: 'OC-106' }, etiqueta: 'Aprobar OC-106' } })
   s = correr(s, 6_000)
   const decision = s.mensajes.filter((m) => m.rol === 'agentes').at(-1)
@@ -922,7 +921,7 @@ test('saludar abre la conversación con el parte, una sola vez, y se reproduce c
   assert.equal(inst.mensajes[0].estado, 'hecho')
   assert.equal(inst.activo, null)
 })
-test('el parte no cuenta como conversación: las novedades esperan a que pidas algo', () => {
+test('el parte no cuenta como conversación y nada llega solo', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'saludar' })
   s = correr(s, 60_000, 500)
   assert.equal(s.mensajes.length, 1, 'solo el parte')
@@ -930,8 +929,7 @@ test('el parte no cuenta como conversación: las novedades esperan a que pidas a
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
   s = correr(s, 30_000, 250)
   assert.ok(conversacionIniciada(s))
-  assert.ok(s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-01'), 'la primera novedad es la factura')
-  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad' && m.eventoId === 'EV-RIESGOS'))
+  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'tampoco después: todo llega porque lo pides')
 })
 test('el recorrido empieza con el parte ya leído y Álvaro recibe su propio saludo', () => {
   const s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
@@ -973,7 +971,7 @@ test('«Para hoy»: lluvia de mañana, compras y certificado; los avisos, aparte
   assert.deepEqual(ag.avisos.subitems.map((s) => s.id), ['RG-4', 'RG-6', 'RG-2'])
   assert.match(renderTexto(ag.items[0].cuando), /antes de publicar la orden del día de mañana/)
   assert.match(renderTexto(ag.items[2].detalle), /620\.000\s€/)
-  assert.equal(ag.resto, 5, 'decisiones que no caben en «Para hoy»; los avisos no cuentan')
+  assert.equal(ag.resto, 4, 'decisiones que no caben en «Para hoy»; los avisos no cuentan (el ticket aún no ha llegado)')
 })
 test('cada botón del parte lleva a un guion que lo resuelve', () => {
   const ag = agendaDelDia(mundoBase)
@@ -1096,7 +1094,7 @@ test('una pregunta corriente no marca como vista una historia que no enseña', (
   assert.ok(!vistosDe(s).includes('aprueba') && !vistosDe(s).includes('equipo'), vistosDe(s).join(','))
 })
 test('«Ya hecho» solo cuenta lo que Conciliación contabilizó sola con su pedido', () => {
-  let m = reducir(mundoBase, { tipo: 'documento/contabilizar', docId: 'G-004', partida: mundoBase.documentos['G-004'].partida, por: 'Marta Cobo' })
+  let m = reducir(conLlegada, { tipo: 'documento/contabilizar', docId: 'G-004', partida: mundoBase.documentos['G-004'].partida, por: 'Marta Cobo' })
   m = reducir(m, { tipo: 'documento/contabilizar', docId: 'F-2026-069', por: 'Marta Cobo' })
   const h = responder(m, { tipo: 'texto', texto: 'Ponme al día' }).turno.bloques.find((b) => b.tipo === 'hecho')
   assert.match(renderTexto(h.items[0].texto), /contabilizó 5 facturas/)
@@ -1107,9 +1105,13 @@ test('deshacer lo que contabilizó Conciliación sola lo deja para que lo revise
   s = avanza(s, 20_000, 100)
   const antes = decisionesAbiertas(s.mundo).length
   s = reducirSesion(s, { tipo: 'deshacer', mensajeId: s.mensajes.filter((m) => m.rol === 'agentes').at(-1).id })
-  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'en_bandeja')
-  assert.equal(decisionesAbiertas(s.mundo).length, antes + 1, 'entra en «Por revisar»')
-  const r = responder(s.mundo, { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' })
+  for (const id of ['F-2026-078', 'F-2026-079']) assert.equal(s.mundo.documentos[id].estado, 'en_bandeja', id)
+  assert.equal(decisionesAbiertas(s.mundo).length, antes + 2, 'las dos entran en «Por revisar»')
+  assert.match(s.mensajes.at(-1).texto, /F-2026-078 y F-2026-079 quedan en la bandeja para que las revises tú/)
+  const hoy = responder(s.mundo, { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' })
+  assert.ok(hoy.turno.bloques.some((b) => b.tipo === 'llegadas'), 'cuenta cómo han llegado')
+  assert.equal(hoy.turno.bloques.find((b) => b.tipo === 'acciones').acciones.length, 3, 'un botón por cada una que espera')
+  const r = responder(s.mundo, { tipo: 'texto', texto: 'Procesa la factura F-2026-078' })
   assert.ok(r.turno.bloques.some((b) => b.tipo === 'aprobacion' && b.ref.id === 'F-2026-078'), 'trae su tarjeta')
   assert.equal(r.mundo.documentos['F-2026-078'].estado, 'en_bandeja', 'no la vuelve a contabilizar sola')
   const inf = responder(s.mundo, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' })
@@ -1118,7 +1120,7 @@ test('deshacer lo que contabilizó Conciliación sola lo deja para que lo revise
 test('el informe por aprobar cuenta en «Por revisar» y «Dejar en revisión» no se repite', () => {
   const m = responder(mundoBase, { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' }).mundo
   assert.ok(decisionesAbiertas(m).some((d) => d.ref.tipo === 'informe'))
-  const aplazado = reducir(mundoBase, { tipo: 'documento/aplazar', docId: 'G-004', por: 'Marta Cobo' })
+  const aplazado = reducir(conLlegada, { tipo: 'documento/aplazar', docId: 'G-004', por: 'Marta Cobo' })
   const tj = responder(aplazado, { tipo: 'texto', texto: '¿Qué gastos tengo que revisar?' }).turno.bloques.find((b) => b.tipo === 'aprobacion')
   assert.ok(!tj.acciones.some((a) => a.id === 'aplazar'))
 })
@@ -1165,15 +1167,12 @@ test('abrir una historia con su novedad ya recibida pregunta con su texto y sale
   const e = reducirSesion(s, { tipo: 'historia/abrir', historia: EPILOGO.id })
   assert.equal(e.mensajes[0].indice, null, 'el epílogo no lleva número')
 })
-test('solo la novedad que llega sin pedirla lleva la marca de «llegó sola»', () => {
+test('lo que se pide nunca lleva la marca de «llegó sola»', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
-  s = avanza(s, 40_000, 250)
-  const sola = s.mensajes.find((m) => m.rol === 'agentes' && m.eventoId === 'EV-01')
-  assert.ok(sola, 'EV-01 llega sola')
-  assert.equal(sola.llegoSola, true)
-  assert.equal(s.mensajes.find((m) => m.rol === 'novedad' && m.eventoId === 'EV-01').llegoSola, true)
-  let p = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
-  assert.equal(p.mensajes.find((m) => m.rol === 'agentes').llegoSola, false, 'la pedida no')
+  s = avanza(s, 60_000, 250)
+  assert.ok(!s.mensajes.some((m) => m.llegoSola), 'nada llega solo')
+  const p = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
+  assert.equal(p.mensajes.find((m) => m.rol === 'agentes').llegoSola, false, 'la pedida no se pliega')
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

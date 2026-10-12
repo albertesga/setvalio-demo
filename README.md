@@ -47,16 +47,15 @@ lleva el contador «Por revisar», el recorrido y las historias; lo que cambia l
 demo (ver como otro rol, velocidad, novedades automáticas, reinicio) está en
 **Opciones**.
 
-### Seis historias
+### Cinco historias
 
-La demo enseña una sola idea: **los agentes preparan y tú decides**. Cada
-historia es un nivel de autonomía, en este orden:
+La demo enseña una sola idea: **los agentes preparan y tú decides**. Las
+historias van en orden de autonomía:
 
 | Arco | Historia | Qué enseña |
 | --- | --- | --- |
 | Cada mañana | Lo que encuentras cada mañana | El parte, sin pedir nada |
-| Lo hace solo | Una factura que cuadra | Conciliación contabiliza sola lo rutinario y reversible, y se puede deshacer |
-| Te lo propone | Un ticket que no sabe dónde va | Facturas propone dos partidas con su impacto y espera tu sí |
+| Lo hace solo o te lo propone | Las facturas de esta mañana | Entran tres por correo (facturas@candilejasfilm.com), formulario web y WhatsApp, cada una con quién la sube. Conciliación contabiliza sola las dos que cuadran con su pedido (se puede deshacer); el ticket dudoso, Facturas te propone dónde va |
 | Pide tu aprobación | Una compra que ningún agente aprueba | Una compra de hotel que pasaría el límite de Viajes: decides tú |
 | Se adelantan | La lluvia de mañana | Riesgos propone cambiar el orden de jornadas antes de que llueva |
 | Todo el equipo | El informe del viernes | Siete agentes se reparten el trabajo; compartir el informe necesita tu aprobación |
@@ -64,9 +63,10 @@ historia es un nivel de autonomía, en este orden:
 Las historias viven en `src/agentes/casos.js` (`HISTORIAS`) y de ahí salen el
 carril, «¿Qué puedes hacer?», el **recorrido guiado** (un paso por historia; el
 de la compra y el de la lluvia esperan tu decisión) y las sugerencias
-«Siguiente». Solo dos novedades llegan solas mientras conversas, una vez cada
-una: la factura (EV-01) y la compra (EV-02). Las demás novedades de ejemplo
-(avisos de rodaje y un vencimiento del dossier) no llegan solas.
+«Siguiente». Abrir una historia empieza una conversación limpia: arriba la
+historia, debajo lo que se pide y la respuesta (lo decidido antes se queda).
+La demo es reactiva: ninguna historia ni novedad llega sola; todo empieza porque
+lo pides.
 
 Las autonomías se nombran igual en todas partes: **Lo hace solo**, **Te lo
 propone** y **Pide tu aprobación**. Ningún agente paga, firma ni se comunica con

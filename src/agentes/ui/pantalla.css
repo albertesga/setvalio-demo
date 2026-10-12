@@ -76,12 +76,6 @@
 .ag-segmentado span { width: 100%; padding: 8px 6px; border-radius: 999px; color: var(--flp-muted); font-size: 14px; text-align: center; }
 .ag-segmentado input:checked + span { background: var(--flp-carbon); color: var(--flp-chalk); }
 .ag-segmentado input:focus-visible + span { outline: 2px solid var(--flp-carbon); outline-offset: 2px; }
-.ag-interruptor {
-  display: flex; min-height: 52px; align-items: center; gap: 12px; padding: 8px 12px; cursor: pointer;
-  border: 1px solid var(--flp-border); border-radius: var(--flp-radius-sm); background: var(--flp-surface);
-}
-.ag-interruptor input { width: 20px; height: 20px; flex: none; accent-color: var(--flp-carbon); cursor: pointer; }
-.ag-interruptor-estado { flex: none; color: var(--flp-carbon); font-family: var(--flp-font-mono); font-size: 12px; }
 
 /* ── Cuerpo y carril ──────────────────────────────────────────────────────── */
 .ag-cuerpo { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
@@ -98,7 +92,7 @@
 
 .ag-carril { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 
-/* Lo que puedes ver: seis historias en filas de dos líneas, sin cortar. */
+/* Lo que puedes ver: las historias en filas de dos líneas, sin cortar. */
 .ag-casos-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 4px 8px 6px; }
 .ag-casos-cuenta { flex: none; color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
 .ag-casos-lista { display: grid; gap: 2px; }

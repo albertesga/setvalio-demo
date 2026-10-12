@@ -1,5 +1,5 @@
 // Sesión de conversación: parte de la mañana, mensajes, reproducción de los pasos
-// de cada agente, novedades que llegan solas, deshacer y recorrido guiado.
+// de cada agente, novedades (por ahora ninguna llega sola), deshacer, historias en limpio y recorrido guiado.
 //
 // Es un reductor puro: el tiempo entra como acción ({ tipo: 'avanzar', ms }),
 // así que se prueba en Node con un reloj falso.
@@ -13,12 +13,12 @@ import { estadoDecision } from './calculos.js'
 import { renderTexto } from './texto.js'
 
 // Contrato EVENTOS: novedades del mundo. { id, retrasoMs, agente, titulo, automatico, historia }.
-// Solo las automáticas (EV-01 y EV-02) llegan solas, en este orden, con la conversación
-// parada (retrasoMs de inactividad) y solo si su historia aún no se ha visto. Las demás
-// las piden los guiones (la tarjeta, el parte) y las pruebas.
+// Por ahora la demo es reactiva: ninguna llega sola (automatico: false en todas) y cada una
+// la trae su historia, una pregunta o un botón. Si alguna vuelve a ser automática, llega con
+// la conversación parada (retrasoMs de inactividad) y solo si su historia aún no se ha visto.
 export const EVENTOS = [
-  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Ha entrado una factura de Grúas y Cámaras del Sur', automatico: true, historia: 'solo' },
-  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado un pedido de hotel', automatico: true, historia: 'aprueba' },
+  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Han entrado tres facturas: por correo, formulario web y WhatsApp', automatico: false, historia: 'solo' },
+  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado un pedido de hotel', automatico: false, historia: 'aprueba' },
   { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas', automatico: false, historia: 'adelanta' },
   { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar', automatico: false, historia: 'adelanta' },
   { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana', automatico: false, historia: 'adelanta' },
@@ -364,7 +364,7 @@ export function reducirSesion(s, a) {
         decision?.rol === 'decision'
           ? `${persona.nombre} ha deshecho «${decision.texto}». Todo vuelve a como estaba.`
           : msg.turno.resumen
-            ? `${persona.nombre} ha deshecho «${renderTexto(msg.turno.resumen)}».${solas.length ? ` ${solas.join(' y ')} queda en la bandeja para que la revises tú.` : ' Todo vuelve a como estaba.'}`
+            ? `${persona.nombre} ha deshecho «${renderTexto(msg.turno.resumen)}».${solas.length === 1 ? ` ${solas[0]} queda en la bandeja para que la revises tú.` : solas.length ? ` ${solas.slice(0, -1).join(', ')} y ${solas.at(-1)} quedan en la bandeja para que las revises tú.` : ' Todo vuelve a como estaba.'}`
             : `${persona.nombre} ha deshecho «${msg.turno.titulo}». Todo vuelve a como estaba.`
       // Qué decisiones deshace (para «Volver a decidir»): las entradas de historial que añadió el turno.
       const deshechoRefs = reducirVarias(previo, conservar(msg)).historial.slice(previo.historial.length).map((h) => h.ref).filter(Boolean)
