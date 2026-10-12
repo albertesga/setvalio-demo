@@ -26,7 +26,7 @@ import { agendaDelDia, PREGUNTAS_PARTE } from '../src/agentes/escenarios/saludo.
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
 import { evaluarRiesgos, riesgo as riesgoDe, JORNADAS, HECHAS, LOCALIZACIONES, SENALES, decisionesRiesgos, PREGUNTA } from '../src/agentes/rodaje.js'
-import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER } from '../src/screens/portada/datos.js'
+import { RODAJE, PLAN_RIESGO, FLOW, DOSSIER, AGENTS_PREVIEW as AGENTES_PORTADA } from '../src/screens/portada/datos.js'
 import { puedeDecidir } from '../src/agentes/politicas.js'
 import { REGLA_COMUN } from '../src/agentes/escenarios/conversacion.js'
 import { decisionesAbiertas } from '../src/agentes/pendientes.js'
@@ -888,6 +888,12 @@ test('la portada cuenta el día y el plan de rodaje del mundo de los agentes', (
   assert.equal(FLOW.find((f) => f.number === '03').value.replace('−', '-'), eur(c.tesoreria(m).minimo.saldo).replace(/\u00a0/g, ' ').replace('−', '-'))
   assert.equal(FLOW.find((f) => f.number === '05').value, `${c.dossier(m).length} bloqueantes`)
   assert.equal(DOSSIER.length, c.dossier(m).length)
+})
+test('la portada cuenta los documentos que lee Facturas en el informe', () => {
+  const r = responder(crearMundo(), { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' })
+  const n = Number(renderTexto(r.turno.pasos.find((p) => p.agente === 'facturas').titulo).match(/\d+/)[0])
+  const PALABRA = { 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco' }
+  assert.ok(AGENTES_PORTADA.some((a) => a.tarea === `Lee los ${PALABRA[n]} documentos de la bandeja`), `la portada debe decir ${PALABRA[n]}`)
 })
 test('la portada enseña las cifras del agente de riesgos', () => {
   const src = readFileSync(new URL('../src/screens/Landing.jsx', import.meta.url), 'utf8')

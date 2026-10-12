@@ -356,7 +356,8 @@ function MensajeAgentes({ msg, ultimo }) {
 
       {puedeDeshacer && (
         <div className="ag-deshacer">
-          <span>{automatico ? 'Lo hizo sin preguntarte.' : '¿No era esto?'}</span>
+          {/* Lo que hizo solo, dicho con su resumen («Conciliación contabilizó sola…»), junto al botón. */}
+          <span>{automatico && t.resumen ? <Tx value={t.resumen} /> : automatico ? 'Lo hizo sin preguntarte.' : '¿No era esto?'}</span>
           <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={deshacer}>
             {automatico ? `Deshacer lo que hizo ${quien}` : 'Deshacer esta decisión'}
           </FilmpilotButton>
@@ -456,8 +457,17 @@ function MensajeGuia({ msg }) {
   )
 }
 
+// Identificadores como F-2026-079 u OC-104: no se parten por el guion.
+const ID_DOC = /([A-Z]{1,4}-\d[\d-]*)/
+
 function MensajeNota({ msg }) {
-  return <p className="ag-msg-nota">{msg.texto}</p>
+  return (
+    <p className="ag-msg-nota">
+      {String(msg.texto)
+        .split(ID_DOC)
+        .map((parte, i) => (i % 2 ? <span key={i} className="whitespace-nowrap">{parte}</span> : parte))}
+    </p>
+  )
 }
 
 export function Mensaje({ msg, ultimo, ultimaNovedad }) {

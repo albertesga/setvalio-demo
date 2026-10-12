@@ -27,12 +27,9 @@ export function documentoObjetivo(m, det) {
   return id && m.documentos[id] ? id : null
 }
 
-/** ¿Trae esta petición lo de esta mañana? La novedad, o preguntar por una de las tres antes de que entre. */
+/** ¿Trae esta petición lo de esta mañana? Solo la novedad: un texto no la ejecuta (no se podría deshacer). */
 function traeLaLlegada(m, det) {
-  if (!m.entrantes.includes('EV-01')) return false
-  if (det.eventoId === 'EV-01') return true
-  const id = documentoObjetivo(m, det)
-  return !!id && LLEGAN_CON_EV01.includes(id)
+  return m.entrantes.includes('EV-01') && det.eventoId === 'EV-01'
 }
 
 /** Pasos de la llegada: recoger los tres canales, leer, cuadrar lo que cuadra y proponer lo dudoso. */
@@ -238,7 +235,9 @@ export const facturaNueva = {
 
     // La que deshiciste: cuadra, pero ahora la contabilizas tú.
     if (d.revisionManual) {
-      const imp = c.impactoNuevoCoste(despues, d.partida, d.base, 'gastado')
+      // El impacto se mide con el reductor: lo que queda abierto del pedido no sube el coste final.
+      const sube = c.totales(reducir(despues, { tipo: 'documento/contabilizar', docId: id })).cef - c.totales(despues).cef
+      const imp = { exceso: sube > 0.004 ? sube : 0 }
       const partida = nombrePartida(despues, d.partida)
       return {
         bloques: [
@@ -333,9 +332,15 @@ export const revisarGasto = {
 
   componer({ despues: m }) {
     const dudosos = enBandeja(m).filter((d) => confianzaBaja(d))
+    // Las que deshiciste esperan también tu revisión: cuentan y se pueden abrir desde aquí.
+    const manuales = enBandeja(m).filter((d) => d.revisionManual)
+    const total = dudosos.length + manuales.length
+    const revisarManuales = manuales.length
+      ? [{ tipo: 'acciones', texto: manuales.length === 1 ? t('También espera tu revisión una factura que cuadra con su pedido.') : t('También esperan tu revisión {n} que cuadran con su pedido.', { n: cuenta(manuales.length, 'factura', 'facturas') }), acciones: manuales.map((d) => ({ id: d.id, etiqueta: `Revisar ${d.id}`, variante: 'secondary', entrada: { tipo: 'texto', texto: `Procesa la factura ${d.id}` } })) }]
+      : []
     if (!dudosos.length) {
       return {
-        bloques: [texto(t('No tienes gastos por revisar. Estas son las decisiones que siguen abiertas:')), { tipo: 'decisiones' }],
+        bloques: [texto(manuales.length ? t('Ningún gasto espera que elijas partida.') : t('Ningún gasto espera que elijas partida. Estas son las decisiones que siguen abiertas:')), ...(manuales.length ? revisarManuales : [{ tipo: 'decisiones' }])],
         sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('Prepárame el informe semanal de coste')],
         fuentes: ['Bandeja de documentos'],
         reglas: [],
@@ -344,9 +349,9 @@ export const revisarGasto = {
     }
     const d = dudosos[0]
     const p = propuestaPartida(m, d)
-    const cuantos = dudosos.length === 1 ? t('Solo tienes un gasto por revisar.') : t('Tienes {n} por revisar; empiezo por el de {prov}.', { n: cuenta(dudosos.length, 'gasto', 'gastos'), prov: v(d.proveedor) })
+    const cuantos = total === 1 ? t('Solo tienes un gasto por revisar.') : t('Tienes {n} por revisar; empiezo por el de {prov}.', { n: cuenta(total, 'gasto', 'gastos'), prov: v(d.proveedor) })
     return {
-      bloques: [texto(unir([cuantos, p.explicacion])), ...p.bloques],
+      bloques: [texto(unir([cuantos, p.explicacion])), ...p.bloques, ...revisarManuales],
       sugerencias: [sug('¿Han llegado facturas nuevas?'), sug('¿Qué bloquea el dossier fiscal?')],
       fuentes: ['Bandeja de documentos', 'Presupuesto por partidas'],
       reglas: [t('Por debajo del {u} de confianza, Facturas propone y una persona confirma', { u: v(POLITICAS.umbralConfianza, 'pct0') })],
@@ -450,7 +455,8 @@ function borradorPara(m, d) {
 
 /** Le falta documentación: ticket simplificado, IGIC por validar o factura sin pedido ni contrato. */
 export function faltaDocumentacion(d) {
-  return d.estado !== 'por_llegar' && (d.tipo === 'ticket' || d.impuesto?.tipo === 'IGIC' || (!d.oc && !d.contrato) || (!d.oc && d.estado === 'en_bandeja'))
+  // Sin pedido pero con contrato marco, el gasto está respaldado: no falta documentación.
+  return d.estado !== 'por_llegar' && (d.tipo === 'ticket' || d.impuesto?.tipo === 'IGIC' || (!d.oc && !d.contrato))
 }
 
 function documentoParaPedir(m, det) {

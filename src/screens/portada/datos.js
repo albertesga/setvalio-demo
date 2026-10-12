@@ -23,7 +23,7 @@ export const RODAJE = { titulo: 'La última función', dia: 7, jornadas: 20 }
 // Vista estática del informe semanal (no importa el motor para no cargarlo en la portada).
 // trabaja y acaba: cuándo empieza y termina cada agente en la toma, en ms.
 export const AGENTS_PREVIEW = [
-  { familia: 'documentacion', nombre: 'Facturas', tarea: 'Lee los cuatro documentos de la bandeja', estado: 'done', trabaja: 300, acaba: 1000 },
+  { familia: 'documentacion', nombre: 'Facturas', tarea: 'Lee los tres documentos de la bandeja', estado: 'done', trabaja: 300, acaba: 1000 },
   { familia: 'financiacion', nombre: 'Conciliación', tarea: 'Cuadra cada factura con su pedido', estado: 'done', trabaja: 1000, acaba: 1700 },
   { familia: 'presupuesto', nombre: 'Control de costes', tarea: 'Escenografía supera el umbral del 8 %', estado: 'done', trabaja: 1700, acaba: 2500 },
   { familia: 'financiacion', nombre: 'Excepciones', tarea: 'Una compra de más de 10.000 € espera tu aprobación', estado: 'review', trabaja: 1700, acaba: 2900 },
