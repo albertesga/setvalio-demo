@@ -17,6 +17,7 @@ import { Sugerencias, Redactor } from '../agentes/ui/Conversacion.jsx'
 import { Cabecera } from '../agentes/ui/Cabecera.jsx'
 import { AgentesPorFamilia, LeyendaAutonomia, DetalleAgente, estadoAgentes } from '../agentes/ui/Paneles.jsx'
 import { ListaConversaciones, CabeceraChat, EstadoVacio } from '../agentes/ui/Conversaciones.jsx'
+import { aprobacionPendiente } from '../agentes/ui/Bloques.jsx'
 import { AGENTES } from '../agentes/agentes.js'
 
 // La pantalla ocupa el alto visible y desplaza sus columnas por dentro: el documento no se mueve.
@@ -50,16 +51,22 @@ function useAncho() {
   return ancho
 }
 
-function Anunciador({ mensajes }) {
+function Anunciador({ mensajes, conv }) {
   const [texto, setTexto] = useState('')
   const ultimoAnunciado = useRef(null)
+  const convAnunciada = useRef(conv)
   useEffect(() => {
     const ultimo = [...mensajes].reverse().find((m) => m.rol === 'agentes' || m.rol === 'novedad')
     if (!ultimo) return
     const clave = `${ultimo.id}-${ultimo.estado ?? ''}`
     if (ultimoAnunciado.current === clave) return
     ultimoAnunciado.current = clave
-    // Lo que ya estaba escrito al abrir no se anuncia como si llegara ahora.
+    // Al volver a una conversación, lo que ya tenía no se anuncia como si llegara ahora.
+    if (convAnunciada.current !== conv) {
+      convAnunciada.current = conv
+      return
+    }
+    // Lo que ya estaba escrito al abrir, tampoco.
     if (ultimo.apertura) return
     if (ultimo.rol === 'novedad') setTexto(`Novedad: ${ultimo.titulo}.`)
     else if (ultimo.estado === 'en_curso') setTexto(`Los agentes trabajan: ${ultimo.turno.titulo}.`)
@@ -67,7 +74,7 @@ function Anunciador({ mensajes }) {
       const decisiones = ultimo.turno.bloques.filter((b) => b.tipo === 'aprobacion').length
       setTexto(`Respuesta lista: ${ultimo.turno.titulo}.${decisiones ? ` Incluye ${decisiones} ${decisiones === 1 ? 'decisión' : 'decisiones'}.` : ''}`)
     }
-  }, [mensajes])
+  }, [mensajes, conv])
   return (
     <div className="sr-only" role="status" aria-live="polite">
       {texto}
@@ -91,6 +98,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const ancho = useAncho()
   // La conversación que se está viendo (en el móvil, ninguna mientras se ve la lista).
   const abierta = ancho || vista === 'chat' ? s.actual : null
+  const anchoRef = useRef(ancho)
+  anchoRef.current = ancho
   const scrollRef = useRef(null)
   const finRef = useRef(null)
   const inputRef = useRef(null)
@@ -115,44 +124,93 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   // Al abrir una conversación: la tarjeta a la que ir, o seguir el final (si se acaba de pedir algo).
   const tarjetaPendiente = useRef(null)
   const alFinalAlAbrir = useRef(false)
+  // Lo escrito sin enviar en cada conversación.
+  const borradores = useRef(new Map())
 
   // Al abrir, los agentes ya han escrito lo suyo en cada conversación.
   useEffect(() => {
     if (!iniciadas) despachar({ tipo: 'conversaciones/iniciar' })
   }, [iniciadas, despachar])
 
-  // Lo que se ve queda leído: el número de la lista desaparece al abrir la conversación.
+  // La pregunta de la portada que ya se ha atendido (cada encargo se atiende una vez).
+  const pedidoAtendido = useRef(null)
+
+  // Lo que se ve queda leído: el número de la lista desaparece al abrir la conversación. Mientras
+  // la portada tenga una pregunta sin atender, nada se da por visto: va a otra conversación.
   const quedaPorLeer = abierta ? porLeer(s, abierta) : 0
+  const encargoPendiente = !!contexto?.pregunta && pedidoAtendido.current !== contexto
   useEffect(() => {
-    if (quedaPorLeer) despachar({ tipo: 'conversacion/leida', id: abierta })
-  }, [quedaPorLeer, abierta, despachar])
+    if (quedaPorLeer && !encargoPendiente) despachar({ tipo: 'conversacion/leida', id: abierta })
+  }, [quedaPorLeer, abierta, encargoPendiente, despachar])
 
   const enfocarRedactor = () => {
     if (!window.matchMedia?.('(pointer: coarse)').matches) requestAnimationFrame(() => inputRef.current?.focus())
   }
   const guardarScroll = () => {
     const actual = sRef.current.actual
-    if (actual && scrollRef.current) scrollPorConv.current.set(actual, scrollRef.current.scrollTop)
+    const el = scrollRef.current
+    // Con el chat oculto (la lista en el móvil) la posición vale 0: ya se guardó al volver.
+    if (actual && el?.clientHeight) scrollPorConv.current.set(actual, el.scrollTop)
   }
+  // Por debajo de 1024 px, el botón pulsado desaparece al pasar de la lista al chat: el foco va al
+  // título de la conversación. Se espera a que una hoja que se cierra devuelva el suyo.
+  const enfocarCabecera = () => setTimeout(() => document.getElementById('ag-chat-titulo')?.focus({ preventScroll: true }), 80)
   const abrirConversacion = useCallback(
-    (id, { tarjeta = null, alFinal = false } = {}) => {
-      guardarScroll()
-      tarjetaPendiente.current = tarjeta
-      alFinalAlAbrir.current = alFinal
+    (id, { tarjeta = null, alFinal = false, desdeLista = false } = {}) => {
+      const misma = id === sRef.current.actual
+      if (!misma) guardarScroll()
       setHoja(null)
       setVista('chat')
+      // En escritorio, la fila pulsada sigue a la vista; con una tarjeta, el foco va a ella.
+      if (!tarjeta && !(desdeLista && anchoRef.current)) enfocarCabecera()
+      // La que ya está abierta: nada que cambiar (ni que terminar de golpe).
+      if (misma) return
+      tarjetaPendiente.current = tarjeta
+      alFinalAlAbrir.current = alFinal
       despachar({ tipo: 'conversacion/abrir', id })
     },
     [despachar],
   )
-  const nuevaConversacion = useCallback(() => {
+  // `agente`: desde la ficha de un agente, la conversación nueva es con él.
+  const nuevaConversacion = useCallback(
+    ({ agente } = {}) => {
+      guardarScroll()
+      alFinalAlAbrir.current = true
+      setHoja(null)
+      setVista('chat')
+      despachar({ tipo: 'conversacion/nueva', agente })
+      // Con teclado, al campo de mensaje; en una pantalla táctil (sin abrir el teclado), al título.
+      if (window.matchMedia?.('(pointer: coarse)').matches) enfocarCabecera()
+      else enfocarRedactor()
+    },
+    [despachar],
+  )
+  // Del chat a la lista (por debajo de 1024 px): se guarda dónde estabas y el foco vuelve a su fila.
+  const volverALista = () => {
+    const deja = sRef.current.actual
     guardarScroll()
-    alFinalAlAbrir.current = true
+    setVista('lista')
+    setTimeout(() => document.querySelector(`.ag-conv[data-conv="${deja}"]`)?.focus(), 80)
+  }
+  // «Revisar» de una decisión cuya tarjeta ya está en la conversación abierta: se enseña el chat
+  // (en el móvil puede estar en la lista) y se lleva a ella, en vez de repetir la pregunta.
+  const irATarjeta = useCallback((ref) => {
+    if (!ref) return false
+    const s0 = sRef.current
+    const aqui = mensajesDe(s0).some((m) => m.rol === 'agentes' && m.estado === 'hecho' && m.turno.bloques.some((b) => b.tipo === 'aprobacion' && b.ref?.tipo === ref.tipo && b.ref?.id === ref.id && aprobacionPendiente(s0.mundo, b)))
+    if (!aqui) return false
     setHoja(null)
     setVista('chat')
-    despachar({ tipo: 'conversacion/nueva' })
-    enfocarRedactor()
-  }, [despachar])
+    // Tras cerrar una hoja, el foco vuelve a su botón: se espera a que termine antes de moverlo.
+    setTimeout(() => {
+      const t = [...document.querySelectorAll(`.ag-aprobacion[data-ref="${ref.tipo}-${ref.id}"]:not(.is-decidida)`)].reverse().find((x) => x.getClientRects().length)
+      if (!t) return
+      const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      t.scrollIntoView({ block: 'center', behavior: reducido ? 'auto' : 'smooth' })
+      t.querySelector('h4')?.focus({ preventScroll: true })
+    }, 80)
+    return true
+  }, [])
 
   // Lo escrito en el redactor se responde en la conversación abierta.
   const enviarAqui = useCallback(
@@ -184,10 +242,10 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const decidir = useCallback((accion, etiqueta) => enviarAqui({ tipo: 'accion', accion, etiqueta }), [enviarAqui])
   // «Pídele algo» desde la ficha de un agente: a su conversación o, si no tiene, a una nueva.
   const preguntarA = useCallback(
-    (texto) => {
+    (texto, agente) => {
       const entrada = { tipo: 'texto', texto }
       if (conversacionPara(sRef.current, entrada)) return pedir(entrada)
-      nuevaConversacion()
+      nuevaConversacion({ agente })
       despachar({ tipo: 'enviar', entrada })
     },
     [pedir, nuevaConversacion, despachar],
@@ -207,7 +265,6 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   }, [despachar])
 
   // Lo que pide la portada: una pregunta va a su conversación o, si no tiene, a una nueva.
-  const pedidoAtendido = useRef(null)
   useEffect(() => {
     if (!iniciadas || pedidoAtendido.current === contexto) return
     pedidoAtendido.current = contexto
@@ -300,7 +357,9 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     }
     if (!anclado.current) {
       if (el) setCerca(el.scrollHeight - el.scrollTop - el.clientHeight < 140)
-      // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos mensajes».
+      // Ni los bloques que siguen saliendo de la respuesta que ya se está leyendo ni la nota de tu
+      // propio «Deshacer» son «nuevos mensajes».
+      if (ultimoMsg.rol === 'nota') return
       if (!(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos((n) => n || ultimoMsg.id)
       return
     }
@@ -333,6 +392,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     decidir,
     preguntarA,
     abrirConversacion,
+    irATarjeta,
     conversacion,
     onNavigate,
     avisar,
@@ -342,7 +402,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   }
 
   const ultimaNovedadId = [...mensajes].reverse().find((m) => m.rol === 'novedad')?.id
-  const capacidad = CONVERSACIONES_POR_ID[s.actual]?.capacidad
+  const capacidad = conversacion?.capacidad ?? CONVERSACIONES_POR_ID[s.actual]?.capacidad
   const nombreAgente = conversacion ? (AGENTES[conversacion.agente]?.nombre ?? 'Orquestador') : 'los agentes'
 
   return (
@@ -357,8 +417,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
           onPortada={() => onNavigate('landing')}
           onEquipo={() => setHoja('equipo')}
           onRevisar={() => {
-            if (sRef.current.actual !== 'parte') abrirConversacion('parte', { alFinal: true })
-            else setVista('chat')
+            abrirConversacion('parte', { alFinal: true })
             despachar({ tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué tengo que revisar?', conv: 'parte' } })
             anclado.current = true
           }}
@@ -367,12 +426,12 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         <div className="ag-cuerpo">
           <aside className="ag-col-izq" aria-label="Conversaciones">
             <div className="ag-panel-scroll">
-              <ListaConversaciones items={lista} actual={abierta} onAbrir={(id) => abrirConversacion(id)} onNueva={nuevaConversacion} />
+              <ListaConversaciones items={lista} actual={abierta} onAbrir={(id) => abrirConversacion(id, { desdeLista: true })} onNueva={() => nuevaConversacion()} />
             </div>
           </aside>
 
           <main className="ag-centro" aria-label={conversacion ? `Conversación: ${conversacion.titulo ?? 'nueva'}` : 'Conversación'}>
-            <CabeceraChat conversacion={conversacion} capacidad={capacidad} onVolver={() => setVista('lista')} />
+            <CabeceraChat conversacion={conversacion} capacidad={capacidad} onVolver={volverALista} />
             <div
               ref={scrollRef}
               className="ag-scroll"
@@ -386,10 +445,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
             >
               <div className="ag-hilo" key={s.actual ?? 'ninguna'}>
                 {mensajes.length > 0 ? (
-                  <section aria-labelledby="ag-titulo-conversacion" className="flex flex-col gap-6">
-                    <h2 id="ag-titulo-conversacion" className="sr-only">
-                      {conversacion?.titulo ?? 'Conversación'}
-                    </h2>
+                  <section aria-labelledby="ag-chat-titulo" className="flex flex-col gap-6">
                     {/* data-msg: el desplazamiento coloca cada respuesta por su mensaje. */}
                     {mensajes.map((m, i) => (
                       <div key={m.id} data-msg={m.id}>
@@ -429,7 +485,17 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                   {trabajando.length === 1 ? '1 agente trabajando' : `${trabajando.length} agentes trabajando`}
                 </p>
               )}
-              <Redactor ocupado={ocupado} inputRef={inputRef} placeholder={conversacion?.agente && conversacion.agente !== 'orquestador' ? `Escribe a ${nombreAgente}…` : 'Escribe a los agentes…'} onEnviar={(texto) => enviarAqui({ tipo: 'texto', texto })} onEscribir={escribir} />
+              {/* Un borrador por conversación: lo que escribes se queda en la suya al cambiar. */}
+              <Redactor
+                key={s.actual ?? 'ninguna'}
+                ocupado={ocupado}
+                inputRef={inputRef}
+                placeholder={conversacion?.agente && conversacion.agente !== 'orquestador' ? `Escribe a ${nombreAgente}…` : 'Escribe a los agentes…'}
+                inicial={borradores.current.get(s.actual) ?? ''}
+                onCambio={(texto) => borradores.current.set(s.actual, texto)}
+                onEnviar={(texto) => enviarAqui({ tipo: 'texto', texto })}
+                onEscribir={escribir}
+              />
               <p className="ag-pie-nota">
                 <span className="hidden sm:inline">Agentes simulados con datos de ejemplo. No se envía nada ni se mueve dinero.</span>
                 <span className="sm:hidden">Datos de ejemplo: no se envía nada ni se mueve dinero.</span>
@@ -455,7 +521,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
         </Hoja>
 
         <DetalleAgente id={agenteAbierto} onCerrar={cerrarAgente} />
-        <Anunciador mensajes={mensajes} />
+        <Anunciador mensajes={mensajes} conv={s.actual} />
       </div>
     </AgentesCtx.Provider>
   )

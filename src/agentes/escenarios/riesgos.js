@@ -154,14 +154,19 @@ export const OPCIONES_RIESGO = {
     siOcurre: (r) => `si no da tiempo, podría costar unos ${eur(r.exposicion)} más`,
     resumen: (m) => {
       const g = datosGrua(m)
-      return t('La jornada {n} necesita la grúa {h} horas. Con el montaje quedan {sin}, pero si la {vis} se alarga solo quedarían {con}. Montarla al cerrar la {vis}, en el mismo decorado, cuesta un día más de grúa, {tar}, y deja {pre} aunque haya retraso.', {
+      // Lo mismo que dice la tabla de impacto: si el día más de grúa cabe en lo que queda de su partida.
+      const sube = c.totales(reducir(m, { tipo: 'riesgo/mitigar', riesgoId: 'RG-7', opcion: 'premontar' })).cef - c.totales(m).cef
+      return t('La jornada {n} necesita la grúa {h} horas. Con el montaje quedan {sin}, pero si la {vis} se alarga solo quedarían {con}. Montarla al cerrar la {vis}, en el mismo decorado, deja {pre} aunque haya retraso. {coste}', {
         n: v(g.jornada, 'num'),
         h: v(g.horas, 'num'),
         sin: v(`${g.sinRetraso} horas`),
         vis: v(g.vispera, 'num'),
         con: v(`${g.conRetraso} horas`),
-        tar: v(g.tarifa, 'eur'),
         pre: v(`${g.horasJornada - g.retraso} horas`),
+        coste:
+          sube > 0.004
+            ? t('Cuesta un día más de grúa, {tar}, y sube el coste estimado final {dif}.', { tar: v(g.tarifa, 'eur'), dif: v(sube, 'eurSigned') })
+            : t('Cuesta un día más de grúa, {tar}, que cabe en lo previsto para {p}: el coste final no cambia.', { tar: v(g.tarifa, 'eur'), p: v(g.partida, 'id') }),
       })
     },
     recomendacion: t('Recomendamos montarla la víspera: asegura sus horas aunque la jornada anterior se alargue.'),

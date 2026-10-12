@@ -315,7 +315,7 @@ export const saludo = {
         cifras(m),
         { tipo: 'tira' },
       ],
-      // Las sugerencias las pone la pantalla (la siguiente historia): «Para hoy» ya lleva sus botones.
+      // Sin sugerencias: «Para hoy» ya lleva sus botones.
       sugerencias: [],
       fuentes: ['Plan de rodaje (ejemplo)', 'Presupuesto ICAA por partidas', 'Bandeja de facturas y órdenes de compra', 'Previsión de tesorería semanal', 'Dossier fiscal', 'Cola de excepciones'],
       reglas: [

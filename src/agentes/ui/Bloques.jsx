@@ -791,23 +791,10 @@ export { decisionesAbiertas }
 // Lo que aún está en exploración lleva su etiqueta también en la cola.
 const EN_EXPLORACION = new Set(['riesgo', 'propuesta'])
 
-/** Si la tarjeta ya está en la conversación y sigue abierta, «Revisar» lleva a ella en vez de repetir el trabajo. */
-export function irATarjeta(ref) {
-  if (!ref) return false
-  const tarjetas = document.querySelectorAll(`.ag-aprobacion[data-ref="${ref.tipo}-${ref.id}"]:not(.is-decidida)`)
-  const t = tarjetas[tarjetas.length - 1]
-  if (!t) return false
-  // Tras cerrar una hoja, el foco vuelve a su botón: se espera a que termine antes de moverlo.
-  setTimeout(() => {
-    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    t.scrollIntoView({ block: 'center', behavior: reducido ? 'auto' : 'smooth' })
-    t.querySelector('h4')?.focus({ preventScroll: true })
-  }, 60)
-  return true
-}
-
+// «Revisar»: si la tarjeta ya está en la conversación abierta y sigue abierta, ctx.irATarjeta lleva a
+// ella (también desde la lista del móvil); si no, se pide y va a la conversación que le toca.
 export function ListaDecisiones({ filtro, onElegir }) {
-  const { mundo, enviar, ocupado } = useCtx()
+  const { mundo, enviar, ocupado, irATarjeta } = useCtx()
   const ex = decisionesAbiertas(mundo).filter(filtro ?? (() => true))
   if (!ex.length) return <p className="text-sm text-flp-muted">Nada por revisar.</p>
   return (
@@ -1546,7 +1533,7 @@ export function RadarRiesgos({ compacto = false }) {
           </strong>
           <span className="block text-xs text-flp-muted">
             {r.jornadas.length > 1 ? `Jornadas ${r.jornadas.join(' y ')}` : `Jornada ${r.jornadas[0]}`} · {fechaLarga(r.fecha)} · {r.dias === 1 ? 'mañana' : `en ${formatear(r.dias, 'dias')}`}
-            {r.probabilidad != null && ` · lluvia ${formatear(r.probabilidad, 'pct0')}`}
+            {r.probabilidad != null && ` · ${r.deQue ?? 'probabilidad'} ${formatear(r.probabilidad, 'pct0')}`}
             {r.exposicion != null && r.exposicion > 0 && ` · si ocurre, hasta ${formatear(r.exposicion, 'eur')}`}
             {r.exposicion == null && ' · impacto por estimar'}
           </span>

@@ -245,9 +245,11 @@ export function reducir(m, accion) {
     }
 
     case 'borrador/crear': {
-      // Un borrador descartado se puede volver a preparar; uno vigente no se duplica.
+      // Un borrador descartado se puede volver a preparar; uno vigente no se duplica, salvo que se
+      // pida rehacerlo (`reemplazar`) y nadie lo haya editado.
       const previo = m.borradores[accion.borrador.id]
-      if (previo && previo.estado !== 'descartado') return m
+      const rehacer = accion.reemplazar && previo?.estado === 'borrador' && previo.textoAsunto == null && previo.textoCuerpo == null
+      if (previo && previo.estado !== 'descartado' && !rehacer) return m
       const n = clonar(m)
       n.borradores[accion.borrador.id] = { ...accion.borrador, estado: 'borrador' }
       return confirmar(n, accion, { tipo: 'borrador', id: accion.borrador.id })

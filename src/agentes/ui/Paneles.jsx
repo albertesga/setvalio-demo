@@ -168,7 +168,7 @@ export function DetalleAgente({ id, onCerrar }) {
                     onClick={() => {
                       onCerrar()
                       // A su conversación si la tiene; si no, a una nueva.
-                      preguntarA(texto)
+                      preguntarA(texto, aid)
                     }}
                   >
                     {texto}

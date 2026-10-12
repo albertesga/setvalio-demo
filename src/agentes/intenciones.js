@@ -69,6 +69,11 @@ const TERRITORIOS = [
 
 const pad = (n, w) => String(n).padStart(w, '0')
 
+// La grúa de la jornada 17 (RG-7): la palabra, lo que la pone en riesgo y lo que habla de otra cosa.
+const GRUA = /\b(grua|technocrane)/
+const PELIGRO_GRUA = /(falla|fallar|falle|averi|romp|retras|tarde|a tiempo|no llega|montaj|montar|respaldo|plan b|alternativ|sustitu|quien (la )?trae|cuanto cuesta|jornada 17|horas)/
+const NO_ES_RIESGO = /(precio|presupuest|factur|\bpag|propuesta|itsasoa|anad|\d+\s*(€|e\b|eur))/
+
 export function extraerEntidades(texto, mundo) {
   const norm = normalizar(texto)
   const e = {}
@@ -178,9 +183,6 @@ export function extraerEntidades(texto, mundo) {
   if (r) e.riesgo = r[1]
   // RG-7 · la grúa de la jornada 17. «Grúa» también es un proveedor (Grúas y Cámaras del Sur):
   // solo cuenta con una palabra de riesgo y sin hablar de precios, facturas o Itsasoa.
-  const GRUA = /\b(grua|technocrane)/
-  const PELIGRO_GRUA = /(falla|fallar|falle|averi|retras|tarde|a tiempo|montaj|montar|respaldo|plan b|jornada 17|horas)/
-  const NO_ES_RIESGO = /(precio|presupuest|factur|\bpag|propuesta|itsasoa|anad|\d+\s*(€|e\b|eur))/
   if (!e.riesgo && ((GRUA.test(norm) && PELIGRO_GRUA.test(norm)) || /recurso (mas caro|critico)|grua de respaldo/.test(norm)) && !NO_ES_RIESGO.test(norm)) {
     e.riesgo = 'RG-7'
     // Lo que se dedujo del nombre del proveedor no aplica: se habla del rodaje, no de su factura.
@@ -193,9 +195,11 @@ export function extraerEntidades(texto, mundo) {
     delete e.capitulo
   }
 
-  // Un paso del dossier fiscal, solo con verbo: «prepara la solicitud del certificado», «pide los justificantes de pago».
-  if (/\b(prepara|preparar|preparame|redacta|redactar|pide|pedir|pideles|solicita|solicitar)\b/.test(norm)) {
-    if (/(certificado|icaa)/.test(norm)) e.dossierPaso = 'DOS-01'
+  // Un paso del dossier fiscal, solo como orden: «prepara la solicitud del certificado cultural»,
+  // «pide los justificantes de pago». Una pregunta («¿qué pide el ICAA…?») solo lee.
+  const esOrden = !/[¿?]/.test(String(texto ?? '')) && /^(por favor,? )?(prepara|preparar|preparame|redacta|redactar|pide|pedir|pideles|solicita|solicitar)\b/.test(norm)
+  if (esOrden) {
+    if (/(certificado cultural|icaa)/.test(norm)) e.dossierPaso = 'DOS-01'
     else if (/(justificantes?|comprobantes?) de pago/.test(norm)) e.dossierPaso = 'DOS-02'
   }
   if (/\b(envia|enviar|enviale|envialo|enviala|manda|mandar|mandale|mandalo)\b/.test(norm)) e.accionExterna = 'enviar'
@@ -358,9 +362,17 @@ export function detectarIntencion(texto, mundo, contexto = {}) {
     const riesgo = entidades.riesgo ?? (/riesg/.test(norm) ? undefined : contexto.ultimasEntidades?.riesgo)
     return { intencion: 'riesgos', puntuacion: 9, entidades: { ...entidades, riesgo, quiereEnviar: true }, alternativas: [] }
   }
-  // «apruébala», «recházala»: la orden de la que se hablaba.
-  if (!entidades.oc && /\b(apruebala|aprobala|rechazala|autorizala)\b/.test(norm) && contexto.ultimasEntidades?.oc) {
+  // «apruébala», «¿la apruebo?», «esta compra»: la orden de la que se hablaba.
+  if (!entidades.oc && /\b(apruebala|aprobala|rechazala|autorizala|la (apruebo|apruebas|aprobamos|autorizo|rechazo)|esta compra|este pedido|esta orden)\b/.test(norm) && contexto.ultimasEntidades?.oc) {
     return { intencion: 'aprobar_oc', puntuacion: 9, entidades: { ...entidades, oc: contexto.ultimasEntidades.oc }, alternativas: [], heredada: true }
+  }
+  // «¿Dónde va?» tras hablar de un gasto por revisar: su partida.
+  if (contexto.ultimaIntencion === 'revisar_gasto' && /\b(donde va|donde lo (pongo|imputo|meto)|(a|en) que partida|que partida)\b/.test(norm)) {
+    return { intencion: 'revisar_gasto', puntuacion: 9, entidades: { ...entidades, documento: entidades.documento ?? contexto.ultimasEntidades?.documento }, alternativas: [], heredada: true }
+  }
+  // En la conversación de la grúa, lo que habla de la grúa, de la víspera o de su retraso sigue siendo RG-7.
+  if (!entidades.riesgo && contexto.ultimasEntidades?.riesgo === 'RG-7' && /\b(grua|technocrane|vispera|jornada 16|la 16|retras|se alarga|alternativ|plan b)/.test(norm) && !NO_ES_RIESGO.test(norm)) {
+    return { intencion: 'riesgos', puntuacion: 9, entidades: { ...entidades, riesgo: 'RG-7', jornada: undefined }, alternativas: [], heredada: true }
   }
   // «envíalo», «manda el borrador»: nunca se envía; se enseña el borrador.
   if (entidades.accionExterna === 'enviar' && (/(borrador|correo|email|mail)/.test(norm) || contexto.ultimaIntencion === 'pedir_documentacion') && !/informe/.test(norm)) {

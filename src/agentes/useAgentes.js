@@ -5,7 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { obtener, suscribir, despachar } from './store.js'
 import { conversacionIniciada, proximaNovedad } from './sesion.js'
 
-// Velocidad de reproducción de los pasos (Opciones de la demo).
+// Velocidad de reproducción de los pasos. La demo va siempre a ritmo «normal».
 export const RITMOS = {
   lento: { etiqueta: 'Lento', factor: 0.6 },
   normal: { etiqueta: 'Normal', factor: 1 },

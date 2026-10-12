@@ -176,6 +176,8 @@ export function evaluarRiesgos(m) {
     jornadas: [j1.n],
     fecha: j1.fecha,
     probabilidad: mitigado1 ? p1 : pOriginal,
+    // De qué es la probabilidad: el radar la nombra («lluvia 80 %»).
+    deQue: 'lluvia',
     exposicion: exp1,
     reserva: Math.round(pOriginal * exp1),
     intercambio: ji.n,
@@ -310,6 +312,7 @@ export function evaluarRiesgos(m) {
     jornadas: [gr.jornada],
     fecha: jg.fecha,
     probabilidad: gr.probabilidad,
+    deQue: 'retraso de la víspera',
     exposicion: exp7,
     reserva: Math.round(gr.probabilidad * exp7),
     titulo: t('La grúa de la jornada {n}, el recurso más caro', { n: v(gr.jornada, 'num') }),

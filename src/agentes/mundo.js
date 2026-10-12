@@ -224,7 +224,7 @@ export function crearMundo() {
     borradores: {},
     revisiones: {},
     ajustesCef: {},
-    // Novedades por llegar. Las trae su historia, una pregunta o un botón; ninguna llega sola (EVENTOS, sesion.js).
+    // Novedades por llegar. Las trae una pregunta o un botón; ninguna llega sola (EVENTOS, sesion.js).
     entrantes: ['EV-RIESGOS', 'EV-01', 'EV-CITACION', 'EV-02', 'EV-LLUVIA', 'EV-03'],
     // Plan de rodaje y señales que vigila el agente de riesgos (exploratorio).
     rodaje: crearRodaje(),
