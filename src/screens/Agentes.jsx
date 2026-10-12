@@ -82,6 +82,8 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
   const posicionados = useRef(new Set())
   // Último paso del recorrido colocado arriba (id de su mensaje 'guia').
   const pasoColocado = useRef(null)
+  // Última historia abierta en limpio y colocada arriba (id de su mensaje 'historia').
+  const historiaColocada = useRef(null)
   // Respuesta que se está colocando arriba: mientras sale (y hasta que hay bastante debajo
   // para que quede arriba) se recoloca con cada bloque, porque lo de encima puede cambiar
   // de alto. Se suelta en cuanto la persona se desplaza.
@@ -108,8 +110,25 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     [despachar, trasPedir],
   )
   const enviar = useCallback((texto) => enviarEntrada({ tipo: 'texto', texto }), [enviarEntrada])
-  // Una sugerencia puede traer su entrada (una novedad, por ejemplo); si no, se pregunta su texto.
-  const elegirSugerencia = useCallback((sg) => enviarEntrada(sg.entrada ?? { tipo: 'texto', texto: sg.texto }), [enviarEntrada])
+  // Una historia se abre en limpio: se cierra la conversación anterior (lo decidido se queda)
+  // y arriba quedan la historia, lo que se pide y la respuesta. El efecto de desplazamiento
+  // la coloca y le pasa el foco.
+  const abrirHistoria = useCallback(
+    (h) => {
+      if (!h) return
+      setHoja(null)
+      setNuevos(false)
+      pendiente.current = null
+      anclado.current = false
+      despachar({ tipo: 'historia/abrir', historia: h.id })
+    },
+    [despachar],
+  )
+  // «Siguiente: …» abre su historia; las demás sugerencias traen su entrada o se preguntan.
+  const elegirSugerencia = useCallback(
+    (sg) => (sg.historia && HISTORIAS_POR_ID[sg.historia] ? abrirHistoria(HISTORIAS_POR_ID[sg.historia]) : enviarEntrada(sg.entrada ?? { tipo: 'texto', texto: sg.texto })),
+    [enviarEntrada, abrirHistoria],
+  )
   const decidir = useCallback((accion, etiqueta) => enviarEntrada({ tipo: 'accion', accion, etiqueta }), [enviarEntrada])
   const avisar = useCallback((texto) => pushToast?.(texto), [pushToast])
   const cerrarHoja = useCallback(() => setHoja(null), [])
@@ -226,6 +245,21 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     }
     const el = scrollRef.current
     const llevarArriba = colocarArriba
+    // Una historia abierta en limpio se lee desde arriba: su cabecera, lo que se pide y la
+    // respuesta, que crece debajo sin mover la vista. El foco va a su título.
+    const idxHistoria = s.mensajes.findLastIndex((m) => m.rol === 'historia')
+    const historia = idxHistoria >= 0 ? s.mensajes[idxHistoria] : null
+    if (historia && historiaColocada.current !== historia.id) {
+      historiaColocada.current = historia.id
+      programado.current = Date.now()
+      el?.scrollTo({ top: 0, behavior: 'auto' })
+      anclado.current = false
+      setNuevos(false)
+      requestAnimationFrame(() => document.querySelector(`[data-msg="${historia.id}"] h3`)?.focus({ preventScroll: true }))
+      return
+    }
+    // Lo que pide la historia (la pregunta o la novedad) y su respuesta no son «nuevos mensajes».
+    const deLaHistoria = historia && s.mensajes.length - 1 - idxHistoria <= 2
     // Cada paso del recorrido empieza arriba, con su separador; el primero es el parte,
     // que ya está al principio. Lo que responden los agentes crece debajo sin mover la vista.
     const guia = s.tour ? [...s.mensajes].reverse().find((m) => m.rol === 'guia') : null
@@ -257,7 +291,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
       // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos
       // mensajes»; en el recorrido tampoco, porque cada paso ya se coloca solo.
       // Se recuerda el primero que llegó: «Nuevos mensajes» lleva a su principio.
-      if (!s.tour && !(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos((n) => n || ultimoMsg.id)
+      if (!s.tour && !deLaHistoria && !(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos((n) => n || ultimoMsg.id)
       return
     }
     if (ultimoMsg.rol === 'agentes' && ultimoMsg.bloquesVisibles > 0) {
@@ -293,6 +327,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     deshacible: s.ultimaMutacion?.mensajeId,
     eventosPausados: s.eventosPausados,
     iniciarRecorrido,
+    abrirHistoria,
     enRecorrido,
     // La decisión que espera el paso del recorrido ({ tipo, id }) o null.
     esperaRecorrido: tour?.paso.espera ?? null,

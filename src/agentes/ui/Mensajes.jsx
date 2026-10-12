@@ -5,7 +5,7 @@ import { IconChevronDown, IconBell, IconStop, IconArrowDown } from '../../compon
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { AGENTES } from '../agentes.js'
 import { PERSONAS } from '../mundo.js'
-import { RECORRIDO } from '../casos.js'
+import { RECORRIDO, ETIQUETA_CAPACIDAD } from '../casos.js'
 import { fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, StatusChip, nombresCortos } from './Piezas.jsx'
@@ -216,7 +216,8 @@ function MensajeAgentes({ msg, ultimo }) {
   // En el recorrido se enseña entera, porque es lo que el paso quiere enseñar.
   // Se decide al llegar: lo que llegó en el recorrido no se pliega al salir de él.
   const [llegoEnRecorrido] = useState(enRecorrido)
-  const plegado = automatico && !!t.resumen && msg.estado === 'hecho' && porDecidir === 0 && !detalle && !llegoEnRecorrido
+  // Lo que trae una historia o una pregunta se enseña entero: no se pliega.
+  const plegado = automatico && msg.llegoSola && !!t.resumen && msg.estado === 'hecho' && porDecidir === 0 && !detalle && !llegoEnRecorrido
 
   const irADecision = () => {
     const tarjeta = document.querySelector(`#msg-${msg.id} .ag-aprobacion:not(.is-decidida)`)
@@ -406,16 +407,39 @@ function MensajeNovedad({ msg, ultimaNovedad }) {
       <span className="min-w-0 flex-1">
         <strong className="font-medium">Novedad</strong> · {msg.titulo}
         <span className="block text-xs text-flp-muted">
-          <span className="tnum">{msg.hora}</span> · {enRecorrido ? 'Así avisan los agentes.' : 'Llega sola, sin que la pidas: así avisan los agentes.'}
+          <span className="tnum">{msg.hora}</span> · {msg.llegoSola ? 'Llega sola, sin que la pidas: así avisan los agentes.' : 'En la demo la traes tú; en Filmpilot llegaría sola.'}
         </span>
       </span>
-      {/* En el recorrido las novedades las trae cada paso: no hay nada que pausar. */}
-      {ultimaNovedad && !enRecorrido && (
+      {/* Solo lo que llega solo se puede pausar; lo que trae una historia o el recorrido, no. */}
+      {ultimaNovedad && msg.llegoSola && !enRecorrido && (
         <button type="button" className="ag-link" onClick={() => despachar({ tipo: 'pausarEventos', valor: !eventosPausados })}>
           {eventosPausados ? 'Reanudar novedades' : 'Pausar novedades'}
         </button>
       )}
     </div>
+  )
+}
+
+/** Cabecera de una historia abierta en limpio: cuál es, qué enseña y, debajo, lo que se pide. */
+function MensajeHistoria({ msg }) {
+  const etiqueta = ETIQUETA_CAPACIDAD[msg.capacidad]
+  return (
+    <header className="ag-msg-historia">
+      <p className="flp-kicker text-flp-muted">
+        {msg.indice != null ? (
+          <>
+            Historia <span className="tnum">{msg.indice + 1}</span> de <span className="tnum">{msg.total}</span> · {msg.arco}
+          </>
+        ) : (
+          msg.arco
+        )}
+      </p>
+      <h3 tabIndex={-1} className="ag-msg-historia-titulo focus:outline-none">
+        {msg.titulo}
+      </h3>
+      <p className="ag-msg-historia-linea">{msg.unaLinea}</p>
+      {etiqueta && <span className="ag-etiqueta-capacidad mt-2 inline-flex">{etiqueta}</span>}
+    </header>
   )
 }
 
@@ -446,6 +470,8 @@ export function Mensaje({ msg, ultimo, ultimaNovedad }) {
       return <MensajeNovedad msg={msg} ultimaNovedad={ultimaNovedad} />
     case 'guia':
       return <MensajeGuia msg={msg} />
+    case 'historia':
+      return <MensajeHistoria msg={msg} />
     case 'nota':
       return <MensajeNota msg={msg} />
     case 'agentes':

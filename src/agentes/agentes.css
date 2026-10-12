@@ -90,6 +90,10 @@
 }
 .ag-msg-novedad-icono { display: inline-flex; color: var(--flp-carbon); }
 /* Inicio de un paso del recorrido: una línea fina con el paso y el arco. */
+/* Cabecera de una historia abierta en limpio: qué historia es y qué enseña, encima de lo que se pide. */
+.ag-msg-historia { padding-bottom: 16px; border-bottom: 1px solid var(--flp-border); }
+.ag-msg-historia-titulo { margin-top: 6px; color: var(--flp-carbon); font-size: clamp(1.375rem, 2.4vw, 1.75rem); font-weight: 400; line-height: 1.12; letter-spacing: -0.03em; text-wrap: balance; }
+.ag-msg-historia-linea { max-width: 680px; margin-top: 8px; color: var(--flp-muted); font-size: 15px; line-height: 1.5; }
 .ag-msg-guia { display: flex; align-items: center; gap: 12px; color: var(--flp-muted); }
 .ag-msg-guia::before, .ag-msg-guia::after { content: ''; height: 1px; flex: 1; background: var(--flp-border); }
 .ag-msg-guia > span { flex: none; max-width: 80%; text-align: center; }

@@ -7,7 +7,7 @@
 import { crearMundo, PERSONAS } from './mundo.js'
 import { responder, interpretar } from './orquestador.js'
 import { reducirVarias } from './acciones.js'
-import { RECORRIDO, HISTORIAS, EPILOGO, entradaDeHistoria } from './casos.js'
+import { RECORRIDO, HISTORIAS, HISTORIAS_POR_ID, EPILOGO, entradaDeHistoria } from './casos.js'
 import { DURACIONES } from './agentes.js'
 import { estadoDecision } from './calculos.js'
 import { renderTexto } from './texto.js'
@@ -64,10 +64,12 @@ function nuevoId(s, pref) {
   return `${pref}-${s.seq}`
 }
 
-function iniciar(s0, entrada) {
+function iniciar(s0, entrada0) {
   const s = { ...s0, mensajes: [...s0.mensajes], snapshots: { ...s0.snapshots } }
   const hora = horaDe(s.reloj)
   const persona = personaDe(s)
+  // `sola`: la novedad ha llegado sin que nadie la pida (no la ha traído una historia ni una pregunta).
+  const { sola = false, ...entrada } = entrada0
   let ent = entrada
 
   if (entrada.tipo === 'texto') {
@@ -80,7 +82,7 @@ function iniciar(s0, entrada) {
     ent = { ...entrada, persona: s.persona }
   } else if (entrada.tipo === 'evento') {
     const ev = EVENTOS_POR_ID[entrada.eventoId]
-    s.mensajes.push({ id: nuevoId(s, 's'), rol: 'novedad', eventoId: entrada.eventoId, agente: ev?.agente, titulo: ev?.titulo ?? 'Novedad', hora })
+    s.mensajes.push({ id: nuevoId(s, 's'), rol: 'novedad', eventoId: entrada.eventoId, agente: ev?.agente, titulo: ev?.titulo ?? 'Novedad', llegoSola: sola, hora })
   }
   // { tipo: 'cierreRecorrido' }: el resumen final lo trae el Orquestador, sin mensaje de la persona.
 
@@ -98,6 +100,8 @@ function iniciar(s0, entrada) {
     hora,
     origen: entrada.tipo,
     eventoId: entrada.tipo === 'evento' ? entrada.eventoId : undefined,
+    // Solo lo que llegó solo se pliega en una línea; lo que pide una historia se enseña entero.
+    llegoSola: sola,
     // Si este turno estrena su historia y se detiene, la historia vuelve a «sin ver».
     casoNuevo: !!r.turno.caso && !s.casosVistos.includes(r.turno.caso),
   })
@@ -305,7 +309,7 @@ export function reducirSesion(s, a) {
       const evento = proximaNovedad(n)
       if (!evento || n.tour || n.eventosPausados || !conversacionIniciada(n)) return n
       n = { ...n, inactivo: n.inactivo + ms }
-      if (n.inactivo >= evento.retrasoMs) return iniciar(n, { tipo: 'evento', eventoId: evento.id })
+      if (n.inactivo >= evento.retrasoMs) return iniciar(n, { tipo: 'evento', eventoId: evento.id, sola: true })
       return n
     }
 
@@ -406,6 +410,28 @@ export function reducirSesion(s, a) {
       if (a.completo) return encolar(n, { tipo: 'cierreRecorrido' })
       n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: 'Has salido del recorrido guiado.', hora: horaDe(n.reloj) })
       return n
+    }
+
+    case 'historia/abrir': {
+      // Una historia se ve sola: la conversación anterior se cierra (el mundo y lo decidido
+      // se quedan) y arriba queda la historia, lo que se pide y la respuesta.
+      const h = HISTORIAS_POR_ID[a.historia]
+      if (!h || s.activo) return s
+      const n = { ...s, mensajes: [], cola: [], snapshots: {}, ultimaMutacion: null, contexto: {}, tour: null, inactivo: 0 }
+      const indice = HISTORIAS.findIndex((x) => x.id === h.id)
+      n.mensajes.push({
+        id: nuevoId(n, 'h'),
+        rol: 'historia',
+        historia: h.id,
+        arco: h.arco,
+        titulo: h.titulo,
+        unaLinea: h.unaLinea,
+        capacidad: h.capacidad,
+        indice: indice >= 0 ? indice : null,
+        total: HISTORIAS.length,
+        hora: horaDe(n.reloj),
+      })
+      return encolar(n, entradaDeHistoria(h, n.mundo))
     }
 
     case 'reiniciar':

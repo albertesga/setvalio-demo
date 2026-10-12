@@ -5,7 +5,7 @@ import { useId, useRef } from 'react'
 import { AgentGlyph } from '../../brand/Filmpilot.jsx'
 import { IconCheck, IconChevronRight } from '../../components/icons.jsx'
 import { AGENTES, ORDEN_AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, agentesDeFamilia } from '../agentes.js'
-import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD, ETIQUETA_NIVEL, entradaDeHistoria } from '../casos.js'
+import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD, ETIQUETA_NIVEL } from '../casos.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, Hoja } from './Piezas.jsx'
 import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
@@ -60,11 +60,12 @@ function FilaHistoria({ h, visto, onElegir, deshabilitado }) {
 
 /** «Lo que puedes ver»: el índice de la demo, arriba del carril y abierto. */
 export function LoQuePuedesVer({ nivel = 2, epilogoVisto = false }) {
-  const { mundo, vistos, enviarEntrada, ocupado } = useCtx()
+  const { vistos, abrirHistoria, ocupado } = useCtx()
   const uid = useId().replace(/:/g, '')
   const H = `h${nivel}`
   const n = vistos.length
-  const elegir = (h) => enviarEntrada(entradaDeHistoria(h, mundo))
+  // Cada historia se abre en limpio: arriba, lo que se pide y la respuesta.
+  const elegir = (h) => abrirHistoria(h)
   return (
     <section className="ag-casos" aria-labelledby={`${uid}-ver`}>
       <div className="ag-casos-cab">

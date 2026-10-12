@@ -13,7 +13,7 @@ import { useCtx } from './contexto.js'
 import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
-import { ETIQUETA_CAPACIDAD } from '../casos.js'
+import { ETIQUETA_CAPACIDAD, HISTORIAS_POR_ID } from '../casos.js'
 import { useMovimientoReducido } from '../useAgentes.js'
 import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, StatusChip, EtiquetaCapacidad, diaCorto } from './Piezas.jsx'
 import { BLOQUES_PARTE } from './Parte.jsx'
@@ -1103,8 +1103,10 @@ function BloqueCaja({ b }) {
 const accionViva = (mundo, a) => a.entrada?.tipo !== 'evento' || mundo.entrantes.includes(a.entrada.eventoId)
 
 function BloqueAcciones({ b, principal = true }) {
-  const { enviarEntrada, ocupado, mundo } = useCtx()
+  const { enviarEntrada, abrirHistoria, ocupado, mundo } = useCtx()
   const acciones = b.acciones.filter((a) => accionViva(mundo, a))
+  // Con `historia`, la acción abre esa historia en limpio; si no, envía su entrada.
+  const pulsar = (a) => (a.historia && HISTORIAS_POR_ID[a.historia] ? abrirHistoria(HISTORIAS_POR_ID[a.historia]) : enviarEntrada(a.entrada))
   if (!acciones.length) return null
   return (
     <div className="ag-panel flex flex-wrap items-center justify-between gap-3">
@@ -1113,7 +1115,7 @@ function BloqueAcciones({ b, principal = true }) {
       </p>
       <div className="flex flex-wrap gap-2">
         {acciones.map((a) => (
-          <FilmpilotButton key={a.id} variant={a.variante === 'primary' && principal ? 'primary' : 'secondary'} icon={IconPlay} disabled={ocupado} onClick={() => enviarEntrada(a.entrada)}>
+          <FilmpilotButton key={a.id} variant={a.variante === 'primary' && principal ? 'primary' : 'secondary'} icon={IconPlay} disabled={ocupado} onClick={() => pulsar(a)}>
             {a.etiqueta}
           </FilmpilotButton>
         ))}

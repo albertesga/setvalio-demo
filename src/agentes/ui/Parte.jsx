@@ -7,7 +7,7 @@ import { useId, useState } from 'react'
 import { IconCheck, IconChevronRight, IconClock } from '../../components/icons.jsx'
 import * as c from '../calculos.js'
 import { AGENTES } from '../agentes.js'
-import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD, entradaDeHistoria } from '../casos.js'
+import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD } from '../casos.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, riesgo as riesgoDe, HECHAS } from '../rodaje.js'
 import { renderTexto, fechaDia } from '../texto.js'
@@ -382,11 +382,8 @@ export function BloqueHistorias({ b }) {
   // Las seis, como en el carril: «N de 6 vistas» cuenta lo que hay en pantalla.
   const historias = HISTORIAS
   const nVistas = HISTORIAS.filter((h) => vistos.includes(h.id)).length
-  const abrir = (h) => {
-    const entrada = entradaDeHistoria(h, ctx.mundo)
-    if (ctx.enviarEntrada) ctx.enviarEntrada(entrada)
-    else ctx.enviar?.(entrada.texto ?? h.prompt)
-  }
+  // Cada historia se abre en limpio, como desde el carril.
+  const abrir = (h) => ctx.abrirHistoria(h)
   return (
     <section className="ag-historias" aria-labelledby={`${id}-t`}>
       <div className="ag-historias-cab">

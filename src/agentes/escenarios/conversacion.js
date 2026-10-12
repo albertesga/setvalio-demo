@@ -127,7 +127,7 @@ export const cierreRecorrido = {
         texto(t('Así trabaja Filmpilot: los agentes preparan, tú decides. Lo has visto en sus tres formas de actuar.')),
         lista('Tres formas de actuar', lineasCierre(antes).map((x) => ({ texto: x }))),
         // Las seis historias ya están en el carril con su marca: aquí solo lo que queda por ver.
-        { tipo: 'acciones', texto: t('Para después: otro proyecto, antes del rodaje. Está en exploración.'), acciones: [{ id: 'itsasoa', etiqueta: EPILOGO.titulo, variante: 'secondary', entrada: EPILOGO.entrada ?? { tipo: 'texto', texto: EPILOGO.prompt } }] },
+        { tipo: 'acciones', texto: t('Para después: otro proyecto, antes del rodaje. Está en exploración.'), acciones: [{ id: 'itsasoa', etiqueta: EPILOGO.titulo, variante: 'secondary', historia: EPILOGO.id, entrada: EPILOGO.entrada ?? { tipo: 'texto', texto: EPILOGO.prompt } }] },
       ],
       sugerencias: ['¿Por qué se desvía Escenografía?', '¿Qué bloquea el dossier fiscal?', '¿Cuánto nos costará al final y llegamos de caja?'].map(sug),
       fuentes: [],
