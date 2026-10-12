@@ -11,6 +11,7 @@ import { reducirVarias, LLEGAN_CON_EV01 } from './acciones.js'
 import { CONVERSACIONES, CONVERSACIONES_POR_ID } from './casos.js'
 import { DURACIONES, AGENTES } from './agentes.js'
 import { renderTexto } from './texto.js'
+import { informeDesactualizado } from './calculos.js'
 
 // Contrato EVENTOS: novedades del mundo. { id, retrasoMs, agente, titulo, automatico }.
 // Por ahora la demo es reactiva: ninguna llega sola (automatico: false en todas) y cada una
@@ -55,6 +56,8 @@ export function crearSesion({ persona = 'marta' } = {}) {
     conversaciones: {},
     actual: null,
     contextos: {},
+    // Versión del mundo con la que se escribieron las aperturas: si cambia, el parte ya no está al día.
+    versionAperturas: null,
   }
 }
 
@@ -78,7 +81,7 @@ function tituloDe(texto, max = 34) {
 function iniciar(s0, entrada0) {
   const s = { ...s0, mensajes: [...s0.mensajes], snapshots: { ...s0.snapshots } }
   const persona = personaDe(s)
-  // `sola`: la novedad ha llegado sin que nadie la pida (no la ha traído una historia ni una pregunta).
+  // `sola`: la novedad ha llegado sin que nadie la pida (no la ha traído una pregunta ni un botón).
   // `conv`: la conversación a la que va (por defecto, la abierta). `apertura`: lo que el agente
   // ya ha escrito al abrir la demo (sin burbuja de la persona ni línea de novedad, con su hora).
   const { sola = false, conv: convEntrada, apertura = false, hora: horaApertura, deshacible = false, ...entrada } = entrada0
@@ -132,6 +135,43 @@ function iniciar(s0, entrada0) {
   return s
 }
 
+// El agente que da nombre y etiqueta a una conversación nueva según lo que se pidió, no el
+// primero que trabaja (en el informe, Facturas solo lee la bandeja). Si no está, el primero
+// que no sea el Orquestador.
+const PRINCIPAL = {
+  saludo: { agente: 'orquestador' },
+  resumen: { agente: 'orquestador' },
+  ayuda: { agente: 'orquestador' },
+  informe_semanal: { agente: 'informes' },
+  explicar_desviacion: { agente: 'costes' },
+  prevision: { agente: 'prevision' },
+  factura_nueva: { agente: 'facturas' },
+  revisar_gasto: { agente: 'facturas' },
+  pedir_documentacion: { agente: 'cumplimiento' },
+  aprobar_oc: { agente: 'excepciones', etiqueta: 'Compras' },
+  cumplimiento: { agente: 'cumplimiento' },
+  incentivo: { agente: 'cumplimiento' },
+  riesgos: { agente: 'riesgos' },
+  presupuesto_nuevo: { agente: 'presupuesto' },
+  anadir_coste: { agente: 'presupuesto' },
+  optimizar_proveedores: { agente: 'proveedores' },
+}
+// Lo que no se ha entendido no da tema: la conversación espera a la primera respuesta útil.
+const SIN_TEMA = new Set(['no_entendido', 'desambiguar', 'fuera_alcance'])
+// Respuestas de título genérico («Cómo va el rodaje»): mejor la pregunta de la persona.
+const TITULO_DE_LA_PREGUNTA = new Set(['resumen'])
+
+function etiquetar(cv, turno) {
+  const p = PRINCIPAL[turno.intencion]
+  // Si se abrió desde la ficha de un agente, se queda con ese agente.
+  const agente = cv.agenteFijo ? cv.agente : (p?.agente ?? turno.agentes?.find((a) => a !== 'orquestador') ?? 'orquestador')
+  const etiqueta = cv.agenteFijo ? cv.etiqueta : (p?.etiqueta ?? AGENTES[agente]?.etiqueta ?? 'Equipo')
+  const titulo = !TITULO_DE_LA_PREGUNTA.has(turno.intencion) && typeof turno.titulo === 'string' && turno.titulo.length <= 34 ? turno.titulo : cv.titulo
+  // Lo que aún no está en Filmpilot (Riesgos, Itsasoa) lleva la etiqueta discontinua.
+  const exploratoria = AGENTES[agente]?.exploratorio || INTENCIONES_ITSASOA.has(turno.intencion) || !!turno.proyecto
+  return { ...cv, agente, etiqueta, titulo, capacidad: exploratoria ? 'exploratoria' : cv.capacidad, etiquetada: true }
+}
+
 function progresar(s0, ms) {
   if (!s0.activo) return s0
   const s = { ...s0, mensajes: [...s0.mensajes] }
@@ -172,13 +212,9 @@ function progresar(s0, ms) {
       // Cualquier otro cambio del mundo invalida el deshacer anterior.
       if (turno.pasos.some((p) => p.muta)) s.ultimaMutacion = null
     }
-    // Una conversación nueva toma la etiqueta y el título de su primera respuesta.
+    // Una conversación nueva toma la etiqueta y el título de su primera respuesta entendida.
     const cv = msg.conv && s.conversaciones?.[msg.conv]
-    if (cv?.nueva && !cv.etiquetada) {
-      const agente = turno.agentes?.find((a) => a !== 'orquestador') ?? 'orquestador'
-      const titulo = typeof turno.titulo === 'string' && turno.titulo.length <= 34 && !['Sin entender', 'No te he entendido'].includes(turno.titulo) ? turno.titulo : cv.titulo
-      s.conversaciones = { ...s.conversaciones, [msg.conv]: { ...cv, agente, etiqueta: AGENTES[agente]?.etiqueta ?? 'Equipo', titulo, etiquetada: true } }
-    }
+    if (cv?.nueva && !cv.etiquetada && !SIN_TEMA.has(turno.intencion)) s.conversaciones = { ...s.conversaciones, [msg.conv]: etiquetar(cv, turno) }
     if (s.cola.length) {
       const [sig, ...resto] = s.cola
       return iniciar({ ...s, cola: resto }, sig)
@@ -219,10 +255,13 @@ export function mensajesDe(s, conv = s.actual) {
   return conv ? s.mensajes.filter((m) => m.conv === conv) : s.mensajes
 }
 
-/** Mensajes que nadie ha visto todavía en una conversación (lo que escribes tú no cuenta). */
+/**
+ * Mensajes que nadie ha visto todavía en una conversación. Lo que escribes tú no cuenta, y una
+ * respuesta solo cuenta al terminar: si sales antes, la encuentras «sin leer» al volver.
+ */
 export function porLeer(s, id) {
   const desde = s.conversaciones[id]?.leidaHasta ?? 0
-  return s.mensajes.filter((m) => m.conv === id && m.rol !== 'usuario' && m.rol !== 'decision' && seqDe(m.id) > desde).length
+  return s.mensajes.filter((m) => m.conv === id && m.rol !== 'usuario' && m.rol !== 'decision' && m.estado !== 'en_curso' && seqDe(m.id) > desde).length
 }
 
 /**
@@ -239,7 +278,7 @@ export function listaConversaciones(s, abierta = s.actual) {
       const ultimo = ultimos[c.id] ?? null
       const seq = ultimo ? seqDe(ultimo.id) : seqDe(c.creada ?? '')
       const sinLeer = c.id === abierta ? 0 : porLeer(s, c.id)
-      return { ...c, capacidad: CONVERSACIONES_POR_ID[c.id]?.capacidad, ultimo, seq, hora: ultimo?.hora ?? null, sinLeer, noLeida: sinLeer > 0 }
+      return { ...c, capacidad: c.capacidad ?? CONVERSACIONES_POR_ID[c.id]?.capacidad, ultimo, seq, hora: ultimo?.hora ?? null, sinLeer, noLeida: sinLeer > 0 }
     })
     .sort((a, b) => b.seq - a.seq)
 }
@@ -287,8 +326,11 @@ export function conversacionPara(s, entrada) {
   const e = det.entidades ?? {}
   // Lo que ya enseña su primer mensaje: la misma pregunta, la novedad que la abrió, la OC-104
   // en la del hotel o lo que ha entrado hoy en la de facturas.
+  // El parte y el informe resumen todo: si algo ha cambiado desde que se escribieron, se rehacen.
+  const alDia = conv === 'parte' ? s.mundo.version === s.versionAperturas : conv === 'informe' ? !informeDesactualizado(s.mundo, s.mundo.periodo.id) : true
   const esApertura =
     !!ap &&
+    alDia &&
     ((ap.tipo === 'evento' && entrada.tipo === 'evento' && ap.eventoId === entrada.eventoId) ||
       (ap.tipo === 'saludo' && det.intencion === 'saludo') ||
       (ap.tipo === 'texto' && entrada.tipo === 'texto' && mismaPeticion(interpretar(s.mundo, ap, {}), det)) ||
@@ -469,23 +511,27 @@ export function reducirSesion(s, a) {
       for (const c of CONVERSACIONES) {
         n = { ...n, conversaciones: { ...n.conversaciones, [c.id]: { id: c.id, titulo: c.titulo, etiqueta: c.etiqueta, agente: c.agente, leidaHasta: 0 } } }
         n = progresar(iniciar(n, { ...c.apertura, conv: c.id, apertura: true, hora: c.hora, deshacible: !!c.deshacible }), Infinity)
+        // Una novedad no deja contexto: la conversación sabe de qué habla («apruébala» es la OC-104).
+        if (c.contexto) n = { ...n, contextos: { ...n.contextos, [c.id]: { ...n.contextos[c.id], ...c.contexto } } }
       }
       // Nada está leído todavía: lo marca la pantalla cuando una conversación se ve
       // (en el móvil se empieza por la lista, sin ninguna abierta).
       const actual = a.actual && n.conversaciones[a.actual] ? a.actual : 'parte'
-      return { ...n, actual, contexto: n.contextos[actual] ?? {}, inactivo: 0 }
+      return { ...n, actual, contexto: n.contextos[actual] ?? {}, versionAperturas: n.mundo.version, inactivo: 0 }
     }
 
     case 'conversacion/leida': {
       // Lo que hay en la conversación ya se ha visto.
       const cv = s.conversaciones[a.id]
       if (!cv || !porLeer(s, a.id)) return s
-      return { ...s, conversaciones: { ...s.conversaciones, [a.id]: { ...cv, leidaHasta: s.seq } } }
+      // Hasta lo último terminado: lo que se está escribiendo se leerá cuando acabe.
+      const hasta = Math.max(cv.leidaHasta ?? 0, ...s.mensajes.filter((m) => m.conv === a.id && m.estado !== 'en_curso').map((m) => seqDe(m.id)))
+      return { ...s, conversaciones: { ...s.conversaciones, [a.id]: { ...cv, leidaHasta: hasta } } }
     }
 
     case 'conversacion/abrir': {
-      if (!s.conversaciones[a.id]) return s
-      if (a.id === s.actual && !s.activo && !s.cola.length) return s
+      // La que ya está abierta: no hay nada que cambiar (ni que terminar de golpe).
+      if (!s.conversaciones[a.id] || a.id === s.actual) return s
       const n = terminarTodo(s)
       const convs = { ...n.conversaciones }
       const prev = n.actual
@@ -500,11 +546,18 @@ export function reducirSesion(s, a) {
       const n = terminarTodo(s)
       const convs = { ...n.conversaciones }
       const prev = n.actual
+      // Desde la ficha de un agente, la conversación es con él (se queda con su etiqueta); si no,
+      // con el Orquestador, y la etiqueta sale de la primera respuesta.
+      const ag = a.agente && AGENTES[a.agente] ? a.agente : 'orquestador'
+      const base = { agente: ag, etiqueta: AGENTES[ag]?.etiqueta ?? 'Equipo', agenteFijo: ag !== 'orquestador' || undefined, capacidad: AGENTES[ag]?.exploratorio ? 'exploratoria' : undefined }
       // Ya hay una nueva vacía abierta: se usa esa.
-      if (prev && convs[prev]?.nueva && !n.mensajes.some((m) => m.conv === prev)) return n === s ? s : n
+      if (prev && convs[prev]?.nueva && !n.mensajes.some((m) => m.conv === prev)) {
+        if (!a.agente) return n === s ? s : n
+        return { ...n, conversaciones: { ...convs, [prev]: { ...convs[prev], ...base } } }
+      }
       const m = { ...n, conversaciones: convs }
       const id = nuevoId(m, 'c')
-      m.conversaciones = { ...m.conversaciones, [id]: { id, titulo: null, etiqueta: 'Equipo', agente: 'orquestador', leidaHasta: m.seq, nueva: true, creada: id } }
+      m.conversaciones = { ...m.conversaciones, [id]: { id, titulo: null, ...base, leidaHasta: m.seq, nueva: true, creada: id } }
       return { ...m, actual: id, contexto: {}, contextos: { ...m.contextos, [id]: {} }, inactivo: 0 }
     }
 

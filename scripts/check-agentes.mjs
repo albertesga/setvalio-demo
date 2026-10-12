@@ -845,8 +845,10 @@ test('la portada cuenta el día y el plan de rodaje del mundo de los agentes', (
   assert.equal(DOSSIER.length, c.dossier(m).length)
 })
 test('la portada cuenta los documentos que lee Facturas en el informe', () => {
-  const r = responder(crearMundo(), { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' })
-  const n = Number(renderTexto(r.turno.pasos.find((p) => p.agente === 'facturas').titulo).match(/\d+/)[0])
+  // El informe que ya está escrito al abrir los agentes (después de que lleguen las facturas de la mañana).
+  const s = reducirSesion(crearSesion(), { tipo: 'conversaciones/iniciar' })
+  const turno = mensajesDe(s, 'informe')[0].turno
+  const n = Number(renderTexto(turno.pasos.find((p) => p.agente === 'facturas').titulo).match(/\d+/)[0])
   const PALABRA = { 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco' }
   assert.ok(AGENTES_PORTADA.some((a) => a.tarea === `Lee los ${PALABRA[n]} documentos de la bandeja`), `la portada debe decir ${PALABRA[n]}`)
 })
@@ -1013,6 +1015,9 @@ test('la interfaz no enseña el vocabulario retirado', () => {
     const src = readFileSync(new URL(f, dir), 'utf8')
     for (const v of VIEJOS) assert.ok(!src.includes(v), `${f}: «${v}»`)
   }
+  // Lo que enseña la portada, también.
+  const textos = (x, out = []) => (typeof x === 'string' ? out.push(x) : x && typeof x === 'object' && Object.values(x).forEach((y) => textos(y, out)), out)
+  for (const s of textos([RODAJE, PLAN_RIESGO, FLOW, DOSSIER, AGENTES_PORTADA])) assert.ok(!PALABRAS_VIEJAS.test(s), `portada: «${s}»`)
 })
 
 // ── 13. Regresiones de la revisión final ─────────────────────────────────────
@@ -1266,6 +1271,130 @@ test('los botones van a la conversación de lo que piden; lo escrito se responde
   assert.deepEqual(ir('Prepara la solicitud del certificado cultural al ICAA'), { conv: 'dossier', esApertura: false })
   assert.equal(ir('¿Qué riesgos hay para las próximas jornadas?'), null)
   for (const f of FLOW) if (f.pregunta) assert.notEqual(responder(mundoBase, { tipo: 'texto', texto: f.pregunta }).turno.intencion, 'no_entendido', f.pregunta)
+})
+
+// ── 18. Revisión de las conversaciones ───────────────────────────────────────
+console.log('Revisión de las conversaciones')
+const hasta = (s) => {
+  for (let i = 0; i < 2000 && s.activo; i++) s = reducirSesion(s, { tipo: 'avanzar', ms: 100 })
+  return s
+}
+const decidirEn = (s, conv, accionId) => {
+  const tarjeta = mensajesDe(s, conv).flatMap((m) => m.turno?.bloques ?? []).find((b) => b.tipo === 'aprobacion' && b.acciones.some((a) => a.id === accionId))
+  const a = tarjeta.acciones.find((x) => x.id === accionId)
+  return hasta(reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: a.accion, etiqueta: a.burbuja ?? a.etiqueta } }))
+}
+const preguntaEn = (s, conv, texto) => {
+  if (s.actual !== conv) s = reducirSesion(s, { tipo: 'conversacion/abrir', id: conv })
+  return hasta(reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto } }))
+}
+test('el parte y el informe se rehacen si algo ha cambiado desde que se escribieron', () => {
+  let s = iniciada()
+  assert.deepEqual(conversacionPara(s, { tipo: 'texto', texto: 'Regenera el informe semanal de coste' }), { conv: 'informe', esApertura: true }, 'al día, basta con abrirlo')
+  assert.deepEqual(conversacionPara(s, { tipo: 'texto', texto: 'Ponme al día' }), { conv: 'parte', esApertura: true })
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'hotel' })
+  s = decidirEn(s, 'hotel', 'aprobar')
+  assert.ok(c.informeDesactualizado(s.mundo, s.mundo.periodo.id))
+  assert.deepEqual(conversacionPara(s, { tipo: 'texto', texto: 'Regenera el informe semanal de coste' }), { conv: 'informe', esApertura: false }, 'desactualizado: se pide allí')
+  assert.deepEqual(conversacionPara(s, { tipo: 'texto', texto: 'Ponme al día' }), { conv: 'parte', esApertura: false })
+})
+test('una conversación nueva toma el agente principal de lo que se pide, no el primero que trabaja', () => {
+  const nueva = (texto, agente) => {
+    const s = hasta(reducirSesion(reducirSesion(iniciada(), { tipo: 'conversacion/nueva', agente }), { tipo: 'enviar', entrada: { tipo: 'texto', texto } }))
+    return s.conversaciones[s.actual]
+  }
+  const inf = nueva('Prepárame el informe semanal de coste')
+  assert.deepEqual([inf.agente, inf.etiqueta], ['informes', 'Informes'])
+  const rev = nueva('¿Qué tengo que revisar?')
+  assert.deepEqual([rev.agente, rev.etiqueta, rev.titulo], ['orquestador', 'Equipo', 'Qué tengo que revisar'], 'el resumen se titula con la pregunta')
+  const oc = nueva('Revisa la orden de compra OC-105')
+  assert.deepEqual([oc.agente, oc.etiqueta], ['excepciones', 'Compras'])
+  const ficha = nueva('¿Qué tengo que revisar?', 'excepciones')
+  assert.deepEqual([ficha.agente, ficha.etiqueta], ['excepciones', 'Revisión'], 'desde la ficha, con ese agente')
+  const rg = nueva('¿Qué riesgos hay para las próximas jornadas?')
+  assert.deepEqual([rg.agente, rg.capacidad], ['riesgos', 'exploratoria'], 'Riesgos, en exploración')
+})
+test('una pregunta que no se entiende no titula ni etiqueta la conversación nueva', () => {
+  let s = reducirSesion(iniciada(), { tipo: 'conversacion/nueva' })
+  s = preguntaEn(s, s.actual, '¿Cuántas sillas hay en el plató?')
+  let cv = s.conversaciones[s.actual]
+  assert.equal(cv.titulo, 'Cuántas sillas hay en el plató')
+  assert.ok(!cv.etiquetada)
+  s = preguntaEn(s, s.actual, '¿Cuánto nos costará al final y llegamos de caja?')
+  cv = s.conversaciones[s.actual]
+  assert.deepEqual([cv.etiqueta, cv.etiquetada], ['Caja', true], 'la primera respuesta entendida le da tema')
+})
+test('una respuesta que termina fuera de la vista se queda «sin leer»', () => {
+  let s = reducirSesion(iniciada(), { tipo: 'conversacion/abrir', id: 'hotel' })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué órdenes de compra tengo pendientes?' } })
+  assert.equal(porLeer(s, 'hotel'), 0, 'lo que aún se escribe no cuenta')
+  s = reducirSesion(s, { tipo: 'conversacion/leida', id: 'hotel' })
+  s = hasta(s)
+  assert.equal(porLeer(s, 'hotel'), 1, 'terminó sin que se viera')
+})
+test('abrir la conversación que ya está abierta no termina de golpe lo que se está escribiendo', () => {
+  let s = reducirSesion(iniciada(), { tipo: 'conversacion/abrir', id: 'hotel' })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué órdenes de compra tengo pendientes?' } })
+  assert.equal(reducirSesion(s, { tipo: 'conversacion/abrir', id: 'hotel' }), s)
+})
+test('las conversaciones que empiezan con una novedad saben de qué hablan', () => {
+  for (const texto of ['Apruébala', '¿La apruebo?', '¿Cuánto sube el coste si la apruebo?']) {
+    const t = mensajesDe(preguntaEn(iniciada(), 'hotel', texto), 'hotel').at(-1).turno
+    assert.deepEqual([t.intencion, t.entidades.oc], ['aprobar_oc', 'OC-104'], texto)
+  }
+  const t = mensajesDe(preguntaEn(iniciada(), 'facturas', '¿Dónde va?'), 'facturas').at(-1).turno
+  assert.deepEqual([t.intencion, t.entidades.documento], ['revisar_gasto', 'G-004'])
+})
+test('en la conversación de la grúa, las preguntas sobre la grúa y la víspera son de la grúa', () => {
+  for (const texto of ['¿Qué pasa si se rompe la grúa?', '¿Cuánto cuesta la grúa?', '¿Y si la grúa no llega?', '¿Hay alternativa a la grúa?', '¿Qué hacemos si la víspera se alarga?', '¿Y si se retrasa la jornada 16?']) {
+    const t = mensajesDe(preguntaEn(iniciada(), 'grua', texto), 'grua').at(-1).turno
+    assert.deepEqual([t.intencion, t.entidades.riesgo], ['riesgos', 'RG-7'], texto)
+  }
+})
+test('preguntar por un paso del dossier no lo prepara: solo una orden', () => {
+  for (const texto of ['¿Qué pide el ICAA para el certificado cultural?', '¿Hace falta solicitar el certificado cultural?', '¿Quién tiene que pedir los justificantes de pago?', 'Pide el certificado de retenciones a la gestoría']) {
+    const s = preguntaEn(iniciada(), 'dossier', texto)
+    assert.deepEqual(Object.keys(s.mundo.borradores).filter((k) => k.startsWith('BOR-DOS')), [], texto)
+  }
+})
+test('la petición de justificantes se rehace si cambia la lista y nadie la ha editado', () => {
+  let s = iniciada()
+  const llegada = s.ultimaMutacion.mensajeId
+  s = preguntaEn(s, 'dossier', 'Pide a administración los justificantes de pago')
+  const antes = s.mundo.borradores['BOR-DOS-02'].docIds
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'facturas' })
+  s = hasta(reducirSesion(s, { tipo: 'deshacer', mensajeId: llegada }))
+  s = preguntaEn(s, 'dossier', 'Pide a administración los justificantes de pago')
+  const ahora = c.justificantesPendientes(s.mundo).map((d) => d.id)
+  assert.notDeepEqual(antes, ahora)
+  assert.deepEqual(s.mundo.borradores['BOR-DOS-02'].docIds, ahora, 'rehecha con la lista nueva')
+  const dice = renderTexto(mensajesDe(s, 'dossier').at(-1).turno.bloques.find((b) => b.tipo === 'texto').texto)
+  assert.ok(dice.includes(`${ahora.length} facturas`), dice)
+  // Editada, se respeta y se avisa.
+  let m = reducir(s.mundo, { tipo: 'borrador/editar', id: 'BOR-DOS-02', asunto: 'Justificantes', cuerpo: 'Hola' })
+  m = reducir(m, { tipo: 'documento/contabilizar', docId: 'F-2026-078' })
+  s = preguntaEn({ ...s, mundo: m }, 'dossier', 'Pide a administración los justificantes de pago')
+  assert.equal(s.mundo.borradores['BOR-DOS-02'].textoCuerpo, 'Hola')
+  const aviso = renderTexto(mensajesDe(s, 'dossier').at(-1).turno.bloques.find((b) => b.tipo === 'texto').texto)
+  assert.ok(/la has editado/.test(aviso), aviso)
+})
+test('el radar dice de qué es cada probabilidad: la grúa no es lluvia', () => {
+  const r = Object.fromEntries(evaluarRiesgos(mundoBase).map((x) => [x.id, x]))
+  assert.equal(r['RG-1'].deQue, 'lluvia')
+  assert.ok(r['RG-7'].probabilidad > 0 && r['RG-7'].deQue && r['RG-7'].deQue !== 'lluvia')
+})
+test('«Volver a La última función» desde Itsasoa lleva al parte', () => {
+  const s = hasta(preguntaEn(iniciada(), 'itsasoa', 'Optimiza los proveedores de la propuesta'))
+  const volver = sugerenciasDe(s).find((x) => /^Volver a /.test(x.etiqueta))
+  assert.ok(volver, 'la sugerencia sale')
+  assert.equal(conversacionPara(s, { tipo: 'texto', texto: volver.texto })?.conv, 'parte')
+})
+test('la grúa dice en su resumen si el día más cabe en lo previsto, como su tabla', () => {
+  const tarjeta = mensajesDe(iniciada(), 'grua')[0].turno.bloques.find((b) => b.tipo === 'aprobacion' && b.ref?.id === 'RG-7')
+  const resumen = renderTexto(tarjeta.resumen)
+  const fila = tarjeta.impacto.find((f) => /grúa/.test(f.etiqueta))
+  assert.ok(/cabe en lo previsto para 06\.02/.test(resumen), resumen)
+  assert.ok(Math.abs(fila.despues - fila.antes) < 0.5, 'y la tabla dice que no cambia')
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)

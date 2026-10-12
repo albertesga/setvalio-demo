@@ -54,9 +54,12 @@ clasificación o el agente con el que hablas):
 | Presupuesto de Itsasoa | Presupuesto | Presupuesto | Otro proyecto, en desarrollo: la primera propuesta con los costes que aportas |
 
 **Nueva** abre una conversación con el Orquestador, que toma título y etiqueta
-de su primera respuesta. Un botón lleva a la conversación de lo que pide (el
-«Revisar» de la compra del hotel abre «Pedido del Hotel NH»); lo que escribes se
-responde en la conversación abierta. La demo es reactiva: nada llega solo; todo
+de su primera respuesta entendida («Pídele algo», en la ficha de un agente, la
+abre con ese agente). Un botón lleva a la conversación de lo que pide (el
+«Revisar» de la compra del hotel abre «Pedido del Hotel NH»); si el parte o el
+informe se han quedado viejos por algo que has decidido, lo pide allí de nuevo.
+Lo que escribes se responde en la conversación abierta, y lo que dejas a medias
+en el campo se queda en su conversación. La demo es reactiva: nada llega solo; todo
 empieza porque lo pides. Las conversaciones salen de `src/agentes/casos.js`
 (`CONVERSACIONES`) y `conversacionPara` (`src/agentes/sesion.js`) decide adónde
 va cada botón.

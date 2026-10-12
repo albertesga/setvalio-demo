@@ -15,9 +15,9 @@ export function proyectoPropuesta(m) {
   return { titulo: m.propuesta.proyecto.titulo, productora: m.propuesta.proyecto.productora, estado: 'en desarrollo' }
 }
 
-/** Sugerencia para volver al proyecto en rodaje. */
+/** Sugerencia para volver al proyecto en rodaje: lleva a su parte (la conversación «Parte de hoy»). */
 export function sugVolver(m) {
-  return { etiqueta: `Volver a ${m.proyecto.titulo}`, texto: '¿Cómo vamos?' }
+  return { etiqueta: `Volver a ${m.proyecto.titulo}`, texto: 'Ponme al día' }
 }
 
 export function textoDiferencia(tot) {

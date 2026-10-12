@@ -13,7 +13,7 @@ import { evaluarRiesgos, riesgo as riesgoDe, HECHAS } from '../rodaje.js'
 import { renderTexto, fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, Tono, AgentAvatar, AutonomyBadge, rangoFechas } from './Piezas.jsx'
-import { ESTADO_DECISION, ESTADO_RIESGO, irATarjeta } from './Bloques.jsx'
+import { ESTADO_DECISION, ESTADO_RIESGO } from './Bloques.jsx'
 import './parte.css'
 
 const PESO = { alta: 0, media: 1, baja: 2, controlado: 3 }
@@ -185,7 +185,7 @@ function BotonIr({ etiqueta, contexto, onClick }) {
 }
 
 function Sublinea({ su }) {
-  const { mundo, enviar } = useCtx()
+  const { mundo, enviar, irATarjeta } = useCtx()
   const e = estadoLinea(mundo, su.ref)
   return (
     <li className={`ag-agenda-sub-item ${e.hecho ? 'is-hecho' : ''}`}>
@@ -383,10 +383,11 @@ export function BloqueConversaciones() {
             <p className="ag-indice-etiqueta">{c.etiqueta}</p>
             <h5 className="ag-indice-titulo">{c.titulo}</h5>
             <div className="ag-indice-meta">
-              <span className="text-xs text-flp-muted">{AGENTES[c.agente]?.nombre}</span>
+              {/* El nombre del agente, solo si no es ya la etiqueta («Facturas · Facturas»). */}
+              {AGENTES[c.agente]?.nombre.toLowerCase() !== c.etiqueta.toLowerCase() && <span className="text-xs text-flp-muted">{AGENTES[c.agente]?.nombre}</span>}
               <Capacidad capacidad={c.capacidad} />
             </div>
-            <button type="button" className="ag-boton-fila ag-indice-boton" onClick={() => ctx.abrirConversacion(c.id)}>
+            <button type="button" className="ag-boton-fila ag-indice-boton" aria-label={`Abrir la conversación: ${c.titulo}`} onClick={() => ctx.abrirConversacion(c.id)}>
               <span>Abrir la conversación</span> <IconChevronRight size={15} aria-hidden="true" />
             </button>
           </li>

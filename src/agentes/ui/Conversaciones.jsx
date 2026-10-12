@@ -23,11 +23,12 @@ export function vistaPrevia(m) {
   return ''
 }
 
-function Etiqueta({ texto, exploratoria }) {
+// `leida`: si la pastilla «En exploración» ya va al lado, el lector de pantalla no lo repite.
+function Etiqueta({ texto, exploratoria, leida = false }) {
   return (
     <span className={`ag-conv-etiqueta ${exploratoria ? 'is-exploratoria' : ''}`}>
       {texto}
-      {exploratoria && <span className="sr-only"> ({ETIQUETA_CAPACIDAD.exploratoria.toLowerCase()})</span>}
+      {exploratoria && !leida && <span className="sr-only"> ({ETIQUETA_CAPACIDAD.exploratoria.toLowerCase()})</span>}
     </span>
   )
 }
@@ -52,7 +53,7 @@ export function ListaConversaciones({ items, actual, onAbrir, onNueva }) {
           const activa = c.id === actual
           return (
             <li key={c.id}>
-              <button type="button" className={`ag-conv ${activa ? 'is-activa' : ''} ${c.noLeida ? 'is-noleida' : ''}`} aria-current={activa ? 'true' : undefined} onClick={() => onAbrir(c.id)}>
+              <button type="button" className={`ag-conv ${activa ? 'is-activa' : ''} ${c.noLeida ? 'is-noleida' : ''}`} data-conv={c.id} aria-current={activa ? 'true' : undefined} onClick={() => onAbrir(c.id)}>
                 <AgentAvatar id={c.agente} size={40} />
                 <span className="ag-conv-cuerpo">
                   <span className="ag-conv-fila">
@@ -92,9 +93,12 @@ export function CabeceraChat({ conversacion, capacidad, onVolver }) {
       </button>
       <AgentAvatar id={conversacion.agente} size={36} />
       <div className="min-w-0 flex-1">
-        <p className="ag-chat-titulo">{conversacion.titulo ?? 'Nueva conversación'}</p>
+        {/* Recibe el foco al abrir una conversación en el móvil (el botón pulsado desaparece). */}
+        <h2 id="ag-chat-titulo" tabIndex={-1} className="ag-chat-titulo focus:outline-none">
+          {conversacion.titulo ?? 'Nueva conversación'}
+        </h2>
         <p className="ag-chat-sub">
-          <Etiqueta texto={conversacion.etiqueta} exploratoria={capacidad === 'exploratoria'} />
+          <Etiqueta texto={conversacion.etiqueta} exploratoria={capacidad === 'exploratoria'} leida={capacidad === 'exploratoria'} />
           {conNombre && <span className="truncate">{nombre}</span>}
           {capacidad === 'exploratoria' && <span className="ag-etiqueta-capacidad">{ETIQUETA_CAPACIDAD.exploratoria}</span>}
         </p>

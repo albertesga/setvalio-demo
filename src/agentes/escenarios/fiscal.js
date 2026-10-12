@@ -61,6 +61,8 @@ function borradorDossier(m, id) {
     id: 'BOR-DOS-02',
     canal: 'email',
     ref: 'DOS-02',
+    // Las facturas que pide: si la lista cambia, la petición sin editar se rehace.
+    docIds: docs.map((d) => d.id),
     para: `Administración · ${m.proyecto.productora}`,
     firma: `${PERSONAS.alvaro.nombre} · ${PERSONAS.alvaro.rol} · ${m.proyecto.titulo}`,
     motivo: t('Justificantes de pago para el dossier fiscal'),
@@ -72,6 +74,20 @@ function borradorDossier(m, id) {
       t('Si alguna aún no está pagada, decidnos cuándo se paga. Gracias.'),
     ],
   }
+}
+
+const listaCambiada = (bor, ids) => !!bor && bor.estado === 'borrador' && String(bor.docIds ?? []) !== String(ids)
+
+/** Lo que se dice de la petición de justificantes: cuenta las facturas del borrador que se enseña. */
+function textoJustificantes(m) {
+  const bor = m.borradores['BOR-DOS-02']
+  const ahora = c.justificantesPendientes(m).map((d) => d.id)
+  const n = cuenta(bor?.docIds?.length ?? ahora.length, 'factura', 'facturas')
+  const firma = { quien: v(PERSONAS.alvaro.nombre), rol: v(PERSONAS.alvaro.rol.toLowerCase()) }
+  if (listaCambiada(bor, ahora)) {
+    return t('La petición a administración ya estaba preparada y la has editado: no la toco. Pide {n}, pero la lista ha cambiado desde entonces: ahora son {ahora}. Revísala antes de pasársela a {quien}.', { n, ahora: cuenta(ahora.length, 'factura', 'facturas'), quien: firma.quien })
+  }
+  return t('Te dejo la petición a administración con las {n} sin justificante de pago. La firma {quien} ({rol}), que lleva los pagos: revísala y pásasela.', { n, ...firma })
 }
 
 /** Próximos pasos para tener el dossier al día. La pantalla tacha cada uno cuando está hecho (`hecho`). */
@@ -87,7 +103,7 @@ function pasosDossier(m) {
   ]
   if (igic) items.push({ id: `rev-${igic.id}`, texto: t('{id} de {prov} lleva IGIC: que cuente como gasto en Canarias lo valida el fiscalista. Tienes la tarjeta debajo.', { id: v(igic.id, 'id'), prov: v(igic.proveedor) }), hecho: { revision: igic.id } })
   for (const d of sinDoc) items.push({ id: `doc-${d.id}`, texto: t('{id} de {prov}: {falta}.', { id: v(d.id, 'id'), prov: v(d.proveedor), falta: v(d.tipo === 'ticket' ? 'es un ticket; hace falta la factura completa' : 'falta documentación') }), etiqueta: d.tipo === 'ticket' ? 'Pedir la factura' : 'Pedir la documentación', entrada: d.tipo === 'ticket' ? `Pide a ${d.proveedor} la factura completa` : `Pide a ${d.proveedor} la documentación que falta`, hecho: { borrador: `BOR-${d.id}` } })
-  items.push({ id: 'DOS-03', texto: t('Coste reconocido por capítulos: lo cierra el informe semanal, que lo prepara Informes.'), etiqueta: 'Ver el informe', entrada: 'Prepárame el informe semanal de coste' })
+  items.push({ id: 'DOS-03', texto: t('Coste reconocido por capítulos: lo cierra el informe semanal, que prepara Informes.'), etiqueta: 'Ver el informe', entrada: 'Prepárame el informe semanal de coste' })
   return { tipo: 'pasos', titulo: 'Para tenerlo al día', nivel: 'propone', items }
 }
 
@@ -100,9 +116,13 @@ export const cumplimiento = {
     const pasoDossier = det.entidades?.dossierPaso
     if (pasoDossier) {
       const borrador = borradorDossier(m, pasoDossier)
+      // La petición ya preparada con otra lista (se ha contabilizado o deshecho alguna factura) se
+      // rehace si nadie la ha editado; si la has editado, se respeta y la respuesta lo avisa.
+      const previo = m.borradores[borrador.id]
+      const reemplazar = pasoDossier === 'DOS-02' && listaCambiada(previo, borrador.docIds) && previo.textoAsunto == null && previo.textoCuerpo == null
       return [
         paso('cumplimiento', pasoDossier === 'DOS-01' ? t('Revisa qué pide el ICAA para el certificado') : t('Busca las facturas contabilizadas sin justificante de pago'), { tipo: 'revision', salida: pasoDossier === 'DOS-01' ? t('Vence el {f}', { f: v(c.dossier(m).find((d) => d.id === 'DOS-01').deadline, 'dia') }) : t('{n}', { n: cuenta(c.justificantesPendientes(m).length, 'factura', 'facturas') }) }),
-        paso('cumplimiento', t('Redacta el borrador'), { tipo: 'redaccion', autonomia: 'propone', acciones: [{ tipo: 'borrador/crear', borrador }], salida: t('Listo para revisar; no se envía') }),
+        paso('cumplimiento', t('Redacta el borrador'), { tipo: 'redaccion', autonomia: 'propone', acciones: [{ tipo: 'borrador/crear', borrador, reemplazar }], salida: t('Listo para revisar; no se envía') }),
       ]
     }
     if (det.eventoId === 'EV-03') {
@@ -137,11 +157,7 @@ export const cumplimiento = {
       return {
         bloques: [
           EXPLORACION_DOSSIER,
-          texto(
-            pasoDossier === 'DOS-01'
-              ? t('Te dejo la solicitud del certificado cultural al ICAA. Revísala antes de enviarla tú: en la checklist del dossier queda como preparada.')
-              : t('Te dejo la petición a administración con las {n} sin justificante de pago. Revísala antes de enviarla tú.', { n: cuenta(c.justificantesPendientes(m).length, 'factura', 'facturas') }),
-          ),
+          texto(pasoDossier === 'DOS-01' ? t('Te dejo la solicitud del certificado cultural al ICAA. Revísala antes de enviarla tú: en la checklist del dossier queda como preparada.') : textoJustificantes(m)),
           { tipo: 'borrador', id },
           bloqueDossier(m),
         ],

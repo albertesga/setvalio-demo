@@ -25,8 +25,13 @@ export function Sugerencias({ items, onElegir, deshabilitado }) {
   )
 }
 
-export function Redactor({ ocupado, onEnviar, onEscribir, inputRef, placeholder = 'Escribe a los agentes…' }) {
-  const [texto, setTexto] = useState('')
+// `inicial` y `onCambio`: el borrador de cada conversación (la pantalla lo guarda y lo devuelve al volver).
+export function Redactor({ ocupado, onEnviar, onEscribir, inputRef, placeholder = 'Escribe a los agentes…', inicial = '', onCambio }) {
+  const [texto, setTextoEstado] = useState(inicial)
+  const setTexto = (v) => {
+    setTextoEstado(v)
+    onCambio?.(v)
+  }
   const historial = useRef([])
   const ref = inputRef
   useEffect(() => {

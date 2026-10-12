@@ -1,5 +1,4 @@
-// Guiones de conversación: ayuda, cierre del recorrido, fuera de alcance,
-// desambiguar y no entendido.
+// Guiones de conversación: ayuda, fuera de alcance, desambiguar y no entendido.
 
 import { AGENTES, ORDEN_AGENTES, ORDEN_FAMILIAS, AUTONOMIA } from '../agentes.js'
 import { ROLES } from '../politicas.js'

@@ -228,7 +228,7 @@ export const accion = {
         break
       }
       case 'orden/escalar':
-        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie: pulsa «Decidir como…» en la tarjeta, o cambia de persona en Opciones, y decide ahí mismo.', { id: v(a.ocId, 'id'), rol: v(minuscula(a.a)) })))
+        bloques.push(texto(t('{id} queda pendiente de {rol}. En la demo no se notifica a nadie.', { id: v(a.ocId, 'id'), rol: v(minuscula(a.a)) })))
         break
       case 'documento/contabilizar': {
         const d = despues.documentos[a.docId]

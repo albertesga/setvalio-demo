@@ -32,8 +32,9 @@ export const CONVERSACIONES = [
   { id: 'lluvia', titulo: 'Lluvia de mañana', etiqueta: 'Riesgos', agente: 'riesgos', apertura: texto(PREGUNTA['RG-1']), hora: '07:40', capacidad: 'exploratoria' },
   { id: 'horas', titulo: 'Horas extra de noche', etiqueta: 'Riesgos', agente: 'riesgos', apertura: texto(PREGUNTA['RG-5']), hora: '07:45', capacidad: 'exploratoria' },
   { id: 'grua', titulo: 'Grúa de la jornada 17', etiqueta: 'Riesgos', agente: 'riesgos', apertura: texto(PREGUNTA['RG-7']), hora: '07:50', capacidad: 'exploratoria' },
-  { id: 'hotel', titulo: 'Pedido del Hotel NH', etiqueta: 'Compras', agente: 'excepciones', apertura: evento('EV-02'), hora: '09:20' },
-  { id: 'facturas', titulo: 'Facturas de esta mañana', etiqueta: 'Facturas', agente: 'facturas', apertura: evento('EV-01'), hora: '09:41', deshacible: true },
+  // `contexto`: de qué se habla cuando la apertura es una novedad («apruébala» es la OC-104).
+  { id: 'hotel', titulo: 'Pedido del Hotel NH', etiqueta: 'Compras', agente: 'excepciones', apertura: evento('EV-02'), hora: '09:20', contexto: { ultimaIntencion: 'aprobar_oc', ultimasEntidades: { oc: 'OC-104' } } },
+  { id: 'facturas', titulo: 'Facturas de esta mañana', etiqueta: 'Facturas', agente: 'facturas', apertura: evento('EV-01'), hora: '09:41', deshacible: true, contexto: { ultimaIntencion: 'revisar_gasto', ultimasEntidades: { documento: 'G-004' } } },
   { id: 'informe', titulo: 'Informe semanal', etiqueta: 'Informes', agente: 'informes', apertura: texto('Prepárame el informe semanal de coste'), hora: '10:05' },
   { id: 'dossier', titulo: 'Dossier fiscal al día', etiqueta: 'Fiscal', agente: 'cumplimiento', apertura: texto('¿Cómo va la adecuación fiscal?'), hora: '10:10' },
   { id: 'parte', titulo: 'Parte de hoy', etiqueta: 'Equipo', agente: 'orquestador', apertura: { tipo: 'saludo' }, hora: '10:30' },
