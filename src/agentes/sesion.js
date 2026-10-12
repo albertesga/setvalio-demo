@@ -1,5 +1,6 @@
-// Sesión de conversación: parte de la mañana, mensajes, reproducción de los pasos
-// de cada agente, novedades (por ahora ninguna llega sola), deshacer, historias en limpio y recorrido guiado.
+// Sesión de los agentes, como un chat: conversaciones (cada una con un agente y un tema),
+// mensajes, reproducción de los pasos de cada agente, novedades (por ahora ninguna llega
+// sola) y deshacer.
 //
 // Es un reductor puro: el tiempo entra como acción ({ tipo: 'avanzar', ms }),
 // así que se prueba en Node con un reloj falso.
@@ -7,22 +8,21 @@
 import { crearMundo, PERSONAS } from './mundo.js'
 import { responder, interpretar } from './orquestador.js'
 import { reducirVarias, LLEGAN_CON_EV01 } from './acciones.js'
-import { RECORRIDO, HISTORIAS, HISTORIAS_POR_ID, EPILOGO, entradaDeHistoria, CONVERSACIONES, CONVERSACIONES_POR_ID } from './casos.js'
+import { CONVERSACIONES, CONVERSACIONES_POR_ID } from './casos.js'
 import { DURACIONES, AGENTES } from './agentes.js'
-import { estadoDecision } from './calculos.js'
 import { renderTexto } from './texto.js'
 
-// Contrato EVENTOS: novedades del mundo. { id, retrasoMs, agente, titulo, automatico, historia }.
+// Contrato EVENTOS: novedades del mundo. { id, retrasoMs, agente, titulo, automatico }.
 // Por ahora la demo es reactiva: ninguna llega sola (automatico: false en todas) y cada una
-// la trae su historia, una pregunta o un botón. Si alguna vuelve a ser automática, llega con
-// la conversación parada (retrasoMs de inactividad) y solo si su historia aún no se ha visto.
+// la trae su conversación, una pregunta o un botón. Si alguna vuelve a ser automática, llega
+// con la conversación parada (retrasoMs de inactividad).
 export const EVENTOS = [
-  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Han entrado tres facturas: por correo, formulario web y WhatsApp', automatico: false, historia: 'solo' },
-  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado un pedido de hotel', automatico: false, historia: 'aprueba' },
-  { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas', automatico: false, historia: 'adelanta' },
-  { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar', automatico: false, historia: 'adelanta' },
-  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana', automatico: false, historia: 'adelanta' },
-  { id: 'EV-03', retrasoMs: 30_000, agente: 'cumplimiento', titulo: 'Un documento del dossier vence esta semana', automatico: false, historia: 'equipo' },
+  { id: 'EV-01', retrasoMs: 16_000, agente: 'facturas', titulo: 'Han entrado tres facturas: por correo, formulario web y WhatsApp', automatico: false },
+  { id: 'EV-02', retrasoMs: 24_000, agente: 'excepciones', titulo: 'Producción ha enviado un pedido de hotel', automatico: false },
+  { id: 'EV-RIESGOS', retrasoMs: 8_000, agente: 'riesgos', titulo: 'Parte de riesgos de las próximas jornadas', automatico: false },
+  { id: 'EV-CITACION', retrasoMs: 12_000, agente: 'riesgos', titulo: 'La orden del día de mañana sigue sin publicar', automatico: false },
+  { id: 'EV-LLUVIA', retrasoMs: 16_000, agente: 'riesgos', titulo: 'Sube la probabilidad de lluvia de mañana', automatico: false },
+  { id: 'EV-03', retrasoMs: 30_000, agente: 'cumplimiento', titulo: 'Un documento del dossier vence esta semana', automatico: false },
 ]
 
 const EVENTOS_POR_ID = Object.fromEntries(EVENTOS.map((e) => [e.id, e]))
@@ -48,8 +48,6 @@ export function crearSesion({ persona = 'marta' } = {}) {
     inactivo: 0,
     eventosPausados: false,
     persona,
-    casosVistos: [],
-    tour: null,
     snapshots: {},
     ultimaMutacion: null,
     // Conversaciones (como en un chat): metadatos por id; los mensajes van en `mensajes`
@@ -103,7 +101,6 @@ function iniciar(s0, entrada0) {
     const ev = EVENTOS_POR_ID[entrada.eventoId]
     s.mensajes.push({ id: nuevoId(s, 's'), rol: 'novedad', eventoId: entrada.eventoId, agente: ev?.agente, titulo: ev?.titulo ?? 'Novedad', llegoSola: sola, hora, conv })
   }
-  // { tipo: 'cierreRecorrido' }: el resumen final lo trae el Orquestador, sin mensaje de la persona.
 
   // Cada conversación recuerda su propio contexto («apruébala» habla de lo de esa conversación).
   const ctx = conv ? (s.contextos?.[conv] ?? {}) : s.contexto
@@ -127,12 +124,9 @@ function iniciar(s0, entrada0) {
     decisionTexto: entrada.tipo === 'accion' ? (entrada.etiqueta ?? 'Decisión') : undefined,
     origen: entrada.tipo,
     eventoId: entrada.tipo === 'evento' ? entrada.eventoId : undefined,
-    // Solo lo que llegó solo se pliega en una línea; lo que pide una historia se enseña entero.
+    // Solo lo que llegó solo se pliega en una línea; lo que se pide se enseña entero.
     llegoSola: sola,
-    // Si este turno estrena su historia y se detiene, la historia vuelve a «sin ver».
-    casoNuevo: !!r.turno.caso && !s.casosVistos.includes(r.turno.caso),
   })
-  if (r.turno.caso && !s.casosVistos.includes(r.turno.caso)) s.casosVistos = [...s.casosVistos, r.turno.caso]
   s.activo = { id, transcurrido: 0 }
   s.inactivo = 0
   return s
@@ -195,44 +189,6 @@ function progresar(s0, ms) {
   return s
 }
 
-function puedeAvanzarTour(s) {
-  if (!s.tour || s.activo || s.cola.length) return false
-  const paso = RECORRIDO[s.tour.paso]
-  if (!paso?.espera) return true
-  const e = estadoDecision(s.mundo, paso.espera).estado
-  return e !== 'pendiente' && e !== 'por_llegar'
-}
-
-export function estadoTour(s) {
-  if (!s.tour) return null
-  const paso = RECORRIDO[s.tour.paso]
-  return { indice: s.tour.paso, total: RECORRIDO.length, paso, puedeAvanzar: puedeAvanzarTour(s), ultimo: s.tour.paso === RECORRIDO.length - 1 }
-}
-
-/**
- * Un paso del recorrido. Contrato del mensaje rol 'guia': { indice, total, titulo, arco,
- * historia }; la nota vive en la barra del recorrido (estadoTour(s).paso.nota).
- * Un paso con entrada null (el parte, que ya está en pantalla) no encola nada.
- */
-function pasoTour(s0, indice) {
-  const paso = RECORRIDO[indice]
-  const s = { ...s0, tour: { paso: indice }, mensajes: [...s0.mensajes] }
-  s.mensajes.push({
-    id: nuevoId(s, 'g'),
-    rol: 'guia',
-    indice,
-    total: RECORRIDO.length,
-    titulo: paso.titulo,
-    arco: paso.arco,
-    historia: paso.historia,
-    hora: horaDe(s.reloj),
-  })
-  if (!paso.entrada) return s
-  // Si la novedad ya llegó, el paso pregunta con el texto de su historia.
-  const h = HISTORIAS.find((x) => x.id === paso.historia)
-  return encolar(s, entradaDeHistoria({ ...h, entrada: paso.entrada }, s.mundo))
-}
-
 function encolar(s, entrada) {
   if (s.activo) return { ...s, cola: [...s.cola, entrada] }
   return iniciar(s, entrada)
@@ -263,18 +219,27 @@ export function mensajesDe(s, conv = s.actual) {
   return conv ? s.mensajes.filter((m) => m.conv === conv) : s.mensajes
 }
 
+/** Mensajes que nadie ha visto todavía en una conversación (lo que escribes tú no cuenta). */
+export function porLeer(s, id) {
+  const desde = s.conversaciones[id]?.leidaHasta ?? 0
+  return s.mensajes.filter((m) => m.conv === id && m.rol !== 'usuario' && m.rol !== 'decision' && seqDe(m.id) > desde).length
+}
+
 /**
  * Lista de conversaciones para la pantalla, de la más reciente a la más antigua.
- * [{ id, titulo, etiqueta, agente, capacidad, ultimo (mensaje), hora, noLeida, nueva }]
+ * `abierta` es la que se está viendo (en el móvil, ninguna mientras se ve la lista): no cuenta
+ * como sin leer.
+ * [{ id, titulo, etiqueta, agente, capacidad, ultimo (mensaje), hora, sinLeer, noLeida, nueva }]
  */
-export function listaConversaciones(s) {
+export function listaConversaciones(s, abierta = s.actual) {
   const ultimos = {}
   for (const m of s.mensajes) if (m.conv) ultimos[m.conv] = m
   return Object.values(s.conversaciones)
     .map((c) => {
       const ultimo = ultimos[c.id] ?? null
       const seq = ultimo ? seqDe(ultimo.id) : seqDe(c.creada ?? '')
-      return { ...c, capacidad: CONVERSACIONES_POR_ID[c.id]?.capacidad, ultimo, seq, hora: ultimo?.hora ?? null, noLeida: c.id !== s.actual && seq > (c.leidaHasta ?? 0) }
+      const sinLeer = c.id === abierta ? 0 : porLeer(s, c.id)
+      return { ...c, capacidad: CONVERSACIONES_POR_ID[c.id]?.capacidad, ultimo, seq, hora: ultimo?.hora ?? null, sinLeer, noLeida: sinLeer > 0 }
     })
     .sort((a, b) => b.seq - a.seq)
 }
@@ -332,20 +297,6 @@ export function conversacionPara(s, entrada) {
   return { conv, esApertura }
 }
 
-/** Contrato: ids de HISTORIAS vistas, en el orden del arco (el epílogo no cuenta: ver epilogoVisto). */
-export function vistosDe(s) {
-  return HISTORIAS.filter((h) => s.casosVistos.includes(h.id)).map((h) => h.id)
-}
-
-export function epilogoVisto(s) {
-  return s.casosVistos.includes(EPILOGO.id)
-}
-
-/** Contrato: la primera historia del arco sin ver, o null. Nunca el epílogo. */
-export function siguienteHistoria(s) {
-  return HISTORIAS.find((h) => !s.casosVistos.includes(h.id)) ?? null
-}
-
 /** La próxima novedad que llegaría sola: automática y aún por llegar (hoy ninguna lo es). */
 export function proximaNovedad(s) {
   return EVENTOS.find((e) => e.automatico && s.mundo.entrantes.includes(e.id)) ?? null
@@ -353,7 +304,6 @@ export function proximaNovedad(s) {
 
 // Entidades que distinguen dos sugerencias de la misma intención («¿Va a llover…?» y «¿Tiene billete…?»).
 const CLAVES_SUGERENCIA = ['oc', 'documento', 'riesgo', 'jornada', 'capitulo', 'partida', 'territorio']
-const INTENCIONES_EPILOGO = new Set(EPILOGO.intenciones)
 
 // Dos sugerencias se repiten si piden lo mismo: misma intención y, si las dos nombran una
 // entidad, la misma. Una genérica («¿Qué órdenes tengo pendientes?») repite a una concreta (OC-104).
@@ -364,18 +314,16 @@ function repiten(a, b) {
 }
 
 /**
- * Contrato: sugerencias del pie tras el último turno, tres como mucho.
- * [{ etiqueta, texto, entrada?, historia? }]: si trae `entrada`, la pantalla la envía tal
- * cual (puede ser una novedad); si no, envía `texto`.
- * Primero la siguiente historia sin ver («Siguiente: Te lo propone»; no durante el
- * recorrido, que ya tiene su barra); después, las del turno. Sin dos que pidan lo mismo
- * (ver repiten) y nunca a otro proyecto desde «La última función».
+ * Contrato: sugerencias del pie tras el último turno de la conversación abierta, tres como
+ * mucho. [{ etiqueta, texto, entrada? }]: si trae `entrada`, la pantalla la envía tal cual
+ * (puede ser una novedad); si no, envía `texto`. Sin dos que pidan lo mismo (ver repiten)
+ * y nunca a otro proyecto (Itsasoa) desde «La última función».
  */
 export function sugerenciasDe(s) {
   const ultimo = [...mensajesDe(s)].reverse().find((m) => m.rol === 'agentes')
   if (!ultimo || ultimo.estado === 'en_curso') return []
   // Tras una acción propuesta/* el turno sigue en Itsasoa (turno.proyecto).
-  const enEpilogo = ultimo.turno.caso === EPILOGO.id || INTENCIONES_ITSASOA.has(ultimo.turno.intencion) || !!ultimo.turno.proyecto
+  const enItsasoa = INTENCIONES_ITSASOA.has(ultimo.turno.intencion) || !!ultimo.turno.proyecto
   const clave = (texto) => {
     const det = interpretar(s.mundo, { tipo: 'texto', texto }, s.contexto)
     return { intencion: det.intencion, entidad: CLAVES_SUGERENCIA.map((k) => det.entidades?.[k] ?? '').join('|').replace(/^\|+$/, '') }
@@ -385,20 +333,17 @@ export function sugerenciasDe(s) {
   const anadir = (sg) => {
     const k = clave(sg.texto)
     if (vistas.some((x) => repiten(x, k))) return
-    if (!enEpilogo && INTENCIONES_EPILOGO.has(k.intencion)) return
+    if (!enItsasoa && INTENCIONES_ITSASOA.has(k.intencion)) return
     vistas.push(k)
     out.push(sg)
   }
-  // Con conversaciones, la lista ya es el camino: sin «Siguiente».
-  const sig = s.tour || s.actual ? null : siguienteHistoria(s)
-  if (sig) anadir({ etiqueta: `Siguiente: ${sig.arco}`, texto: sig.prompt, entrada: entradaDeHistoria(sig, s.mundo), historia: sig.id })
   for (const sg of ultimo.turno.sugerencias ?? []) anadir(sg)
   return out.slice(0, 3)
 }
 
 /** El parte de la mañana abre la conversación una sola vez; instantáneo, sin reproducir los pasos. */
 function saludar(s, { instantaneo = false } = {}) {
-  if (s.mensajes.length || s.activo || s.tour) return s
+  if (s.mensajes.length || s.activo) return s
   const n = iniciar(s, { tipo: 'saludo' })
   return instantaneo ? progresar(n, Infinity) : n
 }
@@ -431,10 +376,10 @@ export function reducirSesion(s, a) {
         const [sig, ...resto] = n.cola
         return iniciar({ ...n, cola: resto }, sig)
       }
-      // Novedades: solo las automáticas con su historia sin ver, con la conversación
-      // empezada (el parte de la mañana no cuenta), sin recorrido y sin pausa.
+      // Novedades: solo las automáticas, con la conversación empezada (lo ya escrito no
+      // cuenta) y sin pausa. Hoy ninguna lo es.
       const evento = proximaNovedad(n)
-      if (!evento || n.tour || n.eventosPausados || !conversacionIniciada(n)) return n
+      if (!evento || n.eventosPausados || !conversacionIniciada(n)) return n
       n = { ...n, inactivo: n.inactivo + ms }
       if (n.inactivo >= evento.retrasoMs) return iniciar(n, { tipo: 'evento', eventoId: evento.id, sola: true })
       return n
@@ -454,8 +399,6 @@ export function reducirSesion(s, a) {
         return m
       })
       const n = { ...s, mensajes, activo: null, cola: [] }
-      // La historia que estrenaba este turno no se ha llegado a ver.
-      if (actual?.casoNuevo) n.casosVistos = s.casosVistos.filter((c) => c !== actual.turno.caso)
       // Si lo detenido ya cambió el mundo, deshacer lo anterior también lo revertiría: se invalida.
       const hechas = actual ? actual.turno.pasos.flatMap((p, i) => (actual.estadoPasos[i] === 'hecho' ? p.acciones : [])) : []
       if (hechas.some((x) => !CONSERVADAS.has(x.tipo))) n.ultimaMutacion = null
@@ -518,53 +461,6 @@ export function reducirSesion(s, a) {
     case 'saludar':
       return saludar(s, { instantaneo: !!a.instantaneo })
 
-    case 'tour/iniciar': {
-      // El recorrido parte de la demo recién abierta (con su parte de la mañana ya
-      // leído) para que cada paso cuente lo que pasa. Solo avisa si había algo que cerrar.
-      // seq sigue contando: ningún mensaje nuevo hereda la clave (y lo plegado) de uno anterior.
-      const limpia = saludar({ ...crearSesion({ persona: s.persona }), seq: s.seq }, { instantaneo: true })
-      if (conversacionIniciada(s)) limpia.mensajes.push({ id: nuevoId(limpia, 'x'), rol: 'nota', texto: 'El recorrido empieza con la demo recién abierta: se han cerrado la conversación y las decisiones anteriores.', hora: horaDe(0) })
-      return pasoTour(limpia, 0)
-    }
-
-    case 'tour/siguiente': {
-      if (!puedeAvanzarTour(s)) return s
-      const sig = s.tour.paso + 1
-      if (sig >= RECORRIDO.length) return reducirSesion(s, { tipo: 'tour/salir', completo: true })
-      return pasoTour(s, sig)
-    }
-
-    case 'tour/salir': {
-      if (!s.tour) return s
-      const n = { ...s, tour: null, mensajes: [...s.mensajes], inactivo: 0 }
-      // Al terminar, el Orquestador resume lo visto (contrato: entrada { tipo: 'cierreRecorrido' }).
-      if (a.completo) return encolar(n, { tipo: 'cierreRecorrido' })
-      n.mensajes.push({ id: nuevoId(n, 'x'), rol: 'nota', texto: 'Has salido del recorrido guiado.', hora: horaDe(n.reloj) })
-      return n
-    }
-
-    case 'historia/abrir': {
-      // Una historia se ve sola: la conversación anterior se cierra (el mundo y lo decidido
-      // se quedan) y arriba queda la historia, lo que se pide y la respuesta.
-      const h = HISTORIAS_POR_ID[a.historia]
-      if (!h || s.activo) return s
-      const n = { ...s, mensajes: [], cola: [], snapshots: {}, ultimaMutacion: null, contexto: {}, tour: null, inactivo: 0 }
-      const indice = HISTORIAS.findIndex((x) => x.id === h.id)
-      n.mensajes.push({
-        id: nuevoId(n, 'h'),
-        rol: 'historia',
-        historia: h.id,
-        arco: h.arco,
-        titulo: h.titulo,
-        unaLinea: h.unaLinea,
-        capacidad: h.capacidad,
-        indice: indice >= 0 ? indice : null,
-        total: HISTORIAS.length,
-        hora: horaDe(n.reloj),
-      })
-      return encolar(n, entradaDeHistoria(h, n.mundo))
-    }
-
     case 'conversaciones/iniciar': {
       // Lo que los agentes ya han escrito al abrir la demo, conversación a conversación y en
       // orden de hora. Idempotente: si ya están, no hace nada.
@@ -574,8 +470,17 @@ export function reducirSesion(s, a) {
         n = { ...n, conversaciones: { ...n.conversaciones, [c.id]: { id: c.id, titulo: c.titulo, etiqueta: c.etiqueta, agente: c.agente, leidaHasta: 0 } } }
         n = progresar(iniciar(n, { ...c.apertura, conv: c.id, apertura: true, hora: c.hora, deshacible: !!c.deshacible }), Infinity)
       }
+      // Nada está leído todavía: lo marca la pantalla cuando una conversación se ve
+      // (en el móvil se empieza por la lista, sin ninguna abierta).
       const actual = a.actual && n.conversaciones[a.actual] ? a.actual : 'parte'
-      return { ...n, actual, contexto: n.contextos[actual] ?? {}, conversaciones: { ...n.conversaciones, [actual]: { ...n.conversaciones[actual], leidaHasta: n.seq } }, inactivo: 0 }
+      return { ...n, actual, contexto: n.contextos[actual] ?? {}, inactivo: 0 }
+    }
+
+    case 'conversacion/leida': {
+      // Lo que hay en la conversación ya se ha visto.
+      const cv = s.conversaciones[a.id]
+      if (!cv || !porLeer(s, a.id)) return s
+      return { ...s, conversaciones: { ...s.conversaciones, [a.id]: { ...cv, leidaHasta: s.seq } } }
     }
 
     case 'conversacion/abrir': {
@@ -584,11 +489,9 @@ export function reducirSesion(s, a) {
       const n = terminarTodo(s)
       const convs = { ...n.conversaciones }
       const prev = n.actual
-      // La que dejas queda leída; una nueva que se quedó vacía desaparece.
-      if (prev && prev !== a.id && convs[prev]) {
-        if (convs[prev].nueva && !n.mensajes.some((m) => m.conv === prev)) delete convs[prev]
-        else convs[prev] = { ...convs[prev], leidaHasta: n.seq }
-      }
+      // Una nueva que se quedó vacía desaparece. La que dejas no se marca leída aquí: en el
+      // móvil puede no haberse visto (la marca la pantalla mientras se ve).
+      if (prev && prev !== a.id && convs[prev]?.nueva && !n.mensajes.some((m) => m.conv === prev)) delete convs[prev]
       convs[a.id] = { ...convs[a.id], leidaHasta: n.seq }
       return { ...n, actual: a.id, contexto: n.contextos[a.id] ?? {}, conversaciones: convs, inactivo: 0 }
     }
@@ -599,7 +502,6 @@ export function reducirSesion(s, a) {
       const prev = n.actual
       // Ya hay una nueva vacía abierta: se usa esa.
       if (prev && convs[prev]?.nueva && !n.mensajes.some((m) => m.conv === prev)) return n === s ? s : n
-      if (prev && convs[prev]) convs[prev] = { ...convs[prev], leidaHasta: n.seq }
       const m = { ...n, conversaciones: convs }
       const id = nuevoId(m, 'c')
       m.conversaciones = { ...m.conversaciones, [id]: { id, titulo: null, etiqueta: 'Equipo', agente: 'orquestador', leidaHasta: m.seq, nueva: true, creada: id } }

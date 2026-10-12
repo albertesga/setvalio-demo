@@ -1,21 +1,16 @@
-// Carril: lo que puedes ver (las historias y el epílogo), cómo actúan los
-// agentes y el equipo (el Orquestador y las tres familias), y el detalle de cada agente.
+// El equipo (hoja «Equipo»): cómo actúan los agentes, el Orquestador y las tres familias,
+// y la ficha de cada agente.
 
 import { useId, useRef } from 'react'
 import { AgentGlyph } from '../../brand/Filmpilot.jsx'
-import { IconCheck, IconChevronRight } from '../../components/icons.jsx'
 import { AGENTES, ORDEN_AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, agentesDeFamilia } from '../agentes.js'
-import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD, ETIQUETA_NIVEL } from '../casos.js'
+import { ETIQUETA_CAPACIDAD, LEYENDA_CAPACIDAD } from '../casos.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, Hoja } from './Piezas.jsx'
 import { ListaDecisiones, decisionesAbiertas } from './Bloques.jsx'
 
 // Qué agente sostiene cada tipo de decisión pendiente.
 const AGENTE_DE_EXCEPCION = { confianza: 'facturas', sin_pedido: 'conciliacion', manual: 'conciliacion', fiscal: 'cumplimiento', orden: 'costes', prevision: 'prevision', propuesta: 'proveedores', riesgo: 'riesgos', informe: 'informes' }
-
-// Historias cuyo arco ya dice su nivel («Lo hace solo o te lo propone», «Pide tu
-// aprobación»): no repiten la insignia. Las demás la llevan (el parte, la lluvia, el informe).
-const ARCO_DICE_NIVEL = new Set(['solo', 'aprueba'])
 
 export function estadoAgentes(s) {
   const out = Object.fromEntries(ORDEN_AGENTES.map((id) => [id, { estado: 'disponible', detalle: null, espera: 0 }]))
@@ -30,78 +25,6 @@ export function estadoAgentes(s) {
     if (a) out[a].espera += 1
   }
   return out
-}
-
-/** Una historia: antetítulo del arco, título entero y, si hace falta, su nivel. Flecha → check al verla. */
-function FilaHistoria({ h, visto, onElegir, deshabilitado }) {
-  const etiquetaCapacidad = ETIQUETA_CAPACIDAD[h.capacidad]
-  const nivel = h.nivel && !ARCO_DICE_NIVEL.has(h.id) ? ETIQUETA_NIVEL[h.nivel] : null
-  return (
-    <li>
-      <button type="button" className={`ag-caso-fila ${visto ? 'is-visto' : ''}`} disabled={deshabilitado} onClick={() => onElegir(h)}>
-        <span className="ag-caso-icono" aria-hidden="true">
-          {visto ? <IconCheck size={14} strokeWidth={2.6} /> : <IconChevronRight size={16} />}
-        </span>
-        <span className="min-w-0 flex-1 text-left">
-          <span className="ag-caso-arco">{h.arco}</span>
-          <span className="ag-caso-titulo">{h.titulo}</span>
-          {(nivel || etiquetaCapacidad) && (
-            <span className="ag-caso-meta">
-              {nivel && <span className="ag-caso-nivel">{nivel}</span>}
-              {etiquetaCapacidad && <span className="ag-etiqueta-capacidad">{etiquetaCapacidad}</span>}
-            </span>
-          )}
-          <span className="sr-only">{visto ? '(vista)' : '(sin ver)'}</span>
-        </span>
-      </button>
-    </li>
-  )
-}
-
-/** «Lo que puedes ver»: el índice de la demo, arriba del carril y abierto. */
-export function LoQuePuedesVer({ nivel = 2, epilogoVisto = false }) {
-  const { vistos, abrirHistoria, ocupado } = useCtx()
-  const uid = useId().replace(/:/g, '')
-  const H = `h${nivel}`
-  const n = vistos.length
-  // Cada historia se abre en limpio: arriba, lo que se pide y la respuesta.
-  const elegir = (h) => abrirHistoria(h)
-  return (
-    <section className="ag-casos" aria-labelledby={`${uid}-ver`}>
-      <div className="ag-casos-cab">
-        <H id={`${uid}-ver`} className="flp-kicker text-flp-muted">
-          Lo que puedes ver
-        </H>
-        <span className="ag-casos-cuenta">
-          <span className="tnum">{n}</span> de <span className="tnum">{HISTORIAS.length}</span> vistas
-        </span>
-      </div>
-      <ul className="ag-casos-lista">
-        {HISTORIAS.map((h) => (
-          <FilaHistoria key={h.id} h={h} visto={vistos.includes(h.id)} onElegir={elegir} deshabilitado={ocupado} />
-        ))}
-      </ul>
-      {/* El epílogo lleva la misma etiqueta de exploración que la lluvia, en su fila. */}
-      <p className="ag-casos-despues flp-kicker text-flp-muted">{EPILOGO.arco}</p>
-      <ul>
-        <li>
-          <button type="button" className={`ag-caso-fila ag-caso-fila--epilogo ${epilogoVisto ? 'is-visto' : ''}`} disabled={ocupado} onClick={() => elegir(EPILOGO)}>
-            <span className="ag-caso-icono" aria-hidden="true">
-              {epilogoVisto ? <IconCheck size={14} strokeWidth={2.6} /> : <IconChevronRight size={16} />}
-            </span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="ag-caso-titulo">{EPILOGO.titulo}</span>
-              <span className="ag-caso-desc">{EPILOGO.unaLinea}</span>
-              <span className="ag-caso-meta">
-                <span className="ag-etiqueta-capacidad">{ETIQUETA_CAPACIDAD[EPILOGO.capacidad]}</span>
-              </span>
-              <span className="sr-only">{epilogoVisto ? '(visto)' : '(sin ver)'}</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-    </section>
-  )
 }
 
 /** Leyenda de autonomía: tres líneas, una por forma de actuar. */
@@ -120,6 +43,11 @@ export function LeyendaAutonomia({ nivel = 2 }) {
             <dd>{a.descripcion}</dd>
           </div>
         ))}
+        {/* La etiqueta de los agentes y conversaciones que aún no están en el producto. */}
+        <div className="ag-leyenda-fila">
+          <dt>{ETIQUETA_CAPACIDAD.exploratoria}</dt>
+          <dd>{LEYENDA_CAPACIDAD}</dd>
+        </div>
       </dl>
     </section>
   )
@@ -188,7 +116,7 @@ export function AgentesPorFamilia({ estados, onAbrir, nivel = 2 }) {
 }
 
 export function DetalleAgente({ id, onCerrar }) {
-  const { enviar, mundo } = useCtx()
+  const { preguntarA, mundo } = useCtx()
   // Conserva el último agente mientras la hoja se cierra, para que no se vacíe a medio camino.
   const ultimo = useRef(null)
   if (id) ultimo.current = id
@@ -239,7 +167,8 @@ export function DetalleAgente({ id, onCerrar }) {
                     className="ag-sugerencia"
                     onClick={() => {
                       onCerrar()
-                      enviar(texto)
+                      // A su conversación si la tiene; si no, a una nueva.
+                      preguntarA(texto)
                     }}
                   >
                     {texto}

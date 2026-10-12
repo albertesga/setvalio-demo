@@ -94,9 +94,6 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
           <FilmpilotButton variant="primary" onClick={() => abrir()} iconAfter={IconChevronRight}>
             Probar los agentes
           </FilmpilotButton>
-          <FilmpilotButton variant="secondary" onClick={() => abrir({ tour: true })}>
-            Empezar el recorrido guiado
-          </FilmpilotButton>
         </div>
       </nav>
     </header>

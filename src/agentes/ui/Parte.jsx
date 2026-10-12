@@ -1,5 +1,5 @@
 // Bloques del parte de la mañana: lo que han hecho solos (hecho), «Para hoy», la tira
-// del rodaje y el índice de historias.
+// del rodaje y el índice de conversaciones.
 // La tira y «Para hoy» leen el mundo actual: lo que decides en la conversación se
 // tacha aquí también.
 
@@ -7,7 +7,7 @@ import { useId, useState } from 'react'
 import { IconCheck, IconChevronRight, IconClock } from '../../components/icons.jsx'
 import * as c from '../calculos.js'
 import { AGENTES } from '../agentes.js'
-import { HISTORIAS, EPILOGO, ETIQUETA_CAPACIDAD } from '../casos.js'
+import { CONVERSACIONES, ETIQUETA_CAPACIDAD } from '../casos.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, riesgo as riesgoDe, HECHAS } from '../rodaje.js'
 import { renderTexto, fechaDia } from '../texto.js'
@@ -207,7 +207,7 @@ function Sublinea({ su }) {
           etiqueta={su.etiqueta}
           contexto={renderTexto(su.titulo)}
           onClick={() => {
-            if (su.ref?.tipo !== 'orden' || !irATarjeta(su.ref)) enviar(su.entrada)
+            if (su.ref?.tipo !== 'orden' || !irATarjeta(su.ref)) enviar(su.entrada, { ref: su.ref })
           }}
         />
       )}
@@ -364,77 +364,37 @@ export function BloqueAgenda({ b }) {
   )
 }
 
-// ── Historias ────────────────────────────────────────────────────────────────
+// ── Conversaciones («¿Qué puedes hacer?») ─────────────────────────────────────
 
-// Historias cuyo arco ya dice su nivel («Lo hace solo o te lo propone», «Pide tu
-// aprobación»): no repiten la insignia, como en el carril.
-const ARCO_DICE_NIVEL = new Set(['solo', 'aprueba'])
-
-/**
- * Índice de historias («¿Qué puedes hacer?»): una tarjeta por historia, también el parte
- * («Ponme al día» lo rehace), con su nivel de autonomía, si ya se ha visto y la pregunta
- * que la abre. Con b.epilogo, debajo, «Antes del rodaje · Itsasoa», que está en exploración.
- */
-export function BloqueHistorias({ b }) {
+/** Las conversaciones de la demo, cada una con su agente y de qué trata: un toque la abre. */
+export function BloqueConversaciones() {
   const ctx = useCtx()
   const id = useId().replace(/:/g, '')
-  const vistos = ctx.vistos ?? []
-  // Las seis, como en el carril: «N de 6 vistas» cuenta lo que hay en pantalla.
-  const historias = HISTORIAS
-  const nVistas = HISTORIAS.filter((h) => vistos.includes(h.id)).length
-  // Cada historia se abre en limpio, como desde el carril.
-  const abrir = (h) => ctx.abrirHistoria(h)
   return (
-    <section className="ag-historias" aria-labelledby={`${id}-t`}>
-      <div className="ag-historias-cab">
+    <section className="ag-indice" aria-labelledby={`${id}-t`}>
+      <div className="ag-indice-cab">
         <h4 id={`${id}-t`} className="flp-kicker text-flp-muted">
-          {b.titulo ?? 'Lo que puedes ver'}
+          Conversaciones
         </h4>
-        <span className="text-xs text-flp-muted">
-          <span className="tnum">{nVistas}</span> de <span className="tnum">{HISTORIAS.length}</span> vistas
-        </span>
       </div>
-      <ol className="ag-historias-lista">
-        {historias.map((h) => {
-          const vista = vistos.includes(h.id)
-          const nivel = !ARCO_DICE_NIVEL.has(h.id)
-          const exploratoria = !!ETIQUETA_CAPACIDAD[h.capacidad]
-          return (
-            <li key={h.id} className={`ag-historia ${vista ? 'is-vista' : ''}`}>
-              <p className="ag-historia-arco">{h.arco}</p>
-              <h5 className="ag-historia-titulo">{h.titulo}</h5>
-              <p className="ag-historia-linea">{h.unaLinea}</p>
-              {(nivel || exploratoria || vista) && (
-                <div className="ag-historia-meta">
-                  {nivel && <AutonomyBadge nivel={h.nivel} />}
-                  <Capacidad capacidad={h.capacidad} />
-                  {vista && (
-                    <Tono tono="positive">
-                      <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />
-                      Vista
-                    </Tono>
-                  )}
-                </div>
-              )}
-              <button type="button" className="ag-boton-fila ag-historia-boton" disabled={ctx.ocupado} onClick={() => abrir(h)}>
-                <span>{h.prompt}</span> <IconChevronRight size={15} aria-hidden="true" />
-              </button>
-            </li>
-          )
-        })}
-      </ol>
-      {b.epilogo && (
-        <p className="ag-historias-epilogo">
-          <span className="text-xs text-flp-muted">{EPILOGO.arco}</span>
-          <button type="button" className="ag-link" disabled={ctx.ocupado} onClick={() => abrir(EPILOGO)}>
-            {EPILOGO.titulo}
-          </button>
-          <Capacidad capacidad={EPILOGO.capacidad} />
-        </p>
-      )}
+      <ul className="ag-indice-lista">
+        {CONVERSACIONES.filter((c) => c.id !== 'parte').map((c) => (
+          <li key={c.id} className="ag-indice-item">
+            <p className="ag-indice-etiqueta">{c.etiqueta}</p>
+            <h5 className="ag-indice-titulo">{c.titulo}</h5>
+            <div className="ag-indice-meta">
+              <span className="text-xs text-flp-muted">{AGENTES[c.agente]?.nombre}</span>
+              <Capacidad capacidad={c.capacidad} />
+            </div>
+            <button type="button" className="ag-boton-fila ag-indice-boton" onClick={() => ctx.abrirConversacion(c.id)}>
+              <span>Abrir la conversación</span> <IconChevronRight size={15} aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }
 
 // Registro de los bloques de este archivo: Bloques.jsx los busca aquí por tipo al pintar.
-export const BLOQUES_PARTE = { hecho: BloqueHecho, agenda: BloqueAgenda, tira: BloqueTira, historias: BloqueHistorias }
+export const BLOQUES_PARTE = { hecho: BloqueHecho, agenda: BloqueAgenda, tira: BloqueTira, conversaciones: BloqueConversaciones }

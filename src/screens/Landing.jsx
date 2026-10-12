@@ -1,5 +1,5 @@
 // Portada de Filmpilot (Brand Kit v1). Todo lo que se pulsa lleva al prototipo de
-// agentes: directamente, al recorrido guiado o con una pregunta de ejemplo.
+// agentes: directamente o con una pregunta de ejemplo, que va a su conversación.
 // Cada sección vive en src/screens/portada/; aquí solo se montan.
 
 import { useLayoutEffect } from 'react'
@@ -37,7 +37,7 @@ export default function Landing({ onNavigate }) {
   const clearSectionHash = () => {
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
   }
-  // Abre los agentes; con { tour } empieza el recorrido y con { pregunta } la hace al entrar.
+  // Abre los agentes; con { pregunta } la hace al entrar, en su conversación.
   const abrirAgentes = (contexto) => {
     clearSectionHash()
     onNavigate('agentes', contexto)

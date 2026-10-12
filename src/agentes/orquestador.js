@@ -7,7 +7,6 @@ import { detectarIntencion } from './intenciones.js'
 import { reducirVarias } from './acciones.js'
 import { confianzaBaja } from './politicas.js'
 import { AGENTES, DURACIONES } from './agentes.js'
-import { CASO_DE_INTENCION } from './casos.js'
 import { t, v } from './texto.js'
 
 const EVENTOS = {
@@ -21,13 +20,11 @@ const EVENTOS = {
 
 /**
  * Entrada → detección: { intencion, entidades, eventoId?, accion?, texto? }.
- * Entradas: { tipo: 'texto' | 'evento' | 'accion' | 'saludo' | 'cierreRecorrido' }.
+ * Entradas: { tipo: 'texto' | 'evento' | 'accion' | 'saludo' }.
  */
 export function interpretar(mundo, entrada, contexto = {}) {
   if (entrada.tipo === 'evento') return { intencion: EVENTOS[entrada.eventoId] ?? 'no_entendido', entidades: {}, eventoId: entrada.eventoId }
   if (entrada.tipo === 'accion') return { intencion: 'accion', entidades: {}, accion: entrada.accion }
-  // Fin del recorrido guiado (sesion.js, 'tour/salir' completo): el Orquestador resume lo visto.
-  if (entrada.tipo === 'cierreRecorrido') return { intencion: 'cierre_recorrido', entidades: {} }
   // El parte de la mañana: la cabecera del saludo lee el día y la persona de aquí.
   if (entrada.tipo === 'saludo') {
     const { diaActual, diasRodaje, titulo } = mundo.proyecto
@@ -94,7 +91,6 @@ export function responder(mundo, entrada, contexto = {}) {
   const comp = esc.componer({ antes: mundo, despues: m, det, contexto, pasos })
   const turno = {
     intencion: det.intencion,
-    caso: CASO_DE_INTENCION[det.intencion] ?? null,
     titulo: typeof esc.titulo === 'function' ? esc.titulo(det) : esc.titulo,
     origen: entrada.tipo,
     entidades: det.entidades,

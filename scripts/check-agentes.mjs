@@ -20,8 +20,8 @@ import { detectarIntencion } from '../src/agentes/intenciones.js'
 import { responder } from '../src/agentes/orquestador.js'
 import { ESCENARIOS } from '../src/agentes/escenarios/index.js'
 import { AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, ORDEN_AGENTES, agentesDeFamilia } from '../src/agentes/agentes.js'
-import { HISTORIAS, EPILOGO, RECORRIDO, CASO_DE_INTENCION, entradaDeHistoria, CONVERSACIONES } from '../src/agentes/casos.js'
-import { crearSesion, reducirSesion, estadoTour, conversacionIniciada, EVENTOS, sugerenciasDe, vistosDe, mensajesDe, listaConversaciones, conversacionPara } from '../src/agentes/sesion.js'
+import { CONVERSACIONES } from '../src/agentes/casos.js'
+import { crearSesion, reducirSesion, conversacionIniciada, EVENTOS, sugerenciasDe, mensajesDe, listaConversaciones, conversacionPara, porLeer } from '../src/agentes/sesion.js'
 import { agendaDelDia, PREGUNTAS_PARTE } from '../src/agentes/escenarios/saludo.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
@@ -203,12 +203,9 @@ for (const [frase, esperada, ent = {}, ctx = {}] of FRASES) {
     }
   })
 }
-test('cada historia, su pregunta y cada ejemplo de guion se resuelven a su intención', () => {
-  for (const h of [...HISTORIAS, EPILOGO]) {
-    const entrada = entradaDeHistoria(h, mundoBase)
-    assert.equal(responder(mundoBase, entrada).turno.caso, h.id, `${h.id}: entrada`)
-    assert.equal(responder(mundoBase, { tipo: 'texto', texto: h.prompt }).turno.caso, h.id, `${h.id}: ${h.prompt}`)
-  }
+test('cada conversación abre con su guion y cada ejemplo de guion se resuelve a su intención', () => {
+  const ESPERADA = { parte: 'saludo', facturas: 'factura_nueva', hotel: 'aprobar_oc', lluvia: 'riesgos', horas: 'riesgos', grua: 'riesgos', informe: 'informe_semanal', dossier: 'cumplimiento', itsasoa: 'presupuesto_nuevo' }
+  for (const cv of CONVERSACIONES) assert.equal(responder(mundoBase, cv.apertura).turno.intencion, ESPERADA[cv.id], cv.id)
   for (const a of Object.values(AGENTES)) {
     for (const q of a.preguntas ?? []) assert.ok(!['no_entendido', 'desambiguar'].includes(responder(mundoBase, { tipo: 'texto', texto: q }).turno.intencion), `${a.id}: ${q}`)
   }
@@ -405,14 +402,6 @@ test('las decisiones de cada tarjeta producen un turno válido', () => {
     }
   }
 })
-test('cinco historias con su intención y un recorrido de un paso por historia', () => {
-  assert.deepEqual(HISTORIAS.map((h) => h.id), ['parte', 'solo', 'aprueba', 'adelanta', 'equipo'])
-  for (const h of [...HISTORIAS, EPILOGO]) assert.ok(Object.values(CASO_DE_INTENCION).includes(h.id), h.id)
-  assert.equal(RECORRIDO.length, HISTORIAS.length)
-  assert.ok(!RECORRIDO.some((p) => p.historia === EPILOGO.id), 'el epílogo no está en el recorrido')
-  assert.equal(RECORRIDO[0].entrada, null, 'el paso 1 es el parte que ya está en pantalla')
-})
-
 // ── 6. Sesión con reloj falso ────────────────────────────────────────────────
 console.log('Sesión')
 function correr(s, ms = 20_000, paso = 100) {
@@ -432,7 +421,6 @@ test('un turno se reproduce paso a paso y termina con el mismo mundo que el orqu
   assert.equal(msg().estado, 'hecho')
   assert.equal(msg().bloquesVisibles, msg().turno.bloques.length)
   assert.deepEqual(c.totales(s.mundo), c.totales(esperado))
-  assert.ok(s.casosVistos.includes('equipo'))
 })
 test('mientras un turno corre, lo siguiente espera en cola', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'pausarEventos', valor: true })
@@ -450,17 +438,9 @@ test('la demo es reactiva: ninguna novedad ni historia llega sola', () => {
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
   s = correr(s, 240_000, 500)
   assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'con la conversación quieta tampoco')
-  assert.deepEqual(vistosDe(s), [], 'ninguna historia se abre sola')
+  assert.ok(!s.mensajes.some((m) => m.rol === 'agentes' && m.origen === 'evento'), 'ninguna conversación se abre sola')
 })
-test('una novedad no llega sola si su historia ya se ha visto, ni dos veces aunque se pida durante su turno', () => {
-  let s = crearSesion()
-  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Han llegado facturas nuevas?' } })
-  s = correr(s, 10_000)
-  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: 'Revisa la orden de compra OC-104' } })
-  s = correr(s, 10_000)
-  assert.ok(['solo', 'aprueba'].every((h) => vistosDe(s).includes(h)))
-  s = correr(s, 120_000, 500)
-  assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'ninguna novedad sobre historias ya vistas')
+test('una novedad no llega dos veces aunque se pida durante su turno', () => {
   let d = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
   d = reducirSesion(d, { tipo: 'avanzar', ms: 300 })
   d = reducirSesion(d, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
@@ -483,37 +463,12 @@ test('aprobar desde la tarjeta y deshacer', () => {
   cerca(c.totales(s.mundo).cef, TOTALES.cef)
   assert.equal(s.mundo.ordenes['OC-104'].estado, 'Pendiente', 'vuelve a pendiente, no a «por llegar»')
 })
-test('el recorrido guiado completa los seis pasos, espera las decisiones y cierra con un resumen', () => {
-  let s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
-  for (let i = 0; i < RECORRIDO.length; i++) {
-    s = correr(s, 12_000)
-    const et = estadoTour(s)
-    assert.equal(et.indice, i)
-    if (RECORRIDO[i].espera) {
-      assert.equal(et.puedeAvanzar, false, 'espera la decisión')
-      const tarjeta = s.mensajes.filter((m) => m.rol === 'agentes').at(-1).turno.bloques.find((b) => b.tipo === 'aprobacion' && b.ref.tipo === RECORRIDO[i].espera.tipo)
-      const accion = tarjeta.acciones.find((a) => a.id === RECORRIDO[i].decisionDePrueba)
-      assert.ok(accion, `paso ${i + 1}: la tarjeta tiene la acción ${RECORRIDO[i].decisionDePrueba}`)
-      s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: accion.accion, etiqueta: accion.etiqueta } })
-      s = correr(s, 8_000)
-    }
-    assert.equal(estadoTour(s).puedeAvanzar, true, `paso ${i + 1}`)
-    s = reducirSesion(s, { tipo: 'tour/siguiente' })
-  }
-  s = correr(s, 12_000)
-  assert.equal(s.tour, null)
-  for (const h of HISTORIAS) assert.ok(s.casosVistos.includes(h.id), `visto ${h.id}`)
-  assert.equal(s.mensajes.filter((m) => m.rol === 'agentes').at(-1).turno.intencion, 'cierre_recorrido')
-})
-test('el recorrido sobre la demo recién abierta no pide nada ni deja notas; las sugerencias no saltan a Itsasoa', () => {
-  const s = reducirSesion(reducirSesion(crearSesion(), { tipo: 'saludar', instantaneo: true }), { tipo: 'tour/iniciar' })
-  assert.ok(!s.mensajes.some((m) => m.rol === 'nota'))
-  assert.equal(estadoTour(s).puedeAvanzar, true, 'el paso 1 es el parte: se avanza sin esperar')
+test('las sugerencias de «La última función» no saltan a Itsasoa', () => {
   let l = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: 'Prepárame el informe semanal de coste' } })
   l = correr(l, 12_000)
   const sug = sugerenciasDe(l)
   assert.ok(sug.length > 0 && sug.length <= 3)
-  for (const x of sug) assert.notEqual(responder(l.mundo, x.entrada ?? { tipo: 'texto', texto: x.texto }).turno.caso, EPILOGO.id, x.texto)
+  for (const x of sug) assert.ok(!['presupuesto_nuevo', 'anadir_coste', 'optimizar_proveedores'].includes(responder(l.mundo, x.entrada ?? { tipo: 'texto', texto: x.texto }).turno.intencion), x.texto)
 })
 test('el personaje sin permiso no puede decidir y la sesión lo anota', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'persona', persona: 'alvaro' })
@@ -937,11 +892,7 @@ test('el parte no cuenta como conversación y nada llega solo', () => {
   assert.ok(conversacionIniciada(s))
   assert.ok(!s.mensajes.some((m) => m.rol === 'novedad'), 'tampoco después: todo llega porque lo pides')
 })
-test('el recorrido empieza con el parte ya leído y Álvaro recibe su propio saludo', () => {
-  const s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
-  assert.equal(s.mensajes[0].origen, 'saludo')
-  assert.equal(s.mensajes[0].estado, 'hecho')
-  assert.equal(s.mensajes[1].rol, 'guia')
+test('Álvaro recibe su propio saludo', () => {
   const a = reducirSesion(crearSesion({ persona: 'alvaro' }), { tipo: 'saludar' })
   assert.equal(a.mensajes[0].turno.entidades.persona, 'alvaro')
 })
@@ -1076,7 +1027,6 @@ test('detener una novedad antes de recibirla deja volver a pedirla y su historia
   s = avanza(s, 400)
   s = reducirSesion(s, { tipo: 'detener' })
   assert.equal(s.mundo.ordenes['OC-104'].estado, 'Por llegar')
-  assert.ok(!vistosDe(s).includes('aprueba'), 'la historia vuelve a «sin ver»')
   s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-02' } })
   s = avanza(s, 20_000, 100)
   assert.equal(s.mundo.ordenes['OC-104'].estado, 'Pendiente', 'la novedad llega al volver a pedirla')
@@ -1092,12 +1042,6 @@ test('detener un turno que ya cambió el mundo invalida el deshacer anterior', (
   assert.equal(msg().estado, 'en_curso', 'se detiene a medias, con la aprobación ya registrada')
   s = reducirSesion(s, { tipo: 'detener' })
   assert.equal(s.ultimaMutacion, null, 'no se puede deshacer lo anterior sin revertir lo detenido')
-})
-test('una pregunta corriente no marca como vista una historia que no enseña', () => {
-  let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cuánto nos costará al final y llegamos de caja?' } })
-  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué bloquea el dossier fiscal?' } })
-  s = avanza(s, 20_000, 200)
-  assert.ok(!vistosDe(s).includes('aprueba') && !vistosDe(s).includes('equipo'), vistosDe(s).join(','))
 })
 test('«Ya hecho» solo cuenta lo que Conciliación contabilizó sola con su pedido', () => {
   let m = reducir(conLlegada, { tipo: 'documento/contabilizar', docId: 'G-004', partida: mundoBase.documentos['G-004'].partida, por: 'Marta Cobo' })
@@ -1139,40 +1083,8 @@ test('deshacer guarda qué decisión vuelve a estar abierta', () => {
   assert.deepEqual(s.mensajes.find((m) => m.id === id).deshechoRefs, [{ tipo: 'orden', id: 'OC-105' }])
 })
 
-// ── 14. Historias abiertas en limpio ─────────────────────────────────────────
-console.log('Historias en limpio')
-test('abrir una historia cierra la conversación anterior, conserva lo decidido y la pide', () => {
-  let s = reducirSesion(crearSesion(), { tipo: 'saludar', instantaneo: true })
-  s = reducirSesion(s, { tipo: 'pausarEventos', valor: true })
-  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'accion', accion: { tipo: 'orden/rechazar', ocId: 'OC-105' }, etiqueta: 'Rechazo OC-105' } })
-  s = avanza(s, 10_000, 100)
-  s = reducirSesion(s, { tipo: 'historia/abrir', historia: 'solo' })
-  assert.equal(s.mensajes[0].rol, 'historia')
-  assert.deepEqual([s.mensajes[0].historia, s.mensajes[0].indice, s.mensajes[0].total], ['solo', 1, HISTORIAS.length])
-  assert.ok(!s.mensajes.some((m) => m.rol === 'agentes' && m.origen === 'saludo'), 'el parte anterior se cierra')
-  assert.equal(s.mundo.ordenes['OC-105'].estado, 'Rechazada', 'lo decidido se queda')
-  assert.equal(s.ultimaMutacion, null, 'no se puede deshacer lo que ya no está a la vista')
-  assert.deepEqual(s.mensajes.slice(1).map((m) => m.rol), ['novedad', 'agentes'], 'debajo, la novedad que pide y su respuesta')
-  s = avanza(s, 20_000, 100)
-  const r = s.mensajes.at(-1)
-  assert.equal(r.estado, 'hecho')
-  assert.equal(r.llegoSola, false, 'la trae la historia: no se pliega')
-  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'contabilizada')
-})
-test('abrir una historia con su novedad ya recibida pregunta con su texto y sale del recorrido', () => {
-  let s = reducirSesion(crearSesion(), { tipo: 'tour/iniciar' })
-  s = reducirSesion(s, { tipo: 'pausarEventos', valor: true })
-  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'evento', eventoId: 'EV-01' } })
-  s = avanza(s, 20_000, 100)
-  s = reducirSesion(s, { tipo: 'historia/abrir', historia: 'solo' })
-  assert.equal(s.tour, null)
-  assert.deepEqual(s.mensajes.slice(1).map((m) => m.rol), ['usuario', 'agentes'])
-  assert.equal(s.mensajes[1].texto, HISTORIAS.find((h) => h.id === 'solo').prompt)
-  assert.equal(reducirSesion(s, { tipo: 'historia/abrir', historia: EPILOGO.id }), s, 'con los agentes trabajando no se abre otra')
-  s = avanza(s, 20_000, 100)
-  const e = reducirSesion(s, { tipo: 'historia/abrir', historia: EPILOGO.id })
-  assert.equal(e.mensajes[0].indice, null, 'el epílogo no lleva número')
-})
+// ── 14. Lo que se pide ───────────────────────────────────────────────────────
+console.log('Lo que se pide')
 test('lo que se pide nunca lleva la marca de «llegó sola»', () => {
   let s = reducirSesion(crearSesion(), { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
   s = avanza(s, 60_000, 250)
@@ -1283,6 +1195,22 @@ test('al abrir, cada conversación trae ya el mensaje de su agente, sin burbuja 
   const lista = listaConversaciones(s)
   assert.equal(lista[0].id, 'parte', 'la más reciente arriba')
   assert.ok(lista.filter((x) => x.id !== 'parte').every((x) => x.noLeida), 'las demás, sin leer')
+})
+test('el número de la lista son los mensajes sin leer y desaparece al ver la conversación', () => {
+  let s = iniciada()
+  // En el móvil se empieza por la lista: ninguna se está viendo y todas tienen su mensaje por leer.
+  assert.ok(listaConversaciones(s, null).every((x) => x.sinLeer === 1), 'una por conversación, el parte incluido')
+  assert.equal(listaConversaciones(s).find((x) => x.id === 'parte').sinLeer, 0, 'la que se ve no cuenta')
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'grua' })
+  assert.equal(porLeer(s, 'grua'), 0, 'abrirla la deja leída')
+  assert.equal(porLeer(s, 'parte'), 1, 'el parte no se vio: sigue por leer')
+  s = reducirSesion(s, { tipo: 'conversacion/leida', id: 'parte' })
+  assert.equal(porLeer(s, 'parte'), 0)
+  assert.equal(reducirSesion(s, { tipo: 'conversacion/leida', id: 'parte' }), s, 'leída dos veces no cambia nada')
+  // Lo que escribes tú no cuenta como por leer; la respuesta, sí.
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué órdenes de compra tengo pendientes?', conv: 'parte' } })
+  s = avanza(s, 20_000, 100)
+  assert.equal(porLeer(s, 'parte'), 1, 'solo la respuesta')
 })
 test('cada conversación de riesgos enseña solo su tarjeta', () => {
   const s = iniciada()

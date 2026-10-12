@@ -22,9 +22,6 @@ export function Cierre({ abrirAgentes }) {
             <FilmpilotButton variant="primary" size="lg" className="claqueta-accion" onClick={() => abrirAgentes()} iconAfter={IconChevronRight}>
               Probar los agentes
             </FilmpilotButton>
-            <FilmpilotButton variant="secondary" size="lg" onClick={() => abrirAgentes({ tour: true })}>
-              Empezar el recorrido guiado
-            </FilmpilotButton>
           </div>
         </div>
         <Claqueta />

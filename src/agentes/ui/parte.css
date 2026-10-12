@@ -1,14 +1,11 @@
-/* Parte de la mañana: saludo, «Ya hecho», «Para hoy», tira del rodaje e índice de
-   historias. Lo importa Parte.jsx. Solo tokens --flp-*. */
+/* Parte de la mañana: «Ya hecho», «Para hoy», tira del rodaje e índice de
+   conversaciones. Lo importa Parte.jsx. Solo tokens --flp-*. */
 
 /* Lo que solo cabe desde 640 px. */
 .ag-solo-ancho { display: none; }
 @media (min-width: 640px) { .ag-solo-ancho { display: revert; } }
 
-/* ── Saludo ───────────────────────────────────────────────────────────────── */
-/* El saludo sale al instante; más bajo que antes para que «Para hoy» quepa en la primera pantalla. */
-.ag-saludo-titulo { margin-top: 6px; color: var(--flp-carbon); font-size: clamp(1.5rem, 2.8vw, 2rem); font-weight: 400; line-height: 1.08; letter-spacing: -0.04em; text-wrap: balance; }
-.ag-saludo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--flp-border); }
+/* ── Entradilla del parte (el saludo es la cabecera del mensaje: Mensajes.jsx) ── */
 .ag-prosa--lead { max-width: 680px; font-size: 15px; line-height: 1.55; }
 @media (min-width: 640px) { .ag-prosa--lead { font-size: 16px; line-height: 1.6; } }
 
@@ -87,19 +84,16 @@
 .ag-agenda-resto-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
 .ag-agenda-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
 
-/* ── Historias: el índice de lo que enseña la demo ────────────────────────── */
-.ag-historias-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-bottom: 8px; }
-.ag-historias-lista { display: grid; gap: 8px; }
-@media (min-width: 640px) { .ag-historias-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ag-historia { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
-.ag-historia-arco { color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
-.ag-historia-titulo { color: var(--flp-carbon); font-size: 16px; font-weight: 500; line-height: 1.3; }
-.ag-historia.is-vista .ag-historia-titulo { color: var(--flp-muted); }
-.ag-historia-linea { color: var(--flp-muted); font-size: 14px; line-height: 1.5; }
-.ag-historia-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 2px; }
-.ag-historia-boton { align-self: flex-start; justify-content: space-between; max-width: 100%; margin-top: auto; padding-block: 8px; white-space: normal; text-align: left; }
-.ag-historia-boton svg { flex: none; }
-.ag-historias-epilogo { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; margin-top: 8px; }
+/* ── Conversaciones («¿Qué puedes hacer?»): una ficha por conversación ──────── */
+.ag-indice-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-bottom: 8px; }
+.ag-indice-lista { display: grid; gap: 8px; }
+@media (min-width: 640px) { .ag-indice-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ag-indice-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--flp-border); border-radius: var(--flp-radius-md); background: var(--flp-surface); }
+.ag-indice-etiqueta { color: var(--flp-muted); font-family: var(--flp-font-mono); font-size: 12px; }
+.ag-indice-titulo { color: var(--flp-carbon); font-size: 16px; font-weight: 500; line-height: 1.3; }
+.ag-indice-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 2px; }
+.ag-indice-boton { align-self: flex-start; justify-content: space-between; max-width: 100%; margin-top: auto; padding-block: 8px; white-space: normal; text-align: left; }
+.ag-indice-boton svg { flex: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .ag-agenda-plegar svg { transition: none; }

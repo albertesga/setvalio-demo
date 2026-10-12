@@ -1,8 +1,7 @@
-// Redactor, sugerencias y barra del recorrido guiado.
+// Redactor y sugerencias de la conversación abierta.
 
-import { forwardRef, useEffect, useRef, useState } from 'react'
-import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
-import { IconArrowUp, IconChevronDown } from '../../components/icons.jsx'
+import { useEffect, useRef, useState } from 'react'
+import { IconArrowUp } from '../../components/icons.jsx'
 
 /**
  * Sugerencias para seguir: van al final de la última respuesta, no en el pie fijo.
@@ -26,7 +25,7 @@ export function Sugerencias({ items, onElegir, deshabilitado }) {
   )
 }
 
-export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
+export function Redactor({ ocupado, onEnviar, onEscribir, inputRef, placeholder = 'Escribe a los agentes…' }) {
   const [texto, setTexto] = useState('')
   const historial = useRef([])
   const ref = inputRef
@@ -35,6 +34,8 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    // La barra de desplazamiento, solo cuando el texto no cabe en el alto máximo.
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden'
   }, [texto, ref])
 
   const enviar = () => {
@@ -64,7 +65,7 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
       }}
     >
       <label htmlFor="ag-entrada" className="sr-only">
-        Pide algo a los agentes
+        {placeholder.replace('…', '')}
       </label>
       <textarea
         id="ag-entrada"
@@ -77,7 +78,7 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
         }}
         onFocus={() => onEscribir?.()}
         onKeyDown={onKeyDown}
-        placeholder="Pide algo a los agentes…"
+        placeholder={placeholder}
         className="ag-redactor-campo"
         autoComplete="off"
         enterKeyHint="send"
@@ -88,83 +89,3 @@ export function Redactor({ ocupado, onEnviar, onEscribir, inputRef }) {
     </form>
   )
 }
-
-/** Lleva a la tarjeta que espera la decisión del paso y le pasa el foco. Devuelve si la encontró. */
-function irALaTarjeta(espera) {
-  const abiertas = [...document.querySelectorAll(`.ag-aprobacion[data-ref="${espera.tipo}-${espera.id}"]:not(.is-decidida)`)]
-  // Nunca otra tarjeta: decidirla no desbloquearía el paso.
-  const t = abiertas[abiertas.length - 1]
-  if (!t) return false
-  const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  // Con un poco de aire arriba: la tarjeta no queda pegada a la barra del recorrido.
-  const hilo = t.closest('.ag-scroll')
-  if (hilo) hilo.scrollTo({ top: t.getBoundingClientRect().top - hilo.getBoundingClientRect().top + hilo.scrollTop - 16, behavior: reducido ? 'auto' : 'smooth' })
-  else t.scrollIntoView({ block: 'start', behavior: reducido ? 'auto' : 'smooth' })
-  const foco = t.querySelector('h4') ?? t
-  if (!foco.hasAttribute('tabindex') && foco.tabIndex < 0) foco.setAttribute('tabindex', '-1')
-  foco.focus({ preventScroll: true })
-  return true
-}
-
-/**
- * Barra fija del recorrido: en qué paso estás y qué mirar, sin subir a buscarlo.
- * En móvil ocupa una línea («2/6 · Lo hace solo») y la nota se abre al tocarla;
- * en escritorio, la nota va entera.
- */
-export const BarraRecorrido = forwardRef(function BarraRecorrido({ tour, ocupado, onSiguiente, onSalir, onPedirTarjeta }, ref) {
-  const [nota, setNota] = useState(false)
-  // Cada paso empieza con la nota plegada en móvil.
-  const indice = tour?.indice
-  useEffect(() => setNota(false), [indice])
-  if (!tour) return null
-  const { paso } = tour
-  const bloqueado = !tour.puedeAvanzar
-  // Si espera una decisión y los agentes ya han terminado, el botón lleva a la tarjeta.
-  const esperaDecision = bloqueado && !ocupado && !!paso.espera
-  const n = tour.indice + 1
-  return (
-    <div ref={ref} tabIndex={-1} className={`ag-tourbar flp-dark ${nota ? 'is-nota' : ''}`} role="region" aria-label={`Recorrido guiado, paso ${n} de ${tour.total}`}>
-      <div className="ag-tourbar-texto">
-        {/* Móvil: una línea que abre la nota. */}
-        <button type="button" className="ag-tourbar-linea" aria-expanded={nota} aria-controls="ag-tourbar-nota" onClick={() => setNota((v) => !v)}>
-          <span className="tnum">
-            {n}/{tour.total}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span className="min-w-0 truncate">{paso.arco}</span>
-          <IconChevronDown size={16} className={`flex-none transition-transform motion-reduce:transition-none ${nota ? 'rotate-180' : ''}`} aria-hidden="true" />
-          <span className="sr-only">{nota ? 'Ocultar la explicación' : 'Ver la explicación'}</span>
-        </button>
-        {/* Escritorio: paso, título y nota entera. */}
-        <span className="ag-tourbar-kicker flp-kicker">
-          Recorrido · paso <span className="tnum">{n}</span> de <span className="tnum">{tour.total}</span> · {paso.arco}
-        </span>
-        <span className="ag-tourbar-titulo">{paso.titulo}</span>
-        <span id="ag-tourbar-nota" className="ag-tourbar-nota">
-          {paso.nota}
-        </span>
-      </div>
-      <div className="ag-tourbar-botones">
-        <FilmpilotButton variant="ghost" onClick={onSalir} aria-label="Salir del recorrido">
-          Salir
-        </FilmpilotButton>
-        {esperaDecision ? (
-          <FilmpilotButton variant="secondary" onClick={() => irALaTarjeta(paso.espera) || onPedirTarjeta?.()} aria-label="Decide en la tarjeta para seguir: ir a la tarjeta">
-            <span className="hidden sm:inline">Decide en la tarjeta</span>
-            <span className="sm:hidden">Decide</span>
-            <span aria-hidden="true">↓</span>
-          </FilmpilotButton>
-        ) : bloqueado ? (
-          // aria-disabled y no disabled: el foco se queda en el botón mientras los agentes terminan.
-          <FilmpilotButton variant="secondary" aria-disabled="true" className="is-bloqueado" title="Espera a que terminen los agentes">
-            {tour.ultimo ? 'Terminar' : 'Siguiente'}
-          </FilmpilotButton>
-        ) : (
-          <FilmpilotButton variant="primary" onClick={onSiguiente}>
-            {tour.ultimo ? 'Terminar' : 'Siguiente'}
-          </FilmpilotButton>
-        )}
-      </div>
-    </div>
-  )
-})

@@ -32,7 +32,7 @@ export function useAgentes({ ritmo = 'normal' } = {}) {
   const activo = !!s.activo
   const activoId = s.activo?.id ?? null
   const hayCola = s.cola.length > 0
-  const esperaEventos = !s.tour && !s.eventosPausados && !!proximaNovedad(s) && conversacionIniciada(s)
+  const esperaEventos = !s.eventosPausados && !!proximaNovedad(s) && conversacionIniciada(s)
 
   useEffect(() => {
     if (activo && reducido) {

@@ -1,19 +1,23 @@
 // Prototipo conversacional: los agentes de Filmpilot trabajan sobre «La última función».
 // Motor simulado y guionizado (src/agentes/): sin modelo de lenguaje y con datos de ejemplo.
+// Como un chat: a la izquierda, las conversaciones (cada una con un agente y de un tema);
+// a la derecha, la abierta. Se guardan hasta refrescar la página.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../agentes/agentes.css'
 import '../agentes/ui/pantalla.css'
 import { useAgentes } from '../agentes/useAgentes.js'
-import { personaDe, estadoTour, conversacionIniciada, vistosDe, epilogoVisto, sugerenciasDe } from '../agentes/sesion.js'
-import { HISTORIAS_POR_ID, entradaDeHistoria } from '../agentes/casos.js'
+import { personaDe, sugerenciasDe, mensajesDe, listaConversaciones, conversacionPara, conversacionIniciada, porLeer } from '../agentes/sesion.js'
+import { CONVERSACIONES_POR_ID } from '../agentes/casos.js'
 import { decisionesAbiertas } from '../agentes/pendientes.js'
 import { AgentesCtx } from '../agentes/ui/contexto.js'
 import { Hoja } from '../agentes/ui/Piezas.jsx'
 import { Mensaje } from '../agentes/ui/Mensajes.jsx'
-import { Sugerencias, Redactor, BarraRecorrido } from '../agentes/ui/Conversacion.jsx'
-import { Cabecera, OpcionesDemo, ConfirmarRecorrido } from '../agentes/ui/Cabecera.jsx'
-import { AgentesPorFamilia, LoQuePuedesVer, LeyendaAutonomia, DetalleAgente, estadoAgentes } from '../agentes/ui/Paneles.jsx'
+import { Sugerencias, Redactor } from '../agentes/ui/Conversacion.jsx'
+import { Cabecera } from '../agentes/ui/Cabecera.jsx'
+import { AgentesPorFamilia, LeyendaAutonomia, DetalleAgente, estadoAgentes } from '../agentes/ui/Paneles.jsx'
+import { ListaConversaciones, CabeceraChat, EstadoVacio } from '../agentes/ui/Conversaciones.jsx'
+import { AGENTES } from '../agentes/agentes.js'
 
 // La pantalla ocupa el alto visible y desplaza sus columnas por dentro: el documento no se mueve.
 // (El color del navegador lo fija App.jsx según la ruta.)
@@ -31,22 +35,39 @@ function useBloqueoScroll() {
   }, [])
 }
 
-function Anunciador({ s }) {
+// Desde 1024 px se ven la lista y la conversación a la vez.
+const ANCHO = '(min-width: 1024px)'
+function useAncho() {
+  const [ancho, setAncho] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(ANCHO).matches)
+  useEffect(() => {
+    const mq = window.matchMedia?.(ANCHO)
+    if (!mq) return
+    const fn = () => setAncho(mq.matches)
+    fn()
+    mq.addEventListener?.('change', fn)
+    return () => mq.removeEventListener?.('change', fn)
+  }, [])
+  return ancho
+}
+
+function Anunciador({ mensajes }) {
   const [texto, setTexto] = useState('')
   const ultimoAnunciado = useRef(null)
   useEffect(() => {
-    const ultimo = [...s.mensajes].reverse().find((m) => m.rol === 'agentes' || m.rol === 'novedad')
+    const ultimo = [...mensajes].reverse().find((m) => m.rol === 'agentes' || m.rol === 'novedad')
     if (!ultimo) return
     const clave = `${ultimo.id}-${ultimo.estado ?? ''}`
     if (ultimoAnunciado.current === clave) return
     ultimoAnunciado.current = clave
+    // Lo que ya estaba escrito al abrir no se anuncia como si llegara ahora.
+    if (ultimo.apertura) return
     if (ultimo.rol === 'novedad') setTexto(`Novedad: ${ultimo.titulo}.`)
     else if (ultimo.estado === 'en_curso') setTexto(`Los agentes trabajan: ${ultimo.turno.titulo}.`)
     else if (ultimo.estado === 'hecho') {
       const decisiones = ultimo.turno.bloques.filter((b) => b.tipo === 'aprobacion').length
       setTexto(`Respuesta lista: ${ultimo.turno.titulo}.${decisiones ? ` Incluye ${decisiones} ${decisiones === 1 ? 'decisión' : 'decisiones'}.` : ''}`)
     }
-  }, [s.mensajes])
+  }, [mensajes])
   return (
     <div className="sr-only" role="status" aria-live="polite">
       {texto}
@@ -54,82 +75,123 @@ function Anunciador({ s }) {
   )
 }
 
-// La velocidad sobrevive a ir a la portada y volver, como la conversación (el almacén es global).
-let ritmoGuardado = 'normal'
-
 export default function Agentes({ onNavigate, contexto, pushToast }) {
   useBloqueoScroll()
-  const [ritmo, setRitmoEstado] = useState(() => ritmoGuardado)
-  const setRitmo = useCallback((r) => {
-    ritmoGuardado = r
-    setRitmoEstado(r)
-  }, [])
-  const { s, despachar } = useAgentes({ ritmo })
+  // La demo se ve siempre como Marta y a ritmo normal.
+  const { s, despachar } = useAgentes({ ritmo: 'normal' })
+  const sRef = useRef(s)
+  sRef.current = s
   const persona = personaDe(s)
   const ocupado = !!s.activo
-  const tour = estadoTour(s)
-  const [hoja, setHoja] = useState(null) // 'agentes' (historias y equipo, sin carril) | 'demo' | 'recorrido' (confirmar)
+  const iniciadas = Object.keys(s.conversaciones).length > 0
+  const [hoja, setHoja] = useState(null) // 'equipo'
   const [agenteAbierto, setAgenteAbierto] = useState(null)
+  // Por debajo de 1024 px se ve la lista o el chat, como en el móvil.
+  const [vista, setVista] = useState('lista')
+  const ancho = useAncho()
+  // La conversación que se está viendo (en el móvil, ninguna mientras se ve la lista).
+  const abierta = ancho || vista === 'chat' ? s.actual : null
   const scrollRef = useRef(null)
   const finRef = useRef(null)
-  const barraRef = useRef(null)
   const inputRef = useRef(null)
   const [cerca, setCerca] = useState(true)
   const [nuevos, setNuevos] = useState(false)
 
+  const mensajes = useMemo(() => mensajesDe(s), [s])
+  const conversacion = s.conversaciones[s.actual] ?? null
+  const lista = useMemo(() => listaConversaciones(s, abierta), [s, abierta])
+
   const anclado = useRef(true)
   // Respuestas ya colocadas al principio de la vista: no se vuelven a mover.
   const posicionados = useRef(new Set())
-  // Último paso del recorrido colocado arriba (id de su mensaje 'guia').
-  const pasoColocado = useRef(null)
-  // Última historia abierta en limpio y colocada arriba (id de su mensaje 'historia').
-  const historiaColocada = useRef(null)
-  // Respuesta que se está colocando arriba: mientras sale (y hasta que hay bastante debajo
-  // para que quede arriba) se recoloca con cada bloque, porque lo de encima puede cambiar
-  // de alto. Se suelta en cuanto la persona se desplaza.
+  // Respuesta que se está colocando arriba, con su pregunta: se recoloca con cada bloque
+  // hasta quedar arriba y terminada. Se suelta en cuanto la persona se desplaza.
   const pendiente = useRef(null)
   // Cuándo se desplazó la vista por código: ese desplazamiento no vuelve a anclar al final.
   const programado = useRef(0)
-  const tourRef = useRef(null)
-  tourRef.current = s.tour
-  // Lo que se pide desde una hoja, una tarjeta o una sugerencia: cierra la hoja,
-  // vuelve a seguir la conversación y devuelve el foco al redactor (no en pantallas táctiles).
-  // Una decisión dentro del recorrido lo devuelve a su barra, donde está «Siguiente».
-  const trasPedir = useCallback((foco = 'redactor') => {
-    setHoja(null)
-    anclado.current = true
-    pendiente.current = null
-    if (foco === 'barra') requestAnimationFrame(() => barraRef.current?.focus({ preventScroll: true }))
-    else if (!window.matchMedia?.('(pointer: coarse)').matches) requestAnimationFrame(() => inputRef.current?.focus())
-  }, [])
-  const enviarEntrada = useCallback(
-    (entrada) => {
-      despachar({ tipo: 'enviar', entrada })
-      trasPedir(entrada.tipo === 'accion' && tourRef.current ? 'barra' : 'redactor')
-    },
-    [despachar, trasPedir],
-  )
-  const enviar = useCallback((texto) => enviarEntrada({ tipo: 'texto', texto }), [enviarEntrada])
-  // Una historia se abre en limpio: se cierra la conversación anterior (lo decidido se queda)
-  // y arriba quedan la historia, lo que se pide y la respuesta. El efecto de desplazamiento
-  // la coloca y le pasa el foco.
-  const abrirHistoria = useCallback(
-    (h) => {
-      if (!h) return
+  // Posición de cada conversación, para volver a donde estabas.
+  const scrollPorConv = useRef(new Map())
+  const convColocada = useRef(null)
+  // Al abrir una conversación: la tarjeta a la que ir, o seguir el final (si se acaba de pedir algo).
+  const tarjetaPendiente = useRef(null)
+  const alFinalAlAbrir = useRef(false)
+
+  // Al abrir, los agentes ya han escrito lo suyo en cada conversación.
+  useEffect(() => {
+    if (!iniciadas) despachar({ tipo: 'conversaciones/iniciar' })
+  }, [iniciadas, despachar])
+
+  // Lo que se ve queda leído: el número de la lista desaparece al abrir la conversación.
+  const quedaPorLeer = abierta ? porLeer(s, abierta) : 0
+  useEffect(() => {
+    if (quedaPorLeer) despachar({ tipo: 'conversacion/leida', id: abierta })
+  }, [quedaPorLeer, abierta, despachar])
+
+  const enfocarRedactor = () => {
+    if (!window.matchMedia?.('(pointer: coarse)').matches) requestAnimationFrame(() => inputRef.current?.focus())
+  }
+  const guardarScroll = () => {
+    const actual = sRef.current.actual
+    if (actual && scrollRef.current) scrollPorConv.current.set(actual, scrollRef.current.scrollTop)
+  }
+  const abrirConversacion = useCallback(
+    (id, { tarjeta = null, alFinal = false } = {}) => {
+      guardarScroll()
+      tarjetaPendiente.current = tarjeta
+      alFinalAlAbrir.current = alFinal
       setHoja(null)
-      setNuevos(false)
-      pendiente.current = null
-      anclado.current = false
-      despachar({ tipo: 'historia/abrir', historia: h.id })
+      setVista('chat')
+      despachar({ tipo: 'conversacion/abrir', id })
     },
     [despachar],
   )
-  // «Siguiente: …» abre su historia; las demás sugerencias traen su entrada o se preguntan.
-  const elegirSugerencia = useCallback(
-    (sg) => (sg.historia && HISTORIAS_POR_ID[sg.historia] ? abrirHistoria(HISTORIAS_POR_ID[sg.historia]) : enviarEntrada(sg.entrada ?? { tipo: 'texto', texto: sg.texto })),
-    [enviarEntrada, abrirHistoria],
+  const nuevaConversacion = useCallback(() => {
+    guardarScroll()
+    alFinalAlAbrir.current = true
+    setHoja(null)
+    setVista('chat')
+    despachar({ tipo: 'conversacion/nueva' })
+    enfocarRedactor()
+  }, [despachar])
+
+  // Lo escrito en el redactor se responde en la conversación abierta.
+  const enviarAqui = useCallback(
+    (entrada) => {
+      setHoja(null)
+      setVista('chat')
+      anclado.current = true
+      pendiente.current = null
+      despachar({ tipo: 'enviar', entrada })
+      enfocarRedactor()
+    },
+    [despachar],
   )
-  const decidir = useCallback((accion, etiqueta) => enviarEntrada({ tipo: 'accion', accion, etiqueta }), [enviarEntrada])
+  // Un botón o un enlace va a la conversación de lo que pide: si ya lo enseña, solo la abre;
+  // si no, la abre y lo pide allí. Si no tiene conversación propia, se responde aquí.
+  const pedir = useCallback(
+    (entrada, { ref = null } = {}) => {
+      const destino = conversacionPara(sRef.current, entrada)
+      if (destino && destino.conv !== sRef.current.actual) {
+        abrirConversacion(destino.conv, { tarjeta: destino.esApertura ? ref : null, alFinal: !destino.esApertura })
+        if (!destino.esApertura) despachar({ tipo: 'enviar', entrada: { ...entrada, conv: destino.conv } })
+        return
+      }
+      enviarAqui(entrada)
+    },
+    [abrirConversacion, enviarAqui, despachar],
+  )
+  const enviar = useCallback((texto, opciones) => pedir({ tipo: 'texto', texto }, opciones), [pedir])
+  const decidir = useCallback((accion, etiqueta) => enviarAqui({ tipo: 'accion', accion, etiqueta }), [enviarAqui])
+  // «Pídele algo» desde la ficha de un agente: a su conversación o, si no tiene, a una nueva.
+  const preguntarA = useCallback(
+    (texto) => {
+      const entrada = { tipo: 'texto', texto }
+      if (conversacionPara(sRef.current, entrada)) return pedir(entrada)
+      nuevaConversacion()
+      despachar({ tipo: 'enviar', entrada })
+    },
+    [pedir, nuevaConversacion, despachar],
+  )
   const avisar = useCallback((texto) => pushToast?.(texto), [pushToast])
   const cerrarHoja = useCallback(() => setHoja(null), [])
   const cerrarAgente = useCallback(() => setAgenteAbierto(null), [])
@@ -144,62 +206,23 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     despachar({ tipo: 'actividad' })
   }, [despachar])
 
-  // El recorrido. Con conversación en marcha pide confirmar (el parte solo no cuenta);
-  // al empezar, vuelve a seguir la conversación desde el paso 1.
-  const hayConversacion = conversacionIniciada(s)
-  const empezarRecorrido = useCallback(() => {
-    setHoja(null)
-    posicionados.current.clear()
-    pasoColocado.current = null
-    anclado.current = true
-    despachar({ tipo: 'tour/iniciar' })
-  }, [despachar])
-  const iniciarRecorrido = useCallback(() => {
-    if (hayConversacion) setHoja('recorrido')
-    else empezarRecorrido()
-  }, [hayConversacion, empezarRecorrido])
-
-  // Al abrir, el parte de la mañana ya está escrito: no se ve a los agentes prepararlo.
-  // Si la portada pide algo, el recorrido empieza después del parte (preguntando si hay
-  // conversación que cerrar) y una pregunta llega justo debajo.
+  // Lo que pide la portada: una pregunta va a su conversación o, si no tiene, a una nueva.
   const pedidoAtendido = useRef(null)
-  const vacia = s.mensajes.length === 0
   useEffect(() => {
-    if (contexto && pedidoAtendido.current !== contexto) {
-      pedidoAtendido.current = contexto
-      if (contexto.tour) {
-        if (!s.tour) iniciarRecorrido()
-        return
-      }
-      if (contexto.pregunta) {
-        despachar({ tipo: 'saludar', instantaneo: true })
-        enviar(contexto.pregunta)
-        return
-      }
+    if (!iniciadas || pedidoAtendido.current === contexto) return
+    pedidoAtendido.current = contexto
+    if (!contexto?.pregunta) return
+    const entrada = { tipo: 'texto', texto: contexto.pregunta }
+    if (conversacionPara(sRef.current, entrada)) pedir(entrada)
+    else {
+      nuevaConversacion()
+      despachar({ tipo: 'enviar', entrada })
     }
-    if (vacia && !s.tour) despachar({ tipo: 'saludar', instantaneo: true })
-  }, [contexto, vacia, s.tour, despachar, enviar, iniciarRecorrido])
+  }, [contexto, iniciadas, pedir, nuevaConversacion, despachar])
 
-  // Al empezar el recorrido, el foco va a su barra: ahí están el paso, la nota y «Siguiente».
-  // Al terminar o salir, la barra desaparece: el foco pasa al cierre (o al redactor).
-  const enRecorrido = !!s.tour
-  const estabaEnRecorrido = useRef(false)
-  useEffect(() => {
-    if (enRecorrido) requestAnimationFrame(() => barraRef.current?.focus({ preventScroll: true }))
-    else if (estabaEnRecorrido.current) {
-      requestAnimationFrame(() => {
-        const ultimo = [...document.querySelectorAll('[data-msg]')].pop()
-        const titulo = ultimo?.querySelector('h3[tabindex="-1"]')
-        if (titulo) titulo.focus({ preventScroll: true })
-        else if (!window.matchMedia?.('(pointer: coarse)').matches) inputRef.current?.focus({ preventScroll: true })
-      })
-    }
-    estabaEnRecorrido.current = enRecorrido
-  }, [enRecorrido])
-
-  // Desplazamiento. Mientras los agentes trabajan, sigue el final; cuando llega la
-  // respuesta, la deja empezando arriba para leerla desde el principio. Si la
-  // persona sube a leer otra cosa, deja de moverla y ofrece «Nuevos mensajes».
+  // Desplazamiento. Al abrir una conversación: donde la dejaste, en su tarjeta o arriba la primera
+  // vez. Mientras los agentes trabajan, sigue el final; cuando llega la respuesta, la deja arriba
+  // con su pregunta. Si la persona sube a leer otra cosa, no la mueve y ofrece «Nuevos mensajes».
   const alFinal = (suave = true) => {
     const el = scrollRef.current
     if (!el) return
@@ -235,69 +258,59 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     if (e.type === 'keydown' && !['ArrowUp', 'PageUp', 'Home'].includes(e.key)) return
     anclado.current = false
   }
-  const ultimoMsg = s.mensajes[s.mensajes.length - 1]
-  const firma = `${s.mensajes.length}-${ultimoMsg?.id ?? ''}-${ultimoMsg?.bloquesVisibles ?? 0}-${ultimoMsg?.estadoPasos?.join('') ?? ''}-${ultimoMsg?.estado ?? ''}-${s.tour?.paso ?? ''}`
+  const ultimoMsg = mensajes[mensajes.length - 1]
+  const firma = `${s.actual}-${mensajes.length}-${ultimoMsg?.id ?? ''}-${ultimoMsg?.bloquesVisibles ?? 0}-${ultimoMsg?.estadoPasos?.join('') ?? ''}-${ultimoMsg?.estado ?? ''}`
   useEffect(() => {
-    if (!s.tour) pasoColocado.current = null
-    if (!ultimoMsg) {
-      posicionados.current.clear()
-      return
-    }
     const el = scrollRef.current
-    const llevarArriba = colocarArriba
-    // Una historia abierta en limpio se lee desde arriba: su cabecera, lo que se pide y la
-    // respuesta, que crece debajo sin mover la vista. El foco va a su título.
-    const idxHistoria = s.mensajes.findLastIndex((m) => m.rol === 'historia')
-    const historia = idxHistoria >= 0 ? s.mensajes[idxHistoria] : null
-    if (historia && historiaColocada.current !== historia.id) {
-      historiaColocada.current = historia.id
+    // Otra conversación: se coloca y no cuenta lo que ya tenía como nuevo.
+    if (convColocada.current !== s.actual) {
+      convColocada.current = s.actual
+      pendiente.current = null
+      setNuevos(false)
+      const siguiendo = alFinalAlAbrir.current
+      alFinalAlAbrir.current = false
+      // Si se acaba de pedir algo aquí, lo nuevo (la pregunta y su respuesta) se coloca como siempre.
+      const yaEstaban = siguiendo ? mensajes.filter((m) => m.estado !== 'en_curso' && m.rol === 'agentes') : mensajes
+      for (const m of yaEstaban) posicionados.current.add(m.id)
       programado.current = Date.now()
-      el?.scrollTo({ top: 0, behavior: 'auto' })
-      anclado.current = false
-      setNuevos(false)
-      requestAnimationFrame(() => document.querySelector(`[data-msg="${historia.id}"] h3`)?.focus({ preventScroll: true }))
+      const tarjeta = tarjetaPendiente.current
+      tarjetaPendiente.current = null
+      requestAnimationFrame(() => {
+        if (!el) return
+        const t = tarjeta && el.querySelector(`.ag-aprobacion[data-ref="${tarjeta.tipo}-${tarjeta.id}"]:not(.is-decidida)`)
+        if (t) {
+          el.scrollTo({ top: t.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 16, behavior: 'auto' })
+          t.querySelector('h4')?.focus({ preventScroll: true })
+        } else if (siguiendo) alFinal(false)
+        else el.scrollTo({ top: scrollPorConv.current.get(s.actual) ?? 0, behavior: 'auto' })
+      })
+      anclado.current = siguiendo
       return
     }
-    // Lo que pide la historia (la pregunta o la novedad) y su respuesta no son «nuevos mensajes».
-    const deLaHistoria = historia && s.mensajes.length - 1 - idxHistoria <= 2
-    // Cada paso del recorrido empieza arriba, con su separador; el primero es el parte,
-    // que ya está al principio. Lo que responden los agentes crece debajo sin mover la vista.
-    const guia = s.tour ? [...s.mensajes].reverse().find((m) => m.rol === 'guia') : null
-    if (guia && pasoColocado.current !== guia.id) {
-      pasoColocado.current = guia.id
-      if (guia.indice === 0) el?.scrollTo({ top: 0, behavior: 'auto' })
-      else llevarArriba(guia.id)
-      setNuevos(false)
-      anclado.current = false
-      return
-    }
+    if (!ultimoMsg) return
+    const llevarArriba = colocarArriba
     // La respuesta que se está colocando se recoloca con cada bloque hasta quedar arriba y terminada.
     if (pendiente.current) {
-      if (pendiente.current === ultimoMsg.id) {
-        if (llevarArriba(ultimoMsg.id) && ultimoMsg.estado === 'hecho') pendiente.current = null
+      if (pendiente.current.id === ultimoMsg.id) {
+        if (llevarArriba(pendiente.current.ancla) && ultimoMsg.estado === 'hecho') pendiente.current = null
         return
       }
-      // Llega otra cosa (una novedad) mientras se leía la anterior: no se mueve la vista.
       pendiente.current = null
       anclado.current = false
     }
-    // El parte de la mañana ya está arriba al abrir: no se mueve, se lee desde su fecha.
-    if (ultimoMsg.rol === 'agentes' && ultimoMsg.origen === 'saludo') {
-      posicionados.current.add(ultimoMsg.id)
-      anclado.current = false
-      return
-    }
     if (!anclado.current) {
-      // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos
-      // mensajes»; en el recorrido tampoco, porque cada paso ya se coloca solo.
-      // Se recuerda el primero que llegó: «Nuevos mensajes» lleva a su principio.
-      if (!s.tour && !deLaHistoria && !(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos((n) => n || ultimoMsg.id)
+      if (el) setCerca(el.scrollHeight - el.scrollTop - el.clientHeight < 140)
+      // Los bloques que siguen saliendo de la respuesta que ya se está leyendo no son «nuevos mensajes».
+      if (!(ultimoMsg.rol === 'agentes' && posicionados.current.has(ultimoMsg.id))) setNuevos((n) => n || ultimoMsg.id)
       return
     }
     if (ultimoMsg.rol === 'agentes' && ultimoMsg.bloquesVisibles > 0) {
       if (posicionados.current.has(ultimoMsg.id)) return
       posicionados.current.add(ultimoMsg.id)
-      if (!llevarArriba(ultimoMsg.id) || ultimoMsg.estado !== 'hecho') pendiente.current = ultimoMsg.id
+      // La pregunta arriba y la respuesta debajo.
+      const previo = mensajes[mensajes.length - 2]
+      const ancla = previo && ['usuario', 'decision', 'novedad'].includes(previo.rol) ? previo.id : ultimoMsg.id
+      if (!llevarArriba(ancla) || ultimoMsg.estado !== 'hecho') pendiente.current = { id: ultimoMsg.id, ancla }
       // La persona está leyendo la respuesta: lo que llegue después no la mueve.
       anclado.current = false
       return
@@ -308,10 +321,7 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
 
   const estados = useMemo(() => estadoAgentes(s), [s])
   const trabajando = Object.entries(estados).filter(([, e]) => e.estado === 'trabajando').map(([id]) => id)
-
-  // Para seguir: la siguiente historia sin ver y las del turno, tres como mucho (sesion.js).
   const sugerencias = useMemo(() => sugerenciasDe(s), [s])
-  const vistos = useMemo(() => vistosDe(s), [s])
   const porRevisar = useMemo(() => decisionesAbiertas(s.mundo).length, [s.mundo])
 
   const ctx = {
@@ -319,112 +329,83 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
     persona,
     despachar,
     enviar,
-    enviarEntrada,
+    enviarEntrada: pedir,
     decidir,
+    preguntarA,
+    abrirConversacion,
+    conversacion,
     onNavigate,
     avisar,
     ocupado,
     deshacible: s.ultimaMutacion?.mensajeId,
     eventosPausados: s.eventosPausados,
-    iniciarRecorrido,
-    abrirHistoria,
-    enRecorrido,
-    // La decisión que espera el paso del recorrido ({ tipo, id }) o null.
-    esperaRecorrido: tour?.paso.espera ?? null,
-    vistos,
   }
 
-  // El carril: lo que puedes ver arriba, cómo actúan y el equipo. A la izquierda desde
-  // 1024 px; por debajo, en una hoja que abre por las historias.
-  const carril = (enHoja) => (
-    <div className="ag-carril">
-      <LoQuePuedesVer nivel={enHoja ? 3 : 2} epilogoVisto={epilogoVisto(s)} />
-      <LeyendaAutonomia nivel={enHoja ? 3 : 2} />
-      <AgentesPorFamilia
-        nivel={enHoja ? 3 : 2}
-        estados={estados}
-        onAbrir={(id) => {
-          if (enHoja) setHoja(null)
-          setAgenteAbierto(id)
-        }}
-      />
-    </div>
-  )
-
-  const ultimaNovedadId = [...s.mensajes].reverse().find((m) => m.rol === 'novedad')?.id
+  const ultimaNovedadId = [...mensajes].reverse().find((m) => m.rol === 'novedad')?.id
+  const capacidad = CONVERSACIONES_POR_ID[s.actual]?.capacidad
+  const nombreAgente = conversacion ? (AGENTES[conversacion.agente]?.nombre ?? 'Orquestador') : 'los agentes'
 
   return (
     <AgentesCtx.Provider value={ctx}>
-      <div className={`ag-app flp-theme ${enRecorrido ? 'is-recorrido' : ''} ${hayConversacion ? 'is-conversando' : ''}`} onPointerDownCapture={marcarActividad} onWheelCapture={marcarActividad} onKeyDownCapture={marcarActividad} onTouchStartCapture={marcarActividad}>
+      <div className={`ag-app flp-theme ${conversacionIniciada(s) ? 'is-conversando' : ''}`} data-vista={vista} onPointerDownCapture={marcarActividad} onWheelCapture={marcarActividad} onKeyDownCapture={marcarActividad} onTouchStartCapture={marcarActividad}>
         <a href="#ag-entrada" className="ag-skip">
           Ir al campo de mensaje
         </a>
         <Cabecera
           s={s}
-          persona={persona}
           porRevisar={porRevisar}
           onPortada={() => onNavigate('landing')}
-          onHistorias={() => setHoja('agentes')}
-          onDemo={() => setHoja('demo')}
-          onRecorrido={iniciarRecorrido}
-          onRevisar={() => enviar('¿Qué tengo que revisar?')}
+          onEquipo={() => setHoja('equipo')}
+          onRevisar={() => {
+            if (sRef.current.actual !== 'parte') abrirConversacion('parte', { alFinal: true })
+            else setVista('chat')
+            despachar({ tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué tengo que revisar?', conv: 'parte' } })
+            anclado.current = true
+          }}
         />
 
         <div className="ag-cuerpo">
-          <aside className="ag-col-izq" aria-labelledby="ag-titulo-agentes">
+          <aside className="ag-col-izq" aria-label="Conversaciones">
             <div className="ag-panel-scroll">
-              <h2 id="ag-titulo-agentes" className="sr-only">
-                Historias y equipo
-              </h2>
-              {carril(false)}
+              <ListaConversaciones items={lista} actual={abierta} onAbrir={(id) => abrirConversacion(id)} onNueva={nuevaConversacion} />
             </div>
           </aside>
 
-          <main className="ag-centro" aria-label="Conversación con los agentes">
-            <BarraRecorrido
-              ref={barraRef}
-              tour={tour}
-              ocupado={ocupado || s.cola.length > 0}
-              onSiguiente={() => {
-                // Sigue al paso nuevo: la respuesta anterior ya está leída.
-                anclado.current = true
-                despachar({ tipo: 'tour/siguiente' })
-              }}
-              onSalir={() => {
-                setNuevos(false)
-                despachar({ tipo: 'tour/salir' })
-              }}
-              // Si la tarjeta del paso no está en el hilo, se vuelve a pedir su historia.
-              onPedirTarjeta={() => {
-                const h = HISTORIAS_POR_ID[tour?.paso.historia]
-                if (h) enviarEntrada(entradaDeHistoria(h, s.mundo))
-              }}
-            />
-            <div ref={scrollRef} className="ag-scroll" onScroll={onScroll} onWheel={soltar} onTouchMove={() => {
+          <main className="ag-centro" aria-label={conversacion ? `Conversación: ${conversacion.titulo ?? 'nueva'}` : 'Conversación'}>
+            <CabeceraChat conversacion={conversacion} capacidad={capacidad} onVolver={() => setVista('lista')} />
+            <div
+              ref={scrollRef}
+              className="ag-scroll"
+              onScroll={onScroll}
+              onWheel={soltar}
+              onTouchMove={() => {
                 anclado.current = false
                 pendiente.current = null
-              }} onKeyDown={soltar}>
-              <div className="ag-hilo">
-                {s.mensajes.length > 0 && (
+              }}
+              onKeyDown={soltar}
+            >
+              <div className="ag-hilo" key={s.actual ?? 'ninguna'}>
+                {mensajes.length > 0 ? (
                   <section aria-labelledby="ag-titulo-conversacion" className="flex flex-col gap-6">
                     <h2 id="ag-titulo-conversacion" className="sr-only">
-                      Conversación
+                      {conversacion?.titulo ?? 'Conversación'}
                     </h2>
-                    {/* data-msg: el desplazamiento coloca cada respuesta y cada paso del recorrido por su mensaje. */}
-                    {s.mensajes.map((m, i) => (
+                    {/* data-msg: el desplazamiento coloca cada respuesta por su mensaje. */}
+                    {mensajes.map((m, i) => (
                       <div key={m.id} data-msg={m.id}>
-                        <Mensaje msg={m} ultimo={i === s.mensajes.length - 1} ultimaNovedad={m.id === ultimaNovedadId} />
+                        <Mensaje msg={m} ultimo={i === mensajes.length - 1} ultimaNovedad={m.id === ultimaNovedadId} />
                       </div>
                     ))}
                   </section>
+                ) : (
+                  conversacion?.nueva && <EstadoVacio ocupado={ocupado} onPedir={(texto) => enviarAqui({ tipo: 'texto', texto })} />
                 )}
-                {!tour && !ocupado && <Sugerencias items={sugerencias} onElegir={elegirSugerencia} />}
+                {!ocupado && <Sugerencias items={sugerencias} onElegir={(sg) => pedir(sg.entrada ?? { tipo: 'texto', texto: sg.texto })} />}
                 <div ref={finRef} />
               </div>
             </div>
             <div className="ag-pie">
-              {/* En el recorrido cada paso se coloca solo: no hace falta el aviso. */}
-              {nuevos && !cerca && !tour && (
+              {nuevos && !cerca && (
                 <button
                   type="button"
                   className="ag-nuevos"
@@ -448,31 +429,33 @@ export default function Agentes({ onNavigate, contexto, pushToast }) {
                   {trabajando.length === 1 ? '1 agente trabajando' : `${trabajando.length} agentes trabajando`}
                 </p>
               )}
-              <Redactor ocupado={ocupado} inputRef={inputRef} onEnviar={enviar} onEscribir={escribir} />
-              {!tour && (
-                <p className="ag-pie-nota">
-                  <span className="hidden sm:inline">Agentes simulados con datos de ejemplo. No se envía nada ni se mueve dinero.</span>
-                  <span className="sm:hidden">Datos de ejemplo: no se envía nada ni se mueve dinero.</span>
-                </p>
-              )}
+              <Redactor ocupado={ocupado} inputRef={inputRef} placeholder={conversacion?.agente && conversacion.agente !== 'orquestador' ? `Escribe a ${nombreAgente}…` : 'Escribe a los agentes…'} onEnviar={(texto) => enviarAqui({ tipo: 'texto', texto })} onEscribir={escribir} />
+              <p className="ag-pie-nota">
+                <span className="hidden sm:inline">Agentes simulados con datos de ejemplo. No se envía nada ni se mueve dinero.</span>
+                <span className="sm:hidden">Datos de ejemplo: no se envía nada ni se mueve dinero.</span>
+              </p>
             </div>
           </main>
         </div>
 
-        <Hoja abierta={hoja === 'agentes'} onCerrar={cerrarHoja} titulo="Historias y equipo" id="ag-hoja-agentes">
-          {hoja === 'agentes' && carril(true)}
-        </Hoja>
-
-        <Hoja abierta={hoja === 'demo'} onCerrar={cerrarHoja} titulo="Opciones de la demo" subtitulo={`Ahora: ${persona.nombre} · ${persona.rol}`} id="ag-hoja-demo">
-          {hoja === 'demo' && <OpcionesDemo s={s} despachar={despachar} ritmo={ritmo} setRitmo={setRitmo} onCerrar={cerrarHoja} avisar={avisar} />}
-        </Hoja>
-
-        <Hoja abierta={hoja === 'recorrido'} onCerrar={cerrarHoja} titulo="¿Empezar el recorrido desde cero?" id="ag-hoja-recorrido">
-          {hoja === 'recorrido' && <ConfirmarRecorrido onConfirmar={empezarRecorrido} onCancelar={cerrarHoja} />}
+        <Hoja abierta={hoja === 'equipo'} onCerrar={cerrarHoja} titulo="El equipo" subtitulo="Cómo actúan y quién hace qué" id="ag-hoja-equipo">
+          {hoja === 'equipo' && (
+            <div className="ag-carril">
+              <LeyendaAutonomia nivel={3} />
+              <AgentesPorFamilia
+                nivel={3}
+                estados={estados}
+                onAbrir={(id) => {
+                  setHoja(null)
+                  setAgenteAbierto(id)
+                }}
+              />
+            </div>
+          )}
         </Hoja>
 
         <DetalleAgente id={agenteAbierto} onCerrar={cerrarAgente} />
-        <Anunciador s={s} />
+        <Anunciador mensajes={mensajes} />
       </div>
     </AgentesCtx.Provider>
   )

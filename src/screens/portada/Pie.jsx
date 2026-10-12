@@ -19,9 +19,6 @@ export function Pie({ abrirAgentes }) {
             <button type="button" onClick={() => abrirAgentes()}>
               <span className="landing-subrayado">Probar los agentes</span>
             </button>
-            <button type="button" onClick={() => abrirAgentes({ tour: true })}>
-              <span className="landing-subrayado">Recorrido guiado</span>
-            </button>
           </nav>
         </div>
         <div className="landing-footer-bottom">

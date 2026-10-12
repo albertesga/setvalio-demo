@@ -18,7 +18,7 @@
 .ag-skip { position: absolute; z-index: 80; top: -80px; left: 12px; padding: 10px 16px; border-radius: 999px; background: var(--flp-signal); color: var(--flp-carbon); font-weight: 500; }
 .ag-skip:focus { top: 8px; }
 
-/* Cabecera, carril, recorrido y redactor: src/agentes/ui/pantalla.css. Parte de la mañana: src/agentes/ui/parte.css. */
+/* Cabecera, lista de conversaciones y redactor: src/agentes/ui/pantalla.css. Parte de la mañana: src/agentes/ui/parte.css. */
 
 .ag-icon-button { display: inline-flex; width: 44px; height: 44px; flex: none; align-items: center; justify-content: center; border-radius: 999px; color: var(--flp-carbon); }
 .ag-icon-button:hover { background: rgb(20 20 20 / 0.06); }
@@ -89,25 +89,20 @@
   border: 1px solid var(--flp-border); border-left: 3px solid var(--flp-carbon); border-radius: 6px; background: var(--flp-surface); color: var(--flp-carbon); font-size: 14px;
 }
 .ag-msg-novedad-icono { display: inline-flex; color: var(--flp-carbon); }
-/* Inicio de un paso del recorrido: una línea fina con el paso y el arco. */
-/* Cabecera de una historia abierta en limpio: qué historia es y qué enseña, encima de lo que se pide. */
-.ag-msg-historia { padding-bottom: 16px; border-bottom: 1px solid var(--flp-border); }
-.ag-msg-historia-titulo { margin-top: 6px; color: var(--flp-carbon); font-size: clamp(1.375rem, 2.4vw, 1.75rem); font-weight: 400; line-height: 1.12; letter-spacing: -0.03em; text-wrap: balance; }
-.ag-msg-historia-linea { max-width: 680px; margin-top: 8px; color: var(--flp-muted); font-size: 15px; line-height: 1.5; }
-.ag-msg-guia { display: flex; align-items: center; gap: 12px; color: var(--flp-muted); }
-.ag-msg-guia::before, .ag-msg-guia::after { content: ''; height: 1px; flex: 1; background: var(--flp-border); }
-.ag-msg-guia > span { flex: none; max-width: 80%; text-align: center; }
 .ag-msg-nota { color: var(--flp-muted); font-size: 13px; text-align: center; }
 
 .ag-msg-agentes { animation: ag-entra .24s var(--flp-ease) both; }
-/* Cabecera de la respuesta: título a 20 px; Saltar y Detener bajan bajo el título en móvil. */
+/* Cabecera de la respuesta, como en un chat: quién escribe y a qué hora (el título del turno
+   es solo para lectores de pantalla). Saltar y Detener bajan bajo el nombre en móvil. */
 .ag-msg-cab { display: flex; align-items: flex-start; gap: 10px; }
-.ag-msg-titulo { color: var(--flp-carbon); font-size: 20px; font-weight: 400; line-height: 1.25; letter-spacing: -0.02em; text-wrap: balance; }
+.ag-msg-cab > .min-w-0 { align-self: center; }
+.ag-msg-autor { color: var(--flp-muted); font-size: 13px; line-height: 1.4; }
+/* El parte empieza saludando: la primera línea del mensaje, sin titular grande. */
+.ag-saludo-linea { margin-top: 2px; color: var(--flp-carbon); font-size: 20px; font-weight: 400; line-height: 1.3; letter-spacing: -0.02em; text-wrap: balance; }
 .ag-msg-controles { display: flex; flex: none; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 639px) {
   .ag-msg-cab { flex-wrap: wrap; }
   .ag-msg-cab > .ag-msg-controles { flex-basis: 100%; padding-left: 42px; }
-  .ag-saludo-meta > .ag-msg-controles { flex-basis: 100%; }
 }
 /* «1 decisión aquí ↓»: el chip «Por revisar» es el botón; la zona táctil, 44 px. */
 .ag-salto-decision { display: inline-flex; min-height: 44px; align-items: center; border-radius: 999px; }
@@ -123,14 +118,13 @@
 .ag-msg-plegado.is-deshecho .ag-msg-plegado-texto { color: var(--flp-muted); }
 /* Con o sin envoltorio por mensaje en el hilo. */
 .ag-msg-novedad:has(+ .ag-msg-plegado), .ag-hilo :has(> .ag-msg-novedad):has(+ * > .ag-msg-plegado) { display: none; }
-/* Un mensaje que no pinta nada (el paso 1 del recorrido) no deja hueco en el hilo. */
+/* Un mensaje que no pinta nada no deja hueco en el hilo. */
 .ag-hilo [data-msg]:empty { display: none; }
 /* Deshacer: lo que hicieron los agentes o tu decisión. Lo deshecho queda atenuado. */
 .ag-deshacer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: var(--flp-muted); font-size: 14px; }
 /* Sin opacidad: bajaría el gris por debajo del contraste mínimo. Bastan el filete, el título y el texto en gris. */
 .ag-msg-agentes.is-deshecho .ag-bloques { padding-left: 12px; border-left: 3px solid var(--flp-border); }
 .ag-msg-agentes.is-deshecho .ag-bloques :is(.text-flp-ink, .ag-prosa) { color: var(--flp-muted); }
-.ag-msg-agentes.is-deshecho .ag-msg-titulo { color: var(--flp-muted); }
 @keyframes ag-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .ag-bloques { display: grid; gap: 12px; margin-top: 12px; }
 .ag-bloque-entrada { min-width: 0; animation: ag-entra .24s var(--flp-ease) both; }

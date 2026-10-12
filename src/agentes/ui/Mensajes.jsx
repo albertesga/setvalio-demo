@@ -5,8 +5,6 @@ import { IconChevronDown, IconBell, IconStop, IconArrowDown } from '../../compon
 import { FilmpilotButton } from '../../brand/Filmpilot.jsx'
 import { AGENTES } from '../agentes.js'
 import { PERSONAS } from '../mundo.js'
-import { RECORRIDO, ETIQUETA_CAPACIDAD } from '../casos.js'
-import { fechaDia } from '../texto.js'
 import { useCtx } from './contexto.js'
 import { Tx, AgentAvatar, AutonomyBadge, StatusChip, nombresCortos } from './Piezas.jsx'
 import { Bloque, aprobacionPendiente, bloquePrincipal } from './Bloques.jsx'
@@ -150,51 +148,40 @@ function saludoDe(hora) {
   return h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
 }
 
-/** Cabecera del parte de la mañana: el saludo sale al instante; el parte, cuando lo terminan los agentes. */
+/** Cabecera del parte: como cualquier mensaje del chat, con el saludo como primera línea. */
 function CabeceraSaludo({ msg, tituloId, enCurso, onSaltar, onDetener }) {
   const { persona } = useCtx()
   const e = msg.turno.entidades
   const nombre = (PERSONAS[e.persona] ?? persona).nombre.split(' ')[0]
-  const fecha = fechaDia(e.fecha)
   const n = nombresAgentes(msg.turno.agentes).length
   return (
-    <header className="ag-saludo">
-      <p className="flp-kicker text-flp-muted">
-        {fecha.charAt(0).toUpperCase() + fecha.slice(1)} · {e.proyecto}
-      </p>
-      <h3 id={tituloId} tabIndex={-1} className="ag-saludo-titulo focus:outline-none">
-        {saludoDe(msg.hora)}, {nombre}. <span className="block text-flp-muted">Hoy es el día {e.dia} de rodaje.</span>
-      </h3>
-      <div className="ag-saludo-meta">
-        <AgentAvatar id="orquestador" size={28} trabajando={enCurso} />
-        <p className="min-w-0 flex-1 text-sm text-flp-muted">
-          {enCurso ? (
-            <span className="font-medium text-flp-ink">Los agentes preparan el parte de la mañana…</span>
-          ) : (
-            <>
-              <span className="font-medium text-flp-ink">Parte de la mañana</span> · <span className="tnum">{msg.hora}</span> · lo han preparado {n} agentes
-            </>
-          )}
+    <header className="ag-msg-cab">
+      <AgentAvatar id="orquestador" size={32} trabajando={enCurso} />
+      <div className="min-w-0 flex-1">
+        <p className="ag-msg-autor">
+          <span className="font-medium text-flp-ink">Parte de la mañana</span> · <span className="tnum">{msg.hora}</span>
+          {!enCurso && <> · lo han preparado {n} agentes</>}
         </p>
-        {enCurso ? (
-          <div className="ag-msg-controles">
-            <button type="button" className="ag-boton-fila" onClick={onSaltar}>
-              Saltar al resultado
-            </button>
-            <button type="button" className="ag-boton-fila" onClick={onDetener}>
-              <IconStop size={14} aria-hidden="true" /> Detener
-            </button>
-          </div>
-        ) : (
-          msg.estado === 'hecho' && <StatusChip estado="hecho" />
-        )}
+        <h3 id={tituloId} tabIndex={-1} className="ag-saludo-linea focus:outline-none">
+          {saludoDe(msg.hora)}, {nombre}. Hoy es el día {e.dia} de rodaje.
+        </h3>
       </div>
+      {enCurso && (
+        <div className="ag-msg-controles">
+          <button type="button" className="ag-boton-fila" onClick={onSaltar}>
+            Saltar al resultado
+          </button>
+          <button type="button" className="ag-boton-fila" onClick={onDetener}>
+            <IconStop size={14} aria-hidden="true" /> Detener
+          </button>
+        </div>
+      )}
     </header>
   )
 }
 
 function MensajeAgentes({ msg, ultimo }) {
-  const { despachar, deshacible, ocupado, mundo, enRecorrido, esperaRecorrido } = useCtx()
+  const { despachar, deshacible, ocupado, mundo, conversacion } = useCtx()
   const [detalle, setDetalle] = useState(false)
   const t = msg.turno
   const enCurso = msg.estado === 'en_curso'
@@ -202,22 +189,18 @@ function MensajeAgentes({ msg, ultimo }) {
   const tituloId = `${msg.id}-titulo`
   // Al terminar: cuántas decisiones de esta respuesta siguen esperando a una persona.
   const porDecidir = !enCurso && msg.estado === 'hecho' ? t.bloques.filter((b) => aprobacionPendiente(mundo, b)).length : 0
-  // El amarillo, en un solo bloque de la respuesta. En el recorrido lo lleva «Siguiente»,
-  // salvo la tarjeta que espera el paso.
-  const principal = enRecorrido
-    ? (bloques.find((b) => esperaRecorrido && b.ref?.tipo === esperaRecorrido.tipo && b.ref?.id === esperaRecorrido.id && aprobacionPendiente(mundo, b))?.clave ?? null)
-    : bloquePrincipal(mundo, bloques)
+  // El amarillo, en un solo bloque de la respuesta.
+  const principal = bloquePrincipal(mundo, bloques)
+  // Quién escribe: el agente de la conversación (como en un chat) o, si no, el primero que trabajó.
+  const autor = conversacion?.agente ?? t.agentes.find((a) => a !== 'orquestador') ?? 'orquestador'
   // Lo deshecho que sigue abierto: «Volver a decidir» lleva a su tarjeta.
   const refsAbiertas = (msg.deshechoRefs ?? []).filter((ref) => aprobacionPendiente(mundo, { tipo: 'aprobacion', ref }))
   const automatico = msg.origen === 'evento'
   const puedeDeshacer = !enCurso && deshacible === msg.id && !msg.deshecho
   const quien = automatico ? agenteQueActuo(t) : null
   // Una novedad que llega sola y no pide nada cabe en una línea: lo hecho y «Ver detalle».
-  // En el recorrido se enseña entera, porque es lo que el paso quiere enseñar.
-  // Se decide al llegar: lo que llegó en el recorrido no se pliega al salir de él.
-  const [llegoEnRecorrido] = useState(enRecorrido)
-  // Lo que trae una historia o una pregunta se enseña entero: no se pliega.
-  const plegado = automatico && msg.llegoSola && !!t.resumen && msg.estado === 'hecho' && porDecidir === 0 && !detalle && !llegoEnRecorrido
+  // Lo que se pide (o ya estaba escrito al abrir) se enseña entero: no se pliega.
+  const plegado = automatico && msg.llegoSola && !!t.resumen && msg.estado === 'hecho' && porDecidir === 0 && !detalle
 
   const irADecision = () => {
     const tarjeta = document.querySelector(`#msg-${msg.id} .ag-aprobacion:not(.is-decidida)`)
@@ -285,32 +268,24 @@ function MensajeAgentes({ msg, ultimo }) {
         <CabeceraSaludo msg={msg} tituloId={tituloId} enCurso={enCurso} onSaltar={saltar} onDetener={detener} />
       ) : (
         <header className="ag-msg-cab">
-          <AgentAvatar id="orquestador" size={32} trabajando={enCurso} />
+          <AgentAvatar id={autor} size={32} trabajando={enCurso} />
           <div className="min-w-0 flex-1">
-            {t.proyecto && (
-              <p className="flp-kicker text-flp-muted">
-                {/* La productora ya la nombra la respuesta: el antetítulo cabe en una línea en móvil. */}
-                Otro proyecto · {t.proyecto.titulo}
-                {t.proyecto.estado ? ` · ${t.proyecto.estado}` : ''}
-              </p>
-            )}
-            <h3 id={tituloId} tabIndex={-1} className="ag-msg-titulo focus:outline-none">
+            {/* Como en un chat: quién escribe y cuándo. El título del turno, solo para lectores de pantalla. */}
+            <p className="ag-msg-autor">
+              <span className="font-medium text-flp-ink">{AGENTES[autor]?.nombre ?? 'Orquestador'}</span> · <span className="tnum">{msg.hora}</span>
+              {t.proyecto && <> · otro proyecto: {t.proyecto.titulo}</>}
+              {msg.deshecho && <> · <span className="font-medium text-flp-ink">deshecho</span></>}
+            </p>
+            <h3 id={tituloId} tabIndex={-1} className="sr-only">
               {msg.deshecho ? `Deshecho: ${t.titulo}` : t.titulo}
             </h3>
-            <p className="text-xs text-flp-muted">
-              {/* La línea de la novedad, justo encima, ya dice que llega sola. */}
-              <span className="tnum">{msg.hora}</span> · {automatico ? quien : msg.origen === 'accion' ? 'Los agentes aplican tu decisión' : 'Orquestador'}
-            </p>
-            {ultimo && msg.estado === 'hecho' && (
+            {ultimo && msg.estado === 'hecho' && porDecidir > 0 && (
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <StatusChip estado="hecho" />
-                {porDecidir > 0 && !enRecorrido && (
-                  <button type="button" className="ag-salto-decision" onClick={irADecision}>
-                    <span className="flp-state flp-state--review">
-                      {porDecidir === 1 ? '1 decisión aquí' : `${porDecidir} decisiones aquí`} <IconArrowDown size={13} aria-hidden="true" />
-                    </span>
-                  </button>
-                )}
+                <button type="button" className="ag-salto-decision" onClick={irADecision}>
+                  <span className="flp-state flp-state--review">
+                    {porDecidir === 1 ? '1 decisión aquí' : `${porDecidir} decisiones aquí`} <IconArrowDown size={13} aria-hidden="true" />
+                  </span>
+                </button>
               </div>
             )}
           </div>
@@ -319,12 +294,9 @@ function MensajeAgentes({ msg, ultimo }) {
               <button type="button" className="ag-boton-fila" onClick={saltar}>
                 Saltar al resultado
               </button>
-              {/* En el recorrido cada paso necesita su respuesta entera: solo se puede saltar. */}
-              {!enRecorrido && (
-                <button type="button" className="ag-boton-fila" onClick={detener}>
-                  <IconStop size={14} aria-hidden="true" /> Detener
-                </button>
-              )}
+              <button type="button" className="ag-boton-fila" onClick={detener}>
+                <IconStop size={14} aria-hidden="true" /> Detener
+              </button>
             </div>
           )}
         </header>
@@ -399,7 +371,7 @@ function MensajeDecision({ msg }) {
 }
 
 function MensajeNovedad({ msg, ultimaNovedad }) {
-  const { despachar, eventosPausados, enRecorrido } = useCtx()
+  const { despachar, eventosPausados } = useCtx()
   return (
     <div className="ag-msg-novedad" role="note">
       <span className="ag-msg-novedad-icono" aria-hidden="true">
@@ -411,49 +383,13 @@ function MensajeNovedad({ msg, ultimaNovedad }) {
           <span className="tnum">{msg.hora}</span> · {msg.llegoSola ? 'Llega sola, sin que la pidas: así avisan los agentes.' : 'En la demo la traes tú; en Filmpilot llegaría sola.'}
         </span>
       </span>
-      {/* Solo lo que llega solo se puede pausar; lo que trae una historia o el recorrido, no. */}
-      {ultimaNovedad && msg.llegoSola && !enRecorrido && (
+      {/* Solo lo que llega solo se puede pausar. */}
+      {ultimaNovedad && msg.llegoSola && (
         <button type="button" className="ag-link" onClick={() => despachar({ tipo: 'pausarEventos', valor: !eventosPausados })}>
           {eventosPausados ? 'Reanudar novedades' : 'Pausar novedades'}
         </button>
       )}
     </div>
-  )
-}
-
-/** Cabecera de una historia abierta en limpio: cuál es, qué enseña y, debajo, lo que se pide. */
-function MensajeHistoria({ msg }) {
-  const etiqueta = ETIQUETA_CAPACIDAD[msg.capacidad]
-  return (
-    <header className="ag-msg-historia">
-      <p className="flp-kicker text-flp-muted">
-        {msg.indice != null ? (
-          <>
-            Historia <span className="tnum">{msg.indice + 1}</span> de <span className="tnum">{msg.total}</span> · {msg.arco}
-          </>
-        ) : (
-          msg.arco
-        )}
-      </p>
-      <h3 tabIndex={-1} className="ag-msg-historia-titulo focus:outline-none">
-        {msg.titulo}
-      </h3>
-      <p className="ag-msg-historia-linea">{msg.unaLinea}</p>
-      {etiqueta && <span className="ag-etiqueta-capacidad mt-2 inline-flex">{etiqueta}</span>}
-    </header>
-  )
-}
-
-/** Inicio de un paso del recorrido: un separador fino. La nota vive en la barra del recorrido. */
-function MensajeGuia({ msg }) {
-  // El paso sin entrada (el parte) ya está arriba: un separador debajo señalaría a nada.
-  if (RECORRIDO[msg.indice]?.entrada === null) return null
-  return (
-    <p className="ag-msg-guia flp-kicker">
-      <span>
-        Paso <span className="tnum">{msg.indice + 1}</span> de <span className="tnum">{msg.total}</span> · {msg.arco ?? msg.titulo}
-      </span>
-    </p>
   )
 }
 
@@ -478,10 +414,6 @@ export function Mensaje({ msg, ultimo, ultimaNovedad }) {
       return <MensajeDecision msg={msg} />
     case 'novedad':
       return <MensajeNovedad msg={msg} ultimaNovedad={ultimaNovedad} />
-    case 'guia':
-      return <MensajeGuia msg={msg} />
-    case 'historia':
-      return <MensajeHistoria msg={msg} />
     case 'nota':
       return <MensajeNota msg={msg} />
     case 'agentes':

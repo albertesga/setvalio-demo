@@ -112,9 +112,6 @@ export function SeccionAgentes({ abrirAgentes }) {
             <FilmpilotButton variant="primary" size="lg" onClick={() => abrirAgentes()} iconAfter={IconChevronRight}>
               Probar los agentes
             </FilmpilotButton>
-            <FilmpilotButton variant="ghost" size="lg" onClick={() => abrirAgentes({ tour: true })}>
-              Empezar el recorrido guiado
-            </FilmpilotButton>
           </div>
         </div>
         <InformeEnDirecto filas={AGENTS_PREVIEW} cef={CEF} />

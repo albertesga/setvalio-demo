@@ -21,7 +21,7 @@ function urlDe(route) {
 
 export default function App() {
   const [route, setRoute] = useState(rutaInicial)
-  // Lo que la portada pide a los agentes al abrirlos: { tour } o { pregunta }.
+  // Lo que la portada pide a los agentes al abrirlos: { pregunta }.
   const [contexto, setContexto] = useState(null)
   const [toast, setToast] = useState(null)
 

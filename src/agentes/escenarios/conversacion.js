@@ -4,7 +4,6 @@
 import { AGENTES, ORDEN_AGENTES, ORDEN_FAMILIAS, AUTONOMIA } from '../agentes.js'
 import { ROLES } from '../politicas.js'
 import { t, v, c, POLITICAS, paso, sug, texto, aviso, lista } from './comun.js'
-import { EPILOGO } from '../casos.js'
 
 // La regla común de lo que nunca hacen los agentes. Se repite igual en todas partes.
 export const REGLA_COMUN = 'No paga, no firma y no se comunica con nadie sin tu permiso'
@@ -40,7 +39,7 @@ function reglasAutonomia() {
   ]
 }
 
-// «¿Qué puedes hacer?»: una frase de marca, las historias que se pueden ver y el
+// «¿Qué puedes hacer?»: una frase de marca, las conversaciones de la demo y el
 // equipo plegado. Contrato del bloque: { tipo: 'tabla', plegado: true, resumen } se
 // pinta cerrado con `resumen` como enlace.
 export const ayuda = {
@@ -54,8 +53,8 @@ export const ayuda = {
     return {
       bloques: [
         texto(t('Un equipo de agentes lleva el control de coste de «{p}». Los agentes preparan, tú decides: hacen solos lo rutinario, te proponen lo dudoso y te piden aprobación cuando hay dinero o riesgo.', { p: v(antes.proyecto.titulo) })),
-        // Contrato: { tipo: 'historias', epilogo? } pinta las historias (sin el parte) con su marca de vista.
-        { tipo: 'historias' },
+        // Contrato: { tipo: 'conversaciones' } pinta las conversaciones de la demo; un toque abre cada una.
+        { tipo: 'conversaciones' },
         {
           tipo: 'tabla',
           titulo: 'El equipo',
@@ -79,66 +78,6 @@ export const ayuda = {
 }
 
 /** Lo que se ha visto de cada nivel, con el estado real del mundo. */
-function lineasCierre(m) {
-  const solas = ['F-2026-078', 'F-2026-079'].map((id) => m.documentos[id]).filter((d) => d?.estado === 'contabilizada' && d.contabilizadaPor === 'Conciliación')
-  const ticket = m.documentos['G-004']
-  const orden = m.ordenes['OC-104']
-  const confianza = Math.min(...Object.values(ticket.confianza ?? { x: 0 }))
-  const lineas = []
-  lineas.push(
-    solas.length > 1
-      ? t('Lo hace solo: Conciliación contabilizó {a} y {b} porque cuadran con su pedido.', { a: v(solas[0].id, 'id'), b: v(solas[1].id, 'id') })
-      : solas.length
-        ? t('Lo hace solo: Conciliación contabilizó {doc} porque cuadra con su pedido, {oc}.', { doc: v(solas[0].id, 'id'), oc: v(solas[0].oc, 'id') })
-        : t('Lo hace solo: Conciliación contabiliza sola las facturas que cuadran con su pedido.'),
-  )
-  const decTicket = c.estadoDecision(m, { tipo: 'documento', id: ticket.id })
-  const datosTicket = { p: v(confianza, 'pct0'), prov: v(ticket.proveedor) }
-  lineas.push(
-    decTicket.estado !== 'aprobada'
-      ? t('Te lo propone: con un {p} de confianza, Facturas no decide la partida del ticket de {prov}. Te propone dos y espera tu sí.', datosTicket)
-      : decTicket.por
-        ? t('Te lo propone: con un {p} de confianza, Facturas no decidió la partida del ticket de {prov}. Propuso dos y {por} eligió.', { ...datosTicket, por: v(decTicket.por) })
-        : t('Te lo propone: con un {p} de confianza, Facturas no decidió la partida del ticket de {prov}. Propuso dos y ya está elegida.', datosTicket),
-  )
-  const dec = c.estadoDecision(m, { tipo: 'orden', id: orden.id })
-  if (dec.estado === 'aprobada' || dec.estado === 'rechazada') {
-    lineas.push(
-      dec.por
-        ? t('Pide tu aprobación: ningún agente podía aprobar {oc}. Esperó a {rol} y {por} la {que}.', { oc: v(orden.id, 'id'), rol: v(ROLES.produccionEjecutiva.toLowerCase()), por: v(dec.por), que: v(dec.estado === 'aprobada' ? 'aprobó' : 'rechazó') })
-        : t('Pide tu aprobación: ningún agente podía aprobar {oc}. Esperó a {rol}.', { oc: v(orden.id, 'id'), rol: v(ROLES.produccionEjecutiva.toLowerCase()) }),
-    )
-  } else {
-    const rol = c.impactoOrden(m, orden.id)?.rol ?? ROLES.produccionEjecutiva
-    lineas.push(t('Pide tu aprobación: ningún agente puede aprobar {oc}. Espera a {rol}.', { oc: v(orden.id, 'id'), rol: v(rol.toLowerCase()) }))
-  }
-  return lineas
-}
-
-// Cierre del recorrido guiado (entrada { tipo: 'cierreRecorrido' }, sesion.js).
-export const cierreRecorrido = {
-  id: 'cierre_recorrido',
-  titulo: 'Lo que acabas de ver',
-  ejemplos: [],
-  planificar() {
-    return [paso('orquestador', t('Resume lo que has visto en el recorrido'), { tipo: 'lectura', salida: t('Lo hace solo, te lo propone y pide tu aprobación') })]
-  },
-  componer({ antes }) {
-    return {
-      bloques: [
-        texto(t('Así trabaja Filmpilot: los agentes preparan, tú decides. Lo has visto en sus tres formas de actuar.')),
-        lista('Tres formas de actuar', lineasCierre(antes).map((x) => ({ texto: x }))),
-        // Las historias ya están en el carril con su marca: aquí solo lo que queda por ver.
-        { tipo: 'acciones', texto: t('Para después: otro proyecto, antes del rodaje. Está en exploración.'), acciones: [{ id: 'itsasoa', etiqueta: EPILOGO.titulo, variante: 'secondary', historia: EPILOGO.id, entrada: EPILOGO.entrada ?? { tipo: 'texto', texto: EPILOGO.prompt } }] },
-      ],
-      sugerencias: ['¿Por qué se desvía Escenografía?', '¿Qué bloquea el dossier fiscal?', '¿Cuánto nos costará al final y llegamos de caja?'].map(sug),
-      fuentes: [],
-      reglas: [t('{regla}.', { regla: v(REGLA_COMUN) })],
-      noHecho: [],
-    }
-  },
-}
-
 const ALCANCE = {
   fase_posterior: {
     titulo: 'Aún no está en Filmpilot',

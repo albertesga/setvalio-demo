@@ -78,12 +78,12 @@ function borradorDossier(m, id) {
 function pasosDossier(m) {
   const dos = c.dossier(m)
   const d1 = dos.find((d) => d.id === 'DOS-01')
-  const d2 = dos.find((d) => d.id === 'DOS-02')
   const igic = Object.values(m.documentos).find((d) => d.estado === 'en_bandeja' && d.impuesto?.tipo === 'IGIC')
   const sinDoc = Object.values(m.documentos).filter((d) => d.estado !== 'por_llegar' && d.impuesto?.tipo !== 'IGIC' && faltaDocumentacion(d))
   const items = [
     { id: 'DOS-01', texto: t('Certificado cultural ICAA: vence el {f}. Preparo la solicitud al ICAA.', { f: v(d1.deadline, 'dia') }), etiqueta: 'Preparar la solicitud', entrada: 'Prepara la solicitud del certificado cultural al ICAA', hecho: { borrador: 'BOR-DOS-01' } },
-    { id: 'DOS-02', texto: t('Justificantes de pago: faltan los de {n}. Se los pido a administración.', { n: cuenta(d2.pendientes, 'factura contabilizada', 'facturas contabilizadas') }), etiqueta: 'Pedir los justificantes', entrada: 'Pide a administración los justificantes de pago', hecho: { borrador: 'BOR-DOS-02' } },
+    // Sin recuento: cambia con cada factura que se contabiliza o se deshace, y lo da en vivo la lista de arriba.
+    { id: 'DOS-02', texto: t('Justificantes de pago de las facturas ya contabilizadas: se los pido a administración.'), etiqueta: 'Pedir los justificantes', entrada: 'Pide a administración los justificantes de pago', hecho: { borrador: 'BOR-DOS-02' } },
   ]
   if (igic) items.push({ id: `rev-${igic.id}`, texto: t('{id} de {prov} lleva IGIC: que cuente como gasto en Canarias lo valida el fiscalista. Tienes la tarjeta debajo.', { id: v(igic.id, 'id'), prov: v(igic.proveedor) }), hecho: { revision: igic.id } })
   for (const d of sinDoc) items.push({ id: `doc-${d.id}`, texto: t('{id} de {prov}: {falta}.', { id: v(d.id, 'id'), prov: v(d.proveedor), falta: v(d.tipo === 'ticket' ? 'es un ticket; hace falta la factura completa' : 'falta documentación') }), etiqueta: d.tipo === 'ticket' ? 'Pedir la factura' : 'Pedir la documentación', entrada: d.tipo === 'ticket' ? `Pide a ${d.proveedor} la factura completa` : `Pide a ${d.proveedor} la documentación que falta`, hecho: { borrador: `BOR-${d.id}` } })

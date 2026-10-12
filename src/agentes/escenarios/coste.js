@@ -422,7 +422,7 @@ export const prevision = {
 
 export const resumen = {
   id: 'resumen',
-  titulo: 'Resumen',
+  titulo: 'Cómo va el rodaje',
   ejemplos: ['¿Cómo vamos?', 'resumen del proyecto', 'estado del proyecto'],
   planificar() {
     return [

@@ -13,7 +13,7 @@ import { useCtx } from './contexto.js'
 import { totalesPropuesta, capitulosPropuesta, ALTERNATIVAS_POR_ID, REQUISITOS } from '../propuesta.js'
 import { decisionesAbiertas } from '../pendientes.js'
 import { evaluarRiesgos, PREGUNTA } from '../rodaje.js'
-import { ETIQUETA_CAPACIDAD, HISTORIAS_POR_ID } from '../casos.js'
+import { ETIQUETA_CAPACIDAD } from '../casos.js'
 import { useMovimientoReducido } from '../useAgentes.js'
 import { Tx, AutonomyBadge, Tono, AgentAvatar, Desplegable, ChipSeveridad, StatusChip, EtiquetaCapacidad, diaCorto } from './Piezas.jsx'
 import { BLOQUES_PARTE } from './Parte.jsx'
@@ -563,9 +563,8 @@ const MOTIVO_INFORME = {
  * el botón amarillo; las demás, carbón.
  */
 export function BloqueAprobacion({ b, principal = true }) {
-  const { mundo, persona, decidir, ocupado, enviar, enviarEntrada, despachar, enRecorrido, esperaRecorrido } = useCtx()
-  // En el recorrido el amarillo es «Siguiente», salvo en la tarjeta que el paso espera.
-  const amarillo = principal && (!enRecorrido || (esperaRecorrido?.tipo === b.ref?.tipo && esperaRecorrido?.id === b.ref?.id))
+  const { mundo, persona, decidir, ocupado, enviar, enviarEntrada, despachar } = useCtx()
+  const amarillo = principal
   // «Todavía no» no decide: marca la tarjeta y la deja en «Por revisar».
   const [pospuesta, setPospuesta] = useState(false)
   const seccion = useRef(null)
@@ -833,7 +832,7 @@ export function ListaDecisiones({ filtro, onElegir }) {
             aria-label={`Revisar: ${e.titulo}`}
             onClick={() => {
               onElegir?.()
-              if (!irATarjeta(e.ref)) enviar(e.entrada)
+              if (!irATarjeta(e.ref)) enviar(e.entrada, { ref: e.ref })
             }}
           >
             Revisar <IconChevronRight size={15} aria-hidden="true" />
@@ -1221,10 +1220,9 @@ function BloqueCaja({ b }) {
 const accionViva = (mundo, a) => a.entrada?.tipo !== 'evento' || mundo.entrantes.includes(a.entrada.eventoId)
 
 function BloqueAcciones({ b, principal = true }) {
-  const { enviarEntrada, abrirHistoria, ocupado, mundo } = useCtx()
+  const { enviarEntrada, ocupado, mundo } = useCtx()
   const acciones = b.acciones.filter((a) => accionViva(mundo, a))
-  // Con `historia`, la acción abre esa historia en limpio; si no, envía su entrada.
-  const pulsar = (a) => (a.historia && HISTORIAS_POR_ID[a.historia] ? abrirHistoria(HISTORIAS_POR_ID[a.historia]) : enviarEntrada(a.entrada))
+  const pulsar = (a) => enviarEntrada(a.entrada)
   if (!acciones.length) return null
   return (
     <div className="ag-panel flex flex-wrap items-center justify-between gap-3">
@@ -1647,7 +1645,7 @@ const REGISTRO = {
 
 // `principal`: este bloque lleva el único botón amarillo de la respuesta (ver bloquePrincipal).
 export function Bloque({ b, mensajeId, principal = true }) {
-  // Los bloques del parte (y del índice de historias) viven en Parte.jsx y se registran allí,
+  // Los bloques del parte (y del índice de conversaciones) viven en Parte.jsx y se registran allí,
   // en BLOQUES_PARTE. Se leen al pintar, no al cargar el módulo: Parte.jsx también importa de aquí.
   const C = REGISTRO[b.tipo] ?? BLOQUES_PARTE[b.tipo]
   return C ? <C b={b} mensajeId={mensajeId} principal={principal} /> : null
