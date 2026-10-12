@@ -20,8 +20,8 @@ import { detectarIntencion } from '../src/agentes/intenciones.js'
 import { responder } from '../src/agentes/orquestador.js'
 import { ESCENARIOS } from '../src/agentes/escenarios/index.js'
 import { AGENTES, AUTONOMIA, FAMILIAS, ORDEN_FAMILIAS, ORDEN_AGENTES, agentesDeFamilia } from '../src/agentes/agentes.js'
-import { HISTORIAS, EPILOGO, RECORRIDO, CASO_DE_INTENCION, entradaDeHistoria } from '../src/agentes/casos.js'
-import { crearSesion, reducirSesion, estadoTour, conversacionIniciada, EVENTOS, sugerenciasDe, vistosDe } from '../src/agentes/sesion.js'
+import { HISTORIAS, EPILOGO, RECORRIDO, CASO_DE_INTENCION, entradaDeHistoria, CONVERSACIONES } from '../src/agentes/casos.js'
+import { crearSesion, reducirSesion, estadoTour, conversacionIniciada, EVENTOS, sugerenciasDe, vistosDe, mensajesDe, listaConversaciones, conversacionPara } from '../src/agentes/sesion.js'
 import { agendaDelDia, PREGUNTAS_PARTE } from '../src/agentes/escenarios/saludo.js'
 import { esPlantilla, renderTexto } from '../src/agentes/texto.js'
 import { totalesPropuesta, ALTERNATIVAS, optimizacion } from '../src/agentes/propuesta.js'
@@ -1259,6 +1259,85 @@ test('un paso del dossier solo se prepara con verbo; preguntar por el plazo solo
   const r = responder(mundoBase, { tipo: 'texto', texto: '¿cuándo vence el certificado cultural?' })
   assert.equal(r.turno.entidades.dossierPaso, undefined)
   assert.equal(Object.keys(r.mundo.borradores).length, 0)
+})
+
+// ── 17. Conversaciones ───────────────────────────────────────────────────────
+console.log('Conversaciones')
+const iniciada = () => reducirSesion(crearSesion(), { tipo: 'conversaciones/iniciar' })
+test('al abrir, cada conversación trae ya el mensaje de su agente, sin burbuja ni novedad', () => {
+  const s = iniciada()
+  assert.equal(reducirSesion(s, { tipo: 'conversaciones/iniciar' }), s, 'idempotente')
+  assert.deepEqual(Object.keys(s.conversaciones).sort(), CONVERSACIONES.map((c) => c.id).sort())
+  for (const c of CONVERSACIONES) {
+    const ms = mensajesDe(s, c.id)
+    assert.deepEqual(ms.map((m) => m.rol), ['agentes'], c.id)
+    assert.equal(ms[0].estado, 'hecho', c.id)
+    assert.ok(ms[0].apertura, c.id)
+    assert.equal(ms[0].hora, c.hora, c.id)
+    revisarTurno(ms[0].turno, `apertura ${c.id}`)
+  }
+  assert.equal(s.actual, 'parte')
+  assert.equal(c.informeDesactualizado(s.mundo, 'R1'), false, 'el informe se escribe después de las facturas')
+  assert.equal(s.mensajes.find((m) => m.id === s.ultimaMutacion?.mensajeId)?.conv, 'facturas', 'se puede deshacer lo de facturas')
+  assert.equal(conversacionIniciada(s), false, 'lo ya escrito no cuenta como conversación')
+  const lista = listaConversaciones(s)
+  assert.equal(lista[0].id, 'parte', 'la más reciente arriba')
+  assert.ok(lista.filter((x) => x.id !== 'parte').every((x) => x.noLeida), 'las demás, sin leer')
+})
+test('cada conversación de riesgos enseña solo su tarjeta', () => {
+  const s = iniciada()
+  for (const [conv, rg] of [['lluvia', 'RG-1'], ['horas', 'RG-5'], ['grua', 'RG-7']]) {
+    const tarjetas = mensajesDe(s, conv)[0].turno.bloques.filter((b) => b.tipo === 'aprobacion')
+    assert.deepEqual(tarjetas.map((b) => b.ref.id), [rg], conv)
+  }
+})
+test('deshacer lo de facturas después de abrir otras conversaciones', () => {
+  let s = iniciada()
+  const id = s.ultimaMutacion.mensajeId
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'grua' })
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'facturas' })
+  s = reducirSesion(s, { tipo: 'deshacer', mensajeId: id })
+  assert.equal(s.mundo.documentos['F-2026-078'].estado, 'en_bandeja')
+  assert.equal(s.mundo.documentos['F-2026-067'].estado, 'contabilizada', 'lo que hizo el informe se conserva')
+  assert.ok(s.mundo.informes.R1, 'el informe sigue')
+  assert.equal(s.mensajes.at(-1).conv, 'facturas', 'la nota va en su conversación')
+  assert.ok(!/ha deshecho «Pedido/.test(s.mensajes.at(-1).texto), 'no cita lo de otra conversación')
+})
+test('cambiar con trabajo en marcha lo termina; cada conversación tiene su contexto', () => {
+  let s = iniciada()
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'hotel' })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Qué órdenes de compra tengo pendientes?' } })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cómo vamos?' } })
+  assert.ok(s.activo && s.cola.length === 1)
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'lluvia' })
+  assert.ok(!s.activo && !s.cola.length, 'nada a medias')
+  assert.ok(mensajesDe(s, 'hotel').filter((m) => m.rol === 'agentes').every((m) => m.estado === 'hecho'))
+  assert.equal(s.contextos.hotel.ultimaIntencion, 'resumen')
+  assert.equal(s.contexto.ultimaIntencion ?? 'riesgos', 'riesgos', 'el de la lluvia no hereda el del hotel')
+})
+test('una conversación nueva toma título y etiqueta de su primera respuesta, y vacía desaparece', () => {
+  let s = reducirSesion(iniciada(), { tipo: 'conversacion/nueva' })
+  const vacia = s.actual
+  assert.equal(reducirSesion(s, { tipo: 'conversacion/nueva' }).actual, vacia, 'no se crean dos vacías')
+  s = reducirSesion(s, { tipo: 'conversacion/abrir', id: 'parte' })
+  assert.ok(!s.conversaciones[vacia], 'la vacía se descarta')
+  s = reducirSesion(s, { tipo: 'conversacion/nueva' })
+  s = reducirSesion(s, { tipo: 'enviar', entrada: { tipo: 'texto', texto: '¿Cuánto nos costará al final y llegamos de caja?' } })
+  s = avanza(s, 20_000, 100)
+  const cv = s.conversaciones[s.actual]
+  assert.equal(cv.etiqueta, 'Caja')
+  assert.ok(cv.titulo && cv.titulo.length <= 34, cv.titulo)
+})
+test('los botones van a la conversación de lo que piden; lo escrito se responde donde estás', () => {
+  const s = iniciada()
+  const ir = (texto) => conversacionPara(s, { tipo: 'texto', texto })
+  assert.deepEqual(ir(PREGUNTA['RG-1']), { conv: 'lluvia', esApertura: true })
+  assert.deepEqual(ir('Revisa la orden de compra OC-104'), { conv: 'hotel', esApertura: true })
+  assert.equal(ir('Revisa la orden de compra OC-105'), null)
+  assert.deepEqual(ir('¿Qué bloquea el dossier fiscal?'), { conv: 'dossier', esApertura: true })
+  assert.deepEqual(ir('Prepara la solicitud del certificado cultural al ICAA'), { conv: 'dossier', esApertura: false })
+  assert.equal(ir('¿Qué riesgos hay para las próximas jornadas?'), null)
+  for (const f of FLOW) if (f.pregunta) assert.notEqual(responder(mundoBase, { tipo: 'texto', texto: f.pregunta }).turno.intencion, 'no_entendido', f.pregunta)
 })
 
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)
