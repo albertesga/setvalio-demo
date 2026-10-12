@@ -36,7 +36,7 @@ Semánticos de interfaz: gris `#595B59`, borde de control `#70726E`, divisor `#D
 
 **Regla del amarillo:** solo en la acción principal de cada sección, en lo que espera una revisión y en composiciones de marca. Siempre con texto carbón encima. Nunca texto amarillo ni plata sobre tiza. Reparto orientativo de la portada: 60–70 % tiza, 20–30 % carbón, 5–15 % señal.
 
-**Atención no es «Por revisar».** Riesgo medio, cerca del límite, no cumple, confianza baja o un informe desactualizado usan el tono de atención (`Tono tono="atencion"`: borde y texto carbón), no la señal. En el prototipo, la cifra amarilla vive en un solo sitio: el contador «Por revisar · n» de la cabecera, discreto y en mono, que pregunta qué tienes que revisar. Cada tarjeta abierta lleva su chip «Por revisar» y solo la primera de cada respuesta tiene el botón amarillo; durante el recorrido el amarillo es «Siguiente», salvo en la tarjeta que espera el paso.
+**Atención no es «Por revisar».** Riesgo medio, cerca del límite, no cumple, confianza baja o un informe desactualizado usan el tono de atención (`Tono tono="atencion"`: borde y texto carbón), no la señal. En el prototipo, la cifra amarilla vive en un solo sitio: el contador «Por revisar · n» de la cabecera, discreto y en mono, que pregunta qué tienes que revisar. Cada tarjeta abierta lleva su chip «Por revisar» y solo la primera de cada respuesta tiene el botón amarillo. En la lista de conversaciones, el número de mensajes sin leer es carbón, no señal: no pide una decisión.
 
 ## Tipografía
 
@@ -54,7 +54,7 @@ Semánticos de interfaz: gris `#595B59`, borde de control `#70726E`, divisor `#D
 
 El Orquestador lleva el símbolo de Filmpilot (tiza sobre carbón). Un glifo nunca va solo: siempre acompaña al nombre del agente. `npm run check:agentes` comprueba que cada agente tenga familia.
 
-Autonomía, con los mismos nombres en el carril, las tarjetas y el recorrido: **Lo hace solo** · **Te lo propone** · **Pide tu aprobación** (en espacios cortos, «Tu aprobación»). Lo que aún no está en Filmpilot lleva una sola etiqueta, **En exploración**, nunca «Exploratorio», «Sin validar» ni «Fase posterior».
+Autonomía, con los mismos nombres en la hoja «Equipo», las tarjetas y las conversaciones: **Lo hace solo** · **Te lo propone** · **Pide tu aprobación** (en espacios cortos, «Tu aprobación»). Lo que aún no está en Filmpilot lleva una sola etiqueta, **En exploración**, nunca «Exploratorio», «Sin validar» ni «Fase posterior».
 
 Estados con texto, nunca solo color: **En espera** · **Trabajando** · **Por revisar** (carbón sobre señal) · **Completado**, más **Detenido** y **Bloqueante** donde hacen falta. El movimiento es breve: el glifo de un agente que trabaja respira dos veces y para; todo respeta `prefers-reduced-motion`.
 
