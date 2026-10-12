@@ -193,6 +193,11 @@ export function extraerEntidades(texto, mundo) {
     delete e.capitulo
   }
 
+  // Un paso del dossier fiscal, solo con verbo: «prepara la solicitud del certificado», «pide los justificantes de pago».
+  if (/\b(prepara|preparar|preparame|redacta|redactar|pide|pedir|pideles|solicita|solicitar)\b/.test(norm)) {
+    if (/(certificado|icaa)/.test(norm)) e.dossierPaso = 'DOS-01'
+    else if (/(justificantes?|comprobantes?) de pago/.test(norm)) e.dossierPaso = 'DOS-02'
+  }
   if (/\b(envia|enviar|enviale|envialo|enviala|manda|mandar|mandale|mandalo)\b/.test(norm)) e.accionExterna = 'enviar'
   if (/\b(paga|pagar|pagale|pagala|pagues|abona|abonar|transfiere|transferir|haz la transferencia)\b/.test(norm)) e.accionExterna = 'pagar'
 
@@ -229,8 +234,9 @@ export const LEXICO = {
     raices: { forecast: 3, cef: 3, previs: 2, cierre: 2, proyecc: 2, tesorer: 3, caja: 3, saldo: 2, liquidez: 3, cerra: 1, negativ: 1 },
   },
   cumplimiento: {
-    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal', 'riesgos fiscales'],
-    raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1 },
+    frases: ['dossier fiscal', 'certificado cultural', 'que bloquea', 'bloqueantes', 'criterios de elegibilidad', 'revisa el igic', 'que documentos faltan', 'que falta para', 'riesgo fiscal', 'riesgos fiscales', 'adecuacion fiscal', 'dossier al dia', 'solicitud del certificado', 'justificantes de pago'],
+    raices: { igic: 4, dossier: 3, elegib: 3, cumplim: 3, justificant: 2, certific: 2, auditor: 2, bloque: 2, fiscal: 1, icaa: 2, falta: 1, documentos: 1, adecuacion: 2 },
+    entidades: { dossierPaso: 3 },
   },
   pedir_documentacion: {
     frases: ['pide a', 'pidele a', 'pidele', 'pedir a', 'solicita a', 'escribe a', 'escribele', 'redacta un correo', 'redacta un email', 'email al proveedor', 'correo al proveedor', 'pide la factura', 'pide los justificantes', 'documentacion que falta', 'factura completa', 'al proveedor'],
@@ -313,6 +319,8 @@ function puntuar(norm, tokens, entidades, mundo) {
   // «Aprueba las horas extra de Eléctricos Prado» es una orden de compra, no un riesgo.
   if (entidades.oc && !/riesg/.test(norm)) out.riesgos = 0
   if (/riesgo fiscal|riesgos fiscales/.test(norm)) out.riesgos = 0
+  // Un paso del dossier (certificado, justificantes) no es pedir documentación a un proveedor.
+  if (entidades.dossierPaso) out.pedir_documentacion = Math.max(0, out.pedir_documentacion - 3)
   // La grúa como riesgo de rodaje no es buscar proveedores para Itsasoa.
   if (entidades.riesgo === 'RG-7') out.optimizar_proveedores = 0
   // «Cambia el orden de las jornadas / del día» habla del plan de rodaje, no de una orden de compra.

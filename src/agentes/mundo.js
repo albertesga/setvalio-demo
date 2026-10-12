@@ -186,7 +186,7 @@ function crearOrdenes(documentos) {
 function crearDossier() {
   return [
     { id: 'DOS-01', documento: 'Certificado cultural ICAA', responsable: 'Productora', estado: 'Bloqueante', deadline: '2026-06-05', evidencia: 'No recibido', razon: 'Acredita el carácter cultural de la obra; sin él no se puede aplicar la deducción.' },
-    { id: 'DOS-02', documento: 'Justificantes de pago vinculados a facturas', responsable: 'Line producer', estado: 'Bloqueante', deadline: '2026-06-14', evidencia: 'Pagos sin justificante', pendientes: 6, razon: 'Cada gasto debe estar soportado por factura y pago trazable.' },
+    { id: 'DOS-02', documento: 'Justificantes de pago vinculados a facturas', responsable: 'Line producer', estado: 'Bloqueante', deadline: '2026-06-14', evidencia: 'Pagos sin justificante', razon: 'Cada gasto debe estar soportado por factura y pago trazable.' },
     { id: 'DOS-03', documento: 'Coste reconocido por capítulos ICAA', responsable: 'Fiscalista', estado: 'Bloqueante', deadline: '2026-06-20', evidencia: 'Pendiente de cierre de coste', razon: 'La base de deducción tiene que cuadrar con el coste real por capítulos.' },
   ]
 }

@@ -3,7 +3,9 @@
 import { reducir } from '../acciones.js'
 import { cuenta } from '../texto.js'
 import { ROLES } from '../politicas.js'
+import { PERSONAS } from '../mundo.js'
 import { t, v, c, paso, sug, texto, aviso, bloqueDocumento, bloqueDossier, minuscula } from './comun.js'
+import { faltaDocumentacion } from './documentos.js'
 
 // Lo que le falta a un gasto para ser justificable, dicho como lo diría una persona.
 function loQueFalta(el) {
@@ -30,12 +32,79 @@ function tarjetaFiscal(m, d) {
   }
 }
 
+// ── Pasos del dossier: borradores que lo mantienen al día (en exploración; nunca se envían) ──
+
+const EXPLORACION_DOSSIER = aviso('exploratorio', 'En exploración', t('En exploración: pedir documentos para el dossier aún no está en Filmpilot. Redactamos el correo; lo envías tú.'))
+
+/** Borrador de un paso del dossier: la solicitud del certificado al ICAA o los justificantes a administración. */
+function borradorDossier(m, id) {
+  const dos = c.dossier(m).find((d) => d.id === id)
+  if (id === 'DOS-01') {
+    return {
+      id: 'BOR-DOS-01',
+      canal: 'email',
+      ref: 'DOS-01',
+      para: 'ICAA · certificados de obras',
+      firma: `${PERSONAS.marta.nombre} · ${PERSONAS.marta.rol} · ${m.proyecto.titulo}`,
+      motivo: t('Certificado cultural pendiente'),
+      asunto: t('Certificado cultural de «{p}»', { p: v(m.proyecto.titulo) }),
+      cuerpo: [
+        t('Buenos días:'),
+        t('Les escribimos de {prod}, productora de «{p}». Para aplicar la deducción por inversión necesitamos el certificado cultural de la obra.', { prod: v(m.proyecto.productora), p: v(m.proyecto.titulo) }),
+        t('¿Pueden decirnos en qué punto está y si falta algún documento? Lo necesitaríamos antes del {f}.', { f: v(dos.deadline, 'dia') }),
+        t('Muchas gracias.'),
+      ],
+    }
+  }
+  const docs = c.justificantesPendientes(m)
+  return {
+    id: 'BOR-DOS-02',
+    canal: 'email',
+    ref: 'DOS-02',
+    para: `Administración · ${m.proyecto.productora}`,
+    firma: `${PERSONAS.alvaro.nombre} · ${PERSONAS.alvaro.rol} · ${m.proyecto.titulo}`,
+    motivo: t('Justificantes de pago para el dossier fiscal'),
+    asunto: t('Justificantes de pago para el dossier ({n})', { n: cuenta(docs.length, 'factura', 'facturas') }),
+    cuerpo: [
+      t('Hola:'),
+      t('Para el dossier de la deducción necesitamos el justificante de pago de estas facturas:'),
+      ...docs.map((d) => t('{id} · {prov} · {total}', { id: v(d.id, 'id'), prov: v(d.proveedor), total: v(d.total, 'eurCents') })),
+      t('Si alguna aún no está pagada, decidnos cuándo se paga. Gracias.'),
+    ],
+  }
+}
+
+/** Próximos pasos para tener el dossier al día. La pantalla tacha cada uno cuando está hecho (`hecho`). */
+function pasosDossier(m) {
+  const dos = c.dossier(m)
+  const d1 = dos.find((d) => d.id === 'DOS-01')
+  const d2 = dos.find((d) => d.id === 'DOS-02')
+  const igic = Object.values(m.documentos).find((d) => d.estado === 'en_bandeja' && d.impuesto?.tipo === 'IGIC')
+  const sinDoc = Object.values(m.documentos).filter((d) => d.estado !== 'por_llegar' && d.impuesto?.tipo !== 'IGIC' && faltaDocumentacion(d))
+  const items = [
+    { id: 'DOS-01', texto: t('Certificado cultural ICAA: vence el {f}. Preparo la solicitud al ICAA.', { f: v(d1.deadline, 'dia') }), etiqueta: 'Preparar la solicitud', entrada: 'Prepara la solicitud del certificado cultural al ICAA', hecho: { borrador: 'BOR-DOS-01' } },
+    { id: 'DOS-02', texto: t('Justificantes de pago: faltan los de {n}. Se los pido a administración.', { n: cuenta(d2.pendientes, 'factura contabilizada', 'facturas contabilizadas') }), etiqueta: 'Pedir los justificantes', entrada: 'Pide a administración los justificantes de pago', hecho: { borrador: 'BOR-DOS-02' } },
+  ]
+  if (igic) items.push({ id: `rev-${igic.id}`, texto: t('{id} de {prov} lleva IGIC: que cuente como gasto en Canarias lo valida el fiscalista. Tienes la tarjeta debajo.', { id: v(igic.id, 'id'), prov: v(igic.proveedor) }), hecho: { revision: igic.id } })
+  for (const d of sinDoc) items.push({ id: `doc-${d.id}`, texto: t('{id} de {prov}: {falta}.', { id: v(d.id, 'id'), prov: v(d.proveedor), falta: v(d.tipo === 'ticket' ? 'es un ticket; hace falta la factura completa' : 'falta documentación') }), etiqueta: d.tipo === 'ticket' ? 'Pedir la factura' : 'Pedir la documentación', entrada: d.tipo === 'ticket' ? `Pide a ${d.proveedor} la factura completa` : `Pide a ${d.proveedor} la documentación que falta`, hecho: { borrador: `BOR-${d.id}` } })
+  items.push({ id: 'DOS-03', texto: t('Coste reconocido por capítulos: lo cierra el informe semanal, que lo prepara Informes.'), etiqueta: 'Ver el informe', entrada: 'Prepárame el informe semanal de coste' })
+  return { tipo: 'pasos', titulo: 'Para tenerlo al día', nivel: 'propone', items }
+}
+
 export const cumplimiento = {
   id: 'cumplimiento',
-  titulo: 'Dossier fiscal e IGIC',
-  ejemplos: ['¿Qué bloquea el dossier fiscal?', 'Revisa el IGIC de la factura F-2026-072', 'elegibilidad de los gastos', '¿cuándo vence el certificado cultural?'],
+  titulo: (det) => (det.entidades?.dossierPaso === 'DOS-01' ? 'Solicitud del certificado cultural' : det.entidades?.dossierPaso === 'DOS-02' ? 'Justificantes de pago' : 'Dossier fiscal'),
+  ejemplos: ['¿Qué bloquea el dossier fiscal?', 'Revisa el IGIC de la factura F-2026-072', 'elegibilidad de los gastos', '¿cuándo vence el certificado cultural?', '¿Cómo va la adecuación fiscal?', 'Prepara la solicitud del certificado cultural al ICAA', 'Pide a administración los justificantes de pago'],
 
   planificar(m, det) {
+    const pasoDossier = det.entidades?.dossierPaso
+    if (pasoDossier) {
+      const borrador = borradorDossier(m, pasoDossier)
+      return [
+        paso('cumplimiento', pasoDossier === 'DOS-01' ? t('Revisa qué pide el ICAA para el certificado') : t('Busca las facturas contabilizadas sin justificante de pago'), { tipo: 'revision', salida: pasoDossier === 'DOS-01' ? t('Vence el {f}', { f: v(c.dossier(m).find((d) => d.id === 'DOS-01').deadline, 'dia') }) : t('{n}', { n: cuenta(c.justificantesPendientes(m).length, 'factura', 'facturas') }) }),
+        paso('cumplimiento', t('Redacta el borrador'), { tipo: 'redaccion', autonomia: 'propone', acciones: [{ tipo: 'borrador/crear', borrador }], salida: t('Listo para revisar; no se envía') }),
+      ]
+    }
     if (det.eventoId === 'EV-03') {
       const recibir = { tipo: 'evento/recibir', eventoId: 'EV-03' }
       const dos = c.dossier(m)[0]
@@ -61,6 +130,27 @@ export const cumplimiento = {
     const reglas = [t('Criterios: factura completa, pago trazable, pedido o contrato y capítulo ICAA coherente')]
     const noHecho = [t('No ha validado ningún tratamiento fiscal: eso lo firma el fiscalista.'), t('No ha enviado nada fuera.')]
     const nota = aviso('info', 'El fiscalista revisa y firma', t('Filmpilot prepara la documentación y avisa de lo que bloquea; la validación fiscal es del fiscalista.'))
+
+    const pasoDossier = det.entidades?.dossierPaso
+    if (pasoDossier) {
+      const id = `BOR-${pasoDossier}`
+      return {
+        bloques: [
+          EXPLORACION_DOSSIER,
+          texto(
+            pasoDossier === 'DOS-01'
+              ? t('Te dejo la solicitud del certificado cultural al ICAA. Revísala antes de enviarla tú: en la checklist del dossier queda como preparada.')
+              : t('Te dejo la petición a administración con las {n} sin justificante de pago. Revísala antes de enviarla tú.', { n: cuenta(c.justificantesPendientes(m).length, 'factura', 'facturas') }),
+          ),
+          { tipo: 'borrador', id },
+          bloqueDossier(m),
+        ],
+        sugerencias: [sug('¿Qué bloquea el dossier fiscal?'), sug(pasoDossier === 'DOS-01' ? 'Pide a administración los justificantes de pago' : 'Prepara la solicitud del certificado cultural al ICAA')],
+        fuentes: ['Dossier fiscal', 'Bandeja de documentos'],
+        reglas: [],
+        noHecho: [t('No ha enviado el correo: lo envías tú.'), t('No ha cambiado el dossier: queda bloqueante hasta que llegue lo pedido.')],
+      }
+    }
 
     if (det.eventoId === 'EV-03') {
       const dos = c.dossier(m)[0]
@@ -108,13 +198,16 @@ export const cumplimiento = {
     const prox = dos.reduce((a, x) => (x.dias < a.dias ? x : a), dos[0])
     const igic = docs.find((d) => d.impuesto?.tipo === 'IGIC' && !m.revisiones[d.id])
     const bloques = [
-      texto(t('Hay {n} en el dossier. El más urgente: {doc}, que vence en {dias}.', { n: cuenta(dos.length, 'bloqueante', 'bloqueantes'), doc: v(prox.documento), dias: v(prox.dias, 'dias') })),
+      texto(t('El dossier de la deducción tiene {n}. El más urgente: {doc}, que vence en {dias}. Esto es lo que te propongo para tenerlo al día.', { n: cuenta(dos.length, 'bloqueante', 'bloqueantes'), doc: v(prox.documento), dias: v(prox.dias, 'dias') })),
       bloqueDossier(m),
+      pasosDossier(m),
     ]
     if (filas.length) {
       bloques.push({
         tipo: 'tabla',
         titulo: 'Elegibilidad de la bandeja',
+        plegado: true,
+        resumen: `${filas.length} ${filas.length === 1 ? 'documento' : 'documentos'} en la bandeja`,
         columnas: [
           { id: 'documento', etiqueta: 'Documento' },
           { id: 'factura', etiqueta: 'Factura', formato: 'check', alinear: 'center' },

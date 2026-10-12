@@ -1231,5 +1231,35 @@ test('preguntar por un riesgo en una jornada que tiene otro dice cuál tiene', (
   assert.match(txt, /permiso de vía pública/)
 })
 
+// ── 16. El dossier fiscal al día ─────────────────────────────────────────────
+console.log('Dossier fiscal al día')
+test('el dossier propone sus pasos y los borradores nunca se envían', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: '¿Cómo va la adecuación fiscal?' })
+  assert.equal(r.turno.intencion, 'cumplimiento')
+  const pasos = r.turno.bloques.find((b) => b.tipo === 'pasos')
+  assert.deepEqual(pasos.items.slice(0, 2).map((i) => i.id), ['DOS-01', 'DOS-02'])
+  for (const i of pasos.items.filter((x) => x.entrada)) assert.notEqual(responder(mundoBase, { tipo: 'texto', texto: i.entrada }).turno.intencion, 'no_entendido', i.entrada)
+  for (const [texto, id] of [['Prepara la solicitud del certificado cultural al ICAA', 'BOR-DOS-01'], ['Pide a administración los justificantes de pago', 'BOR-DOS-02']]) {
+    const x = responder(mundoBase, { tipo: 'texto', texto })
+    revisarTurno(x.turno, texto)
+    assert.equal(x.turno.intencion, 'cumplimiento', texto)
+    assert.equal(x.mundo.borradores[id].estado, 'borrador', 'queda en borrador: no se envía')
+    for (const p of plantillas(x.mundo.borradores[id])) assert.ok(!/\d/.test(p.plantilla), `borrador: «${p.plantilla}»`)
+    assert.equal(c.dossier(x.mundo).length, 3, 'el dossier sigue con sus tres bloqueantes')
+    assert.match(c.dossier(x.mundo).find((d) => `BOR-${d.id}` === id).evidencia, /preparada, sin enviar/)
+  }
+})
+test('los justificantes que faltan salen de las facturas contabilizadas sin pago', () => {
+  const dos2 = c.dossier(mundoBase).find((d) => d.id === 'DOS-02')
+  assert.equal(dos2.pendientes, Object.values(mundoBase.documentos).filter((d) => d.estado === 'contabilizada' && d.pago === 'pendiente').length)
+  const x = responder(mundoBase, { tipo: 'texto', texto: 'Pide a administración los justificantes de pago' })
+  assert.equal(x.mundo.borradores['BOR-DOS-02'].cuerpo.length, 3 + dos2.pendientes, 'una línea por factura')
+})
+test('un paso del dossier solo se prepara con verbo; preguntar por el plazo solo lee', () => {
+  const r = responder(mundoBase, { tipo: 'texto', texto: '¿cuándo vence el certificado cultural?' })
+  assert.equal(r.turno.entidades.dossierPaso, undefined)
+  assert.equal(Object.keys(r.mundo.borradores).length, 0)
+})
+
 console.log(`\n${total - fallos}/${total} comprobaciones correctas`)
 if (fallos) process.exit(1)

@@ -434,3 +434,10 @@
   .ag-llegada { flex-wrap: wrap; }
   .ag-llegada-estado { flex-basis: 100%; padding-left: 44px; padding-top: 0; }
 }
+
+/* Próximos pasos del dossier: qué hacer y su botón; lo hecho se marca y se apaga. */
+.ag-pasos { display: grid; margin-top: 8px; }
+.ag-paso { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--flp-border); }
+.ag-paso:first-child { border-top: 0; }
+.ag-paso-texto { min-width: 0; flex: 1 1 260px; color: var(--flp-carbon); font-size: 14px; line-height: 1.5; }
+.ag-paso.is-hecho .ag-paso-texto { color: var(--flp-muted); }

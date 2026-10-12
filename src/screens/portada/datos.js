@@ -56,7 +56,7 @@ export const PLAN_RIESGO = {
 // Los mismos bloqueantes que enseña el agente de Cumplimiento.
 export const DOSSIER = [
   ['Certificado cultural ICAA', 'Productora · vence 05/06/2026'],
-  ['Justificantes de pago vinculados a facturas', 'Line producer · vence 14/06/2026 · faltan 6'],
+  ['Justificantes de pago vinculados a facturas', 'Line producer · vence 14/06/2026 · pagos sin justificante'],
   ['Coste reconocido por capítulos ICAA', 'Fiscalista · vence 20/06/2026'],
 ]
 

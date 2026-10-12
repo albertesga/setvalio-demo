@@ -176,11 +176,8 @@ export function bloqueCaja(m, antes) {
 }
 
 export function bloqueDossier(m) {
-  return {
-    tipo: 'checklist',
-    titulo: 'Bloqueantes del dossier fiscal',
-    items: c.dossier(m).map((d) => ({ id: d.id, documento: d.documento, responsable: d.responsable, deadline: d.deadline, dias: d.dias, estado: d.estado, evidencia: d.pendientes ? `${d.pendientes} ${d.evidencia.toLowerCase()}` : d.evidencia, razon: d.razon })),
-  }
+  // `vivo`: la pantalla la vuelve a leer del mundo, así refleja lo que se prepara después.
+  return { tipo: 'checklist', titulo: 'Bloqueantes del dossier fiscal', vivo: 'dossier', items: c.dossier(m).map(c.itemDossier) }
 }
 
 /**

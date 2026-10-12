@@ -1070,11 +1070,14 @@ function BloqueBorrador({ b, principal = true }) {
 // ── Checklist del dossier ────────────────────────────────────────────────────
 
 function BloqueChecklist({ b }) {
+  const { mundo } = useCtx()
+  // La del dossier se lee del mundo: refleja lo que se prepara después de este mensaje.
+  const items = b.vivo === 'dossier' ? c.dossier(mundo).map(c.itemDossier) : b.items
   return (
     <div className="ag-panel">
       <Titulo>{b.titulo}</Titulo>
       <ul className="divide-y divide-flp-line">
-        {b.items.map((it) => (
+        {items.map((it) => (
           <li key={it.id} className="flex flex-wrap items-start justify-between gap-2 py-2.5 first:pt-0">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-flp-ink">{it.documento}</div>
@@ -1095,6 +1098,53 @@ function BloqueChecklist({ b }) {
         ))}
       </ul>
       {b.nota && <p className="mt-3 border-t border-flp-line pt-3 text-xs text-flp-muted">{b.nota}</p>}
+    </div>
+  )
+}
+
+// ── Próximos pasos (dossier al día) ───────────────────────────────────────────
+
+/** ¿Está hecho el paso? Un borrador preparado (sin descartar) o una revisión ya pedida. */
+function pasoHecho(mundo, h) {
+  if (!h) return false
+  if (h.borrador) {
+    const bor = mundo.borradores[h.borrador]
+    return !!bor && bor.estado !== 'descartado'
+  }
+  if (h.revision) return !!mundo.revisiones[h.revision]
+  return false
+}
+
+/** Lista de pasos con su botón; lo hecho se marca en vivo y deja de ofrecer el botón. */
+function BloquePasos({ b }) {
+  const { mundo, enviar, ocupado } = useCtx()
+  return (
+    <div className="ag-panel">
+      <Titulo extra={b.nivel && <AutonomyBadge nivel={b.nivel} />}>{b.titulo}</Titulo>
+      <ol className="ag-pasos">
+        {b.items.map((it) => {
+          const hecho = pasoHecho(mundo, it.hecho)
+          return (
+            <li key={it.id} className={`ag-paso ${hecho ? 'is-hecho' : ''}`}>
+              <span className="ag-paso-texto">
+                <Tx value={it.texto} />
+              </span>
+              {hecho ? (
+                <Tono tono="positive">
+                  <IconCheck size={12} strokeWidth={2.6} aria-hidden="true" />
+                  Preparado
+                </Tono>
+              ) : (
+                it.etiqueta && (
+                  <FilmpilotButton size="sm" variant="secondary" disabled={ocupado} onClick={() => enviar(it.entrada)}>
+                    {it.etiqueta}
+                  </FilmpilotButton>
+                )
+              )}
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }
@@ -1575,6 +1625,7 @@ const SEVERIDAD_ORDEN = { alta: 0, media: 1, baja: 2, controlado: 3 }
 const REGISTRO = {
   texto: BloqueTexto,
   llegadas: BloqueLlegadas,
+  pasos: BloquePasos,
   aviso: BloqueAviso,
   lista: BloqueLista,
   kpis: BloqueKpis,

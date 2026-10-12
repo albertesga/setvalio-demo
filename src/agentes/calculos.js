@@ -252,8 +252,31 @@ export function excepciones(mundo) {
   return out.sort((a, b) => peso[a.nivel] - peso[b.nivel] || b.importe - a.importe)
 }
 
+/** Facturas contabilizadas cuyo pago aún no está justificado: lo que pide DOS-02. */
+export function justificantesPendientes(mundo) {
+  return Object.values(mundo.documentos).filter((d) => d.estado === 'contabilizada' && d.pago === 'pendiente')
+}
+
+// Lo que dice cada bloqueante cuando ya hay un borrador preparado para resolverlo.
+const PREPARADO = { 'DOS-01': 'Solicitud al ICAA', 'DOS-02': 'Petición a administración' }
+
+/** El dossier con lo que se sabe hoy: días hasta el plazo, justificantes que faltan y lo preparado. */
 export function dossier(mundo) {
-  return mundo.dossier.map((d) => ({ ...d, dias: diasEntre(mundo.corte.fecha, d.deadline) }))
+  return mundo.dossier.map((d) => {
+    const x = { ...d, dias: diasEntre(mundo.corte.fecha, d.deadline) }
+    if (d.id === 'DOS-02') x.pendientes = justificantesPendientes(mundo).length
+    const bor = mundo.borradores?.[`BOR-${d.id}`]
+    if (bor && bor.estado !== 'descartado' && PREPARADO[d.id]) {
+      x.preparado = true
+      x.evidencia = `${PREPARADO[d.id]} ${bor.estado === 'listo' ? 'revisada' : 'preparada'}, sin enviar`
+    }
+    return x
+  })
+}
+
+/** Una fila de la checklist del dossier (la usan el guion y la tarjeta en vivo). */
+export function itemDossier(d) {
+  return { id: d.id, documento: d.documento, responsable: d.responsable, deadline: d.deadline, dias: d.dias, estado: d.estado, evidencia: d.pendientes && !d.preparado ? `${d.pendientes} ${d.evidencia.toLowerCase()}` : d.evidencia, razon: d.razon }
 }
 
 /** Estimación de deducción con el motor V2 (src/lib/incentivos.js). Exploratorio. */
