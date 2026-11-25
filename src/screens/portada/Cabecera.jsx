@@ -65,7 +65,7 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
         </nav>
         <div className="landing-header-actions">
           <FilmpilotButton variant="carbon" size="sm" className="landing-header-cta" onClick={() => abrir()} iconAfter={IconChevronRight}>
-            Probar los agentes
+            Probar la demo
           </FilmpilotButton>
           <button ref={menuButtonRef} className="landing-menu-toggle" type="button" onClick={() => setMenuOpen((value) => !value)} aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={menuOpen} aria-controls="landing-mobile-nav">
             {menuOpen ? <IconClose size={22} /> : <IconMenu size={22} />}
@@ -92,7 +92,7 @@ export function Cabecera({ abrirAgentes, clearSectionHash }) {
         ))}
         <div className="landing-mobile-actions">
           <FilmpilotButton variant="primary" onClick={() => abrir()} iconAfter={IconChevronRight}>
-            Probar los agentes
+            Probar la demo
           </FilmpilotButton>
         </div>
       </nav>

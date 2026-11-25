@@ -3,18 +3,20 @@ import { IconCheckCircle } from './components/icons.jsx'
 import Landing from './screens/Landing.jsx'
 
 const Agentes = lazy(() => import('./screens/Agentes.jsx'))
+const Workspace = lazy(() => import('./screens/Workspace.jsx'))
 
-// Dos pantallas: la portada y el prototipo de agentes.
-// ?vista=agentes abre directamente los agentes (enlace compartible en GitHub Pages).
+// La portada, la demo escritorio + WhatsApp y el prototipo de agentes conservado.
+// Las rutas por query permiten compartir ambas demos desde GitHub Pages.
 function rutaInicial() {
   if (typeof window === 'undefined') return 'landing'
-  return new URLSearchParams(window.location.search).get('vista') === 'agentes' ? 'agentes' : 'landing'
+  const vista = new URLSearchParams(window.location.search).get('vista')
+  return ['agentes', 'demo'].includes(vista) ? vista : 'landing'
 }
 
 // Cada cambio de pantalla deja una entrada en el historial: «Atrás» vuelve a la anterior.
 function urlDe(route) {
   const url = new URL(window.location.href)
-  if (route === 'agentes') url.searchParams.set('vista', 'agentes')
+  if (route === 'agentes' || route === 'demo') url.searchParams.set('vista', route)
   else url.searchParams.delete('vista')
   return url.pathname + url.search
 }
@@ -56,7 +58,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      {route === 'agentes' ? (
+      {route === 'demo' ? (
+        <Suspense fallback={<div className="flp-theme flex min-h-screen items-center justify-center" role="status">Cargando FilmPilot…</div>}>
+          <Workspace onNavigate={navegar} />
+        </Suspense>
+      ) : route === 'agentes' ? (
         <Suspense fallback={<div className="flp-theme flex min-h-screen items-center justify-center text-sm text-flp-muted" role="status">Cargando agentes…</div>}>
           <Agentes onNavigate={navegar} contexto={contexto} pushToast={pushToast} />
         </Suspense>

@@ -37,10 +37,11 @@ export default function Landing({ onNavigate }) {
   const clearSectionHash = () => {
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
   }
-  // Abre los agentes; con { pregunta } la hace al entrar, en su conversación.
+  // La entrada principal abre escritorio + WhatsApp. Las preguntas de los
+  // escenarios anteriores conservan su conversación en el prototipo de agentes.
   const abrirAgentes = (contexto) => {
     clearSectionHash()
-    onNavigate('agentes', contexto)
+    onNavigate(contexto?.pregunta ? 'agentes' : 'demo', contexto)
   }
 
   return (

@@ -17,7 +17,7 @@ export function Pie({ abrirAgentes }) {
               Filmpilot
             </h2>
             <button type="button" onClick={() => abrirAgentes()}>
-              <span className="landing-subrayado">Probar los agentes</span>
+              <span className="landing-subrayado">Probar la demo</span>
             </button>
           </nav>
         </div>

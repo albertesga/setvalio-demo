@@ -20,7 +20,7 @@ export function Cierre({ abrirAgentes }) {
           <div className="landing-final-actions">
             {/* claqueta-accion: el botón que cierra el palo (Cierre.css). */}
             <FilmpilotButton variant="primary" size="lg" className="claqueta-accion" onClick={() => abrirAgentes()} iconAfter={IconChevronRight}>
-              Probar los agentes
+              Probar la demo
             </FilmpilotButton>
           </div>
         </div>

@@ -63,10 +63,10 @@ export function Hero({ abrirAgentes }) {
         </div>
         <div className="landing-hero-copy">
           <p className="landing-hero-support">Un equipo de agentes. Una producción bajo control.</p>
-          <p className="landing-hero-description">Para productoras de cine y series: los agentes preparan el presupuesto, vigilan el coste y la caja y ordenan los incentivos fiscales. Tú apruebas cada paso.</p>
+          <p className="landing-hero-description">Habla con Filmpilot por WhatsApp. Consulta el presupuesto, las desviaciones y tus documentos en el escritorio. Tú decides cada paso.</p>
           <div className="landing-hero-actions">
             <FilmpilotButton variant="primary" size="lg" onClick={() => abrirAgentes()} iconAfter={IconChevronRight}>
-              Probar los agentes
+              Probar la demo
             </FilmpilotButton>
             <FilmpilotButton variant="secondary" size="lg" href="#agentes" iconAfter={IconChevronDown}>
               Ver cómo trabajan

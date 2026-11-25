@@ -1,8 +1,8 @@
 # Filmpilot
 
 Prototipo de Filmpilot: un equipo de agentes que prepara el presupuesto, controla
-el coste y vigila el rodaje de producciones de cine y televisión. Tiene dos
-pantallas: la **portada** y el **prototipo de agentes**. Todos los datos son de
+el coste y vigila el rodaje de producciones de cine y televisión. Tiene tres
+experiencias: la **portada**, el **escritorio con WhatsApp** y el **prototipo de agentes anterior**. Todos los datos son de
 demostración y viven en memoria; no hay backend ni persistencia.
 
 El proyecto de ejemplo es **La última función**, un largometraje en rodaje:
@@ -23,10 +23,39 @@ Cada cambio en `main` se publica automáticamente con el flujo de `.github/workf
 
 ## Portada
 
-Cuenta qué es Filmpilot y lleva a los agentes. Cada etapa de «Cómo funciona»
+Cuenta qué es Filmpilot y lleva a la nueva demo. Cada etapa de «Cómo funciona»
 (presupuesto, incentivos, financiación, rodaje, justificación) abre los agentes
 con una pregunta de ejemplo, y las cifras que enseña son las mismas que ellos
 responden.
+
+## Escritorio y WhatsApp
+
+**Probar la demo** abre `?vista=demo`. En pantallas amplias se ven juntos el
+escritorio y la conversación de WhatsApp; en móvil, los controles superiores
+permiten pasar de uno a otra. El acceso **Demo anterior** conserva `?vista=agentes`.
+
+El escritorio simplifica la consulta en Resumen, Presupuesto y Documentos, con
+comparación presupuesto/previsión, capítulos, caja por semana y fichas de documentos.
+WhatsApp muestra un único contacto FilmPilot, mensajes breves, un adjunto de ejemplo
+y decisiones concretas. Los enlaces «Ver en escritorio» abren el detalle correspondiente.
+
+Tres recorridos para probar:
+
+1. Preguntar «¿Cómo vamos?» y comparar el coste previsto y la caja con las gráficas.
+2. Pulsar **+**, enviar el ticket de ejemplo y confirmar su partida. El documento y
+   los costes se actualizan juntos, únicamente después de la decisión de la persona.
+3. Revisar el hotel y aprobar o rechazar la compra. La previsión y la caja reflejan
+   el efecto; **Deshacer última decisión** restaura el estado anterior.
+
+Esta vista representa el canal WhatsApp, sin conectarse a él. Las respuestas son
+preparadas, los adjuntos son ejemplos y no se envía ningún mensaje o archivo.
+El nuevo estado vive en `src/demo/model.js`, reutiliza los cálculos y las acciones
+del mundo existente y se comparte entre escritorio y chat. La demo anterior mantiene
+su propia sesión. Recargar reinicia ambas; «Reiniciar demo» reinicia la vista nueva.
+
+`npm run check:workspace` comprueba la coherencia de cifras, las decisiones,
+la ausencia de duplicados y deshacer. `npm run check:agentes` sigue verificando
+los escenarios del prototipo anterior.
 
 ## Agentes (prototipo conversacional)
 
