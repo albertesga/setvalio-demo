@@ -34,28 +34,42 @@ responden.
 escritorio y la conversación de WhatsApp; en móvil, los controles superiores
 permiten pasar de uno a otra. El acceso **Demo anterior** conserva `?vista=agentes`.
 
-El escritorio simplifica la consulta en Resumen, Presupuesto y Documentos, con
-comparación presupuesto/previsión, capítulos, caja por semana y fichas de documentos.
-WhatsApp muestra un único contacto FilmPilot, mensajes breves, un adjunto de ejemplo
-y decisiones concretas. Los enlaces «Ver en escritorio» abren el detalle correspondiente.
+El selector **Probar un caso** y el catálogo **Casos de uso** del escritorio abren
+los mismos siete recorridos. Cambiar de caso conserva el estado de la sesión.
 
-Tres recorridos para probar:
+| Recorrido | Qué permite recorrer |
+| --- | --- |
+| Dossier diario | Consultar el rodaje de hoy, la agenda y las decisiones pendientes; abrir cada revisión. |
+| Informe semanal | Preparar el informe de coste completo, revisar sus cifras y aprobarlo; regenerarlo si cambia la información. |
+| Recepción de facturas | Recibir ejemplos de correo, formulario y WhatsApp; contabilizar las que cuadran con su pedido y decidir la imputación del ticket dudoso. |
+| Revisión de cambios | Comparar el impacto del hotel y otras compras pendientes; aprobar, aprobar el importe previsto o rechazar según las opciones del caso. |
+| Riesgos de rodaje | Revisar lluvia, horas extra y grúa; cambiar el plan, reservar dinero o asumir el riesgo. Escenario en exploración. |
+| Creación de presupuesto | Preparar la propuesta de Itsasoa, añadir costes, comparar proveedores y autorizar llamadas simuladas antes de elegir. Es otro proyecto en desarrollo. |
+| Dossier fiscal | Consultar bloqueantes, preparar y editar solicitudes de documentación, revisar borradores y solicitar la revisión del fiscalista. |
 
-1. Preguntar «¿Cómo vamos?» y comparar el coste previsto y la caja con las gráficas.
-2. Pulsar **+**, enviar el ticket de ejemplo y confirmar su partida. El documento y
-   los costes se actualizan juntos, únicamente después de la decisión de la persona.
-3. Revisar el hotel y aprobar o rechazar la compra. La previsión y la caja reflejan
-   el efecto; **Deshacer última decisión** restaura el estado anterior.
+WhatsApp conserva un único contacto FilmPilot, respuestas breves, un adjunto de
+ejemplo y acciones contextuales; **Más opciones** despliega las restantes. En los casos,
+**Ver en escritorio** abre el análisis completo de esa respuesta: tablas, informes,
+propuestas, borradores, criterios y decisiones. Resumen, Presupuesto y Documentos
+siguen disponibles para consultar las cifras y documentos compartidos.
+
+Las decisiones de cada análisis están vinculadas a una revisión de la sesión.
+Si cambian los datos, el detalle pide **Actualizar análisis** y las decisiones antiguas
+del chat quedan deshabilitadas; el modelo también rechaza esas acciones. **Deshacer
+último cambio** restaura el cambio reversible disponible y avanza la revisión, sin
+volver vigentes los análisis anteriores.
 
 Esta vista representa el canal WhatsApp, sin conectarse a él. Las respuestas son
 preparadas, los adjuntos son ejemplos y no se envía ningún mensaje o archivo.
-El nuevo estado vive en `src/demo/model.js`, reutiliza los cálculos y las acciones
-del mundo existente y se comparte entre escritorio y chat. La demo anterior mantiene
-su propia sesión. Recargar reinicia ambas; «Reiniciar demo» reinicia la vista nueva.
+El estado vive en `src/demo/model.js`; `src/demo/cases.js` adapta el motor original
+de escenarios, cálculos y acciones a ambas superficies. `WorkspaceCaseDetail`
+reutiliza sus bloques completos en el escritorio. La propuesta de Itsasoa conserva
+su propio presupuesto y no altera el de «La última función». La demo anterior
+mantiene su propia sesión. Recargar reinicia ambas; **Reiniciar demo** reinicia la vista nueva.
 
-`npm run check:workspace` comprueba la coherencia de cifras, las decisiones,
-la ausencia de duplicados y deshacer. `npm run check:agentes` sigue verificando
-los escenarios del prototipo anterior.
+Comprobaciones disponibles: `npm run check:workspace` cubre el estado compartido,
+las revisiones y deshacer; `npm run check:cases`, los siete recorridos y sus decisiones;
+`npm run check:agentes`, los escenarios del prototipo anterior.
 
 ## Agentes (prototipo conversacional)
 

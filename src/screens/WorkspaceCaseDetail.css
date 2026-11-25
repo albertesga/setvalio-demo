@@ -1,0 +1,67 @@
+.ws-case-detail { min-width:0; width:100%; container:ws-case / inline-size; color:var(--flp-text); }
+.ws-case-header { padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--flp-border); }
+.ws-case-back { display:inline-flex; align-items:center; gap:8px; min-height:36px; margin-bottom:18px; color:var(--flp-muted); font-size:.875rem; }
+.ws-case-back:hover { color:var(--flp-text); text-decoration:underline; text-underline-offset:4px; }
+.ws-case-heading-row { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.ws-case-heading-row h1,.ws-case-empty h1 { margin:0; font-size:1.875rem; line-height:1.2; font-weight:400; letter-spacing:-.03em; text-wrap:balance; scroll-margin-top:24px; }
+.ws-case-heading-row h1:focus { outline:none; }
+.ws-case-project { margin-top:14px; font-size:.9375rem; color:var(--flp-muted); }
+.ws-case-project strong { font-weight:500; color:var(--flp-text); }
+.ws-case-cut { margin-top:5px; font-size:.75rem; color:var(--flp-muted); }
+.ws-case-button { display:inline-flex; align-items:center; justify-content:center; flex:none; min-height:40px; padding:8px 15px; border:1px solid var(--flp-control-border); border-radius:7px; font-size:.875rem; background:var(--flp-surface); }
+.ws-case-button:hover { background:var(--flp-bg); }
+.ws-case-button-primary { border-color:var(--flp-signal); background:var(--flp-signal); }
+.ws-case-button-primary:hover { background:var(--flp-signal-hover); }
+.ws-case-detail :is(button,a,input,textarea,select,summary):focus-visible { outline:2px solid var(--flp-carbon); outline-offset:3px; }
+.ws-case-stale { display:flex; align-items:flex-start; gap:15px; padding:24px; background:#f7f2dd; border-radius:9px; color:#564a1c; }
+.ws-case-stale>svg { flex:none; margin-top:3px; }
+.ws-case-stale h2 { font-weight:500; font-size:1.125rem; margin:0; }
+.ws-case-stale p { margin:7px 0 18px; max-width:55ch; }
+.ws-case-stale button { color:var(--flp-carbon); }
+.ws-case-blocks { display:grid; gap:20px; min-width:0; }
+.ws-case-block { min-width:0; overflow-wrap:anywhere; }
+.ws-case-block .ag-prosa { max-width:72ch; font-size:1rem; line-height:1.6; }
+.ws-case-block .ag-propuesta { box-shadow:none; }
+.ws-case-block .ag-panel,.ws-case-block .ag-aprobacion,.ws-case-block .ag-propuesta,.ws-case-block .ag-informe { border-radius:10px; }
+.ws-case-block .ag-tabla-scroll { max-width:100%; scrollbar-width:thin; scrollbar-color:var(--flp-silver) transparent; }
+.ws-case-block .ag-kpi dd { white-space:normal; overflow-wrap:normal; }
+.ws-case-block .ag-kpis { grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr)); }
+.ws-case-block .ag-importes { gap:12px; }
+.ws-case-block .flp-button { white-space:normal; text-align:center; }
+.ws-case-block .ag-boton-fila { white-space:normal; text-align:left; }
+.ws-case-block :is(input,textarea,select) { max-width:100%; }
+.ws-case-evidence { padding:20px 0; margin-top:28px; border-top:1px solid var(--flp-border); color:var(--flp-muted); }
+.ws-case-evidence summary { width:fit-content; cursor:pointer; font-size:.875rem; color:var(--flp-text); }
+.ws-case-evidence>div { margin-top:20px; }
+.ws-case-evidence h2 { margin:0 0 8px; font-size:.875rem; font-weight:500; color:var(--flp-text); }
+.ws-case-evidence ul { list-style:disc; padding-left:19px; display:grid; gap:5px; font-size:.875rem; max-width:72ch; }
+.ws-case-empty { padding:26px 0; }
+.ws-case-empty>svg { color:var(--flp-muted); margin-bottom:16px; }
+.ws-case-empty p { margin:14px 0 24px; color:var(--flp-muted); max-width:60ch; }
+
+/* These blocks were originally sized against the viewport. In a split desktop,
+   their own available width decides when tables, reports and plans condense. */
+@container ws-case (max-width:650px) {
+  .ws-case-block .ag-informe-cifras { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ws-case-block .ag-informe-secciones,.ws-case-block .ag-llamada-cuerpo,.ws-case-block .ag-indice-lista { grid-template-columns:minmax(0,1fr); }
+  .ws-case-block .ag-desv-fila { grid-template-columns:minmax(0,1fr) auto; }
+  .ws-case-block .ag-desv-barra { grid-column:1 / -1; }
+  .ws-case-block .ag-plan { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ws-case-block .ag-caja { grid-template-columns:repeat(4,minmax(0,1fr)); row-gap:18px; }
+  .ws-case-block .ag-tira-semanas { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ws-case-block .ag-impacto { overflow-x:auto; }
+  .ws-case-block .ag-impacto>div { min-width:350px; }
+  .ws-case-block .ag-impacto.is-unico>div { min-width:260px; }
+}
+@container ws-case (max-width:420px) {
+  .ws-case-heading-row { flex-direction:column; gap:15px; }
+  .ws-case-heading-row h1 { font-size:1.625rem; }
+  .ws-case-stale { padding:18px; }
+  .ws-case-block .ag-panel,.ws-case-block .ag-aprobacion,.ws-case-block .ag-propuesta,.ws-case-block .ag-informe { padding:14px; }
+  .ws-case-block .ag-panel--flush { padding:0; }
+  .ws-case-block .ag-importes { grid-template-columns:minmax(0,1fr); }
+  .ws-case-block .ag-kpi { padding:12px; }
+  .ws-case-block .ag-kpi dd { font-size:1rem; }
+  .ws-case-block .ag-informe-cifras dd { font-size:.875rem; }
+  .ws-case-block .ag-tabla-scroll { margin:0; }
+}

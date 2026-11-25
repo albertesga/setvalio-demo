@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:agentes": "node scripts/check-agentes.mjs",
-    "check:workspace": "node scripts/check-workspace.mjs"
+    "check:workspace": "node scripts/check-workspace.mjs",
+    "check:cases": "node scripts/check-cases.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -5,6 +5,7 @@ import { reducir } from '../agentes/acciones.js'
 import { totales, capitulo, desviaciones, tesoreria, impactoOrden, dossier, etiquetaPartida } from '../agentes/calculos.js'
 import { eur, eurCents, eurSigned, pctSigned } from '../lib/format.js'
 import { fecha } from '../agentes/texto.js'
+import { CASES, ejecutarCaso, resumirTurno, accionDisponible, entradaParaActualizar } from './cases.js'
 
 const TICKET = 'G-004'
 const HOTEL = 'OC-104'
@@ -52,10 +53,71 @@ function recibir(s, eventoId, texto, destino) {
 export function crearDemo() {
   const mundo = crearMundo()
   return mensaje(
-    { mundo, mensajes: [], seq: 0, undo: null, actividad: [] },
+    { mundo, mensajes: [], seq: 0, undo: null, actividad: [], revision: 0, casoActivo: null, contextos: {}, detalles: {}, detalleActual: null, sugerencias: [] },
     'filmpilot',
     `Hola, Marta. Soy FilmPilot. Tengo a mano el presupuesto y los documentos de «${mundo.proyecto.titulo}». ¿Qué necesitas revisar?`,
   )
+}
+
+const casoDe = (id) => CASES.find((c) => c.id === id)
+
+function casoDesdeTexto(normal) {
+  if (/\b(itsasoa|primera propuesta|crear presupuesto|nuevo presupuesto|presupuesto nuevo|proveedores)\b/.test(normal)) return 'presupuesto'
+  if (/\b(riesgos?|lluvia|llover|grua|horas extra|citacion|actriz|orden de rodaje)\b/.test(normal)) return 'riesgos'
+  if (/\b(informe|cost report)\b/.test(normal)) return 'informe'
+  if (/\b(dossier diario|parte diario|parte de hoy|parte del dia|dossier del dia)\b/.test(normal)) return 'parte'
+  if (/\b(dossier fiscal|adecuacion fiscal|certificado cultural)\b/.test(normal)) return 'dossier'
+  if (/\b(facturas nuevas|han llegado facturas|recepcion de facturas|facturas de esta|facturas recibidas)\b/.test(normal)) return 'facturas'
+  if (/\b(revision de cambios|revisar cambios|cambios pendientes|ordenes de compra)\b/.test(normal)) return 'cambios'
+  return null
+}
+
+function casoDeTurno(turno, actual) {
+  if (['presupuesto_nuevo', 'anadir_coste', 'optimizar_proveedores'].includes(turno.intencion)) return 'presupuesto'
+  if (turno.intencion === 'riesgos') return 'riesgos'
+  if (turno.intencion === 'informe_semanal') return 'informe'
+  if (['factura_nueva', 'revisar_gasto'].includes(turno.intencion)) return 'facturas'
+  if (['cumplimiento', 'pedir_documentacion'].includes(turno.intencion)) return 'dossier'
+  if (turno.intencion === 'aprobar_oc') return 'cambios'
+  if (['saludo', 'resumen', 'prevision', 'explicar_desviacion'].includes(turno.intencion)) return 'parte'
+  return actual || 'parte'
+}
+
+// The original scenarios still own all calculations, reports and decisions.
+// This adapter presents their short replies in WhatsApp and their full detail on desktop.
+function motor(s, { entrada, caseId = s.casoActivo || 'parte', etiqueta, sourceDetail, silencioso = false }) {
+  const fuente = sourceDetail ? s.detalles[sourceDetail] : null
+  if (entrada?.tipo === 'accion' && fuente && fuente.version !== s.revision) return s
+  if (entrada?.tipo === 'accion' && !accionDisponible(s.mundo, entrada.accion, fuente?.turno)) return s
+  const contexto = s.contextos[caseId] ?? {}
+  const resultado = ejecutarCaso(s.mundo, entrada, contexto)
+  if (!resultado.turno) return s
+  const casoId = casoDeTurno(resultado.turno, caseId)
+  const caso = casoDe(casoId)
+  const changed = resultado.mundo !== s.mundo
+  let n = { ...s, mundo: resultado.mundo, casoActivo: casoId, contextos: { ...s.contextos, [casoId]: resultado.contexto } }
+  if (!silencioso) n = mensaje(n, 'usuario', etiqueta ?? (entrada.tipo === 'texto' ? entrada.texto : caso?.pregunta ?? caso?.title ?? 'Revisar este caso'))
+  const id = `detail-${n.seq + 1}`
+  const detalle = { id, caseId: casoId, title: caso?.title ?? resultado.turno.titulo, turno: resultado.turno, version: s.revision + (changed ? 1 : 0), hora: hora(n.seq), refreshEntrada: entradaParaActualizar(resultado.turno, resultado.entrada, fuente?.refreshEntrada) }
+  n = {
+    ...n,
+    detalles: { ...s.detalles, [id]: detalle },
+    detalleActual: id,
+    sugerencias: resultado.turno.sugerencias ?? [],
+  }
+  n = mensaje(n, 'filmpilot', resumirTurno(resultado.turno, resultado.mundo), { caseId: casoId, detailId: id, titulo: resultado.turno.titulo, turno: resultado.turno, destino: { section: 'caso', detailId: id } })
+  if (changed) {
+    const acciones = resultado.turno.pasos.flatMap(p => p.acciones ?? [])
+    const recepciones = acciones.filter(a => a.tipo === 'evento/recibir')
+    const antesConRecepciones = recepciones.reduce((m, a) => reducir(m, a), s.mundo)
+    const cambioReversible = acciones.some(a => !['evento/recibir', 'borrador/crear'].includes(a.tipo))
+    if (cambioReversible) n.undo = { mundo: antesConRecepciones, actividad: s.actividad, etiqueta: etiqueta ?? resultado.turno.titulo, id }
+    else if (n.undo && recepciones.length) n.undo = { ...n.undo, mundo: recepciones.reduce((m, a) => reducir(m, a), n.undo.mundo) }
+    // A newly prepared draft must not disappear when undoing an unrelated older decision.
+    if (!cambioReversible && acciones.some(a => a.tipo === 'borrador/crear')) n.undo = null
+    n = anotar(n, resultado.turno.titulo, entrada.tipo === 'accion' ? 'decision' : 'preparacion', { section: 'caso', detailId: id })
+  }
+  return n
 }
 
 function resumen(s, informe = false) {
@@ -109,6 +171,11 @@ function preguntar(s, texto) {
   if (typeof texto !== 'string' || !texto.trim()) return s
   const limpio = texto.trim().slice(0, 2000)
   const normal = limpio.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const caso = casoDesdeTexto(normal)
+  if (caso || s.casoActivo) {
+    const entrada = caso === 'parte' && /\b(dossier diario|parte diario|dossier del dia)\b/.test(normal) ? { tipo: 'saludo' } : { tipo: 'texto', texto: limpio }
+    return motor(s, { entrada, caseId: caso ?? s.casoActivo, etiqueta: limpio })
+  }
   let n = mensaje(s, 'usuario', limpio)
   // Aprobaciones ambiguas por texto nunca cambian el mundo; los botones nombran
   // la compra o la clasificación concreta que la persona confirma.
@@ -179,8 +246,23 @@ function decidir(s, id) {
   return anotar(n, `${POR}: ${etiqueta.charAt(0).toLowerCase()}${etiqueta.slice(1)}.`, 'decision', destino)
 }
 
-export function reducirDemo(s, accion) {
+function reducirAccion(s, accion) {
   switch (accion?.tipo) {
+    case 'caso': {
+      const caso = casoDe(accion.id)
+      return caso ? motor(s, { entrada: caso.entrada, caseId: caso.id, etiqueta: caso.pregunta ?? caso.title }) : s
+    }
+    case 'motor': return motor(s, accion)
+    case 'refrescarDetalle': {
+      const detalle = s.detalles[accion.id]
+      return detalle ? motor(s, { entrada: detalle.refreshEntrada, caseId: detalle.caseId, silencioso: true }) : s
+    }
+    case 'editarBorrador': {
+      const mundo = reducir(s.mundo, { tipo: 'borrador/editar', id: accion.id, asunto: accion.asunto, cuerpo: accion.cuerpo })
+      if (mundo === s.mundo) return s
+      const d = s.detalles[accion.detailId]
+      return { ...s, mundo, undo: null, detalles: d ? { ...s.detalles, [d.id]: { ...d, version: s.revision + 1 } } : s.detalles }
+    }
     case 'preguntar': return preguntar(s, accion.texto)
     case 'ticket': return ticket(s)
     case 'decidir': return decidir(s, accion.id)
@@ -193,4 +275,10 @@ export function reducirDemo(s, accion) {
     case 'reiniciar': return crearDemo()
     default: return s
   }
+}
+
+export function reducirDemo(s, accion) {
+  const n = reducirAccion(s, accion)
+  if (n === s || accion?.tipo === 'reiniciar') return n
+  return n.mundo === s.mundo ? n : { ...n, revision: s.revision + 1 }
 }

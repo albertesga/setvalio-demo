@@ -136,3 +136,34 @@
   .workspace-project-header { padding:0 18px; height:62px; font-size:.8125rem; }.workspace-project-header>span { font-size:.75rem; }.workspace-stage { display:none; }
   .workspace #workspace-main { padding:24px 18px; }.workspace-footnote { padding:10px 18px 24px; }
 }
+
+/* The same production cases stay visible across desktop and WhatsApp. */
+.workspace-case-picker { display:flex; align-items:center; gap:12px; }
+.workspace-case-picker label { white-space:nowrap; color:#cbd1c7; }
+.workspace-case-picker select { min-width:210px; max-width:250px; padding:7px 28px 7px 10px; border:1px solid #66705f; border-radius:5px; background:#30352f; color:#fff; font:inherit; cursor:pointer; }
+.workspace select:focus-visible,.workspace summary:focus-visible { outline:2px solid #408e6f; outline-offset:3px; }
+.workspace-eyebrow { display:block; color:var(--ws-muted); font-size:.75rem; margin-bottom:16px; }
+.workspace-cases h1 { font-size:clamp(26px,2.5vw,36px); line-height:1.15; letter-spacing:-.035em; font-weight:400; margin:0 0 12px; }
+.workspace-cases>p { font-size:.9375rem; max-width:550px; color:var(--ws-muted); line-height:1.6; margin:0 0 26px; }
+.workspace-case-list { border-top:1px solid var(--ws-line); }
+.workspace-case-list>button { width:100%; display:flex; align-items:center; gap:18px; padding:19px 4px; border-bottom:1px solid var(--ws-line); text-align:left; }
+.workspace-case-list>button:hover { background:#f6f7f1; }
+.workspace-case-number { color:var(--ws-muted); font-size:.75rem; font-variant-numeric:tabular-nums; }
+.workspace-case-list strong { display:block; font-size:1rem; font-weight:550; margin-bottom:4px; }
+.workspace-case-list strong+span { display:block; font-size:.8125rem; color:var(--ws-muted); line-height:1.5; }
+.workspace-case-arrow { margin-left:auto; padding:9px; border-radius:50%; background:#f0f2e9; flex:none; }
+.workspace-notice { display:flex; gap:16px; align-items:center; padding:12px 14px; margin-bottom:20px; background:#fff5c9; border-radius:5px; font-size:.875rem; }
+.workspace-notice button { margin-left:auto; }
+.wa-more summary { padding:10px 4px; text-align:center; font-size:.8125rem; color:#006b58; cursor:pointer; }
+.wa-more button { width:100%; }
+@media(max-width:1050px) { .workspace-demo-bar { gap:12px; }.workspace-case-picker label { display:none; }.workspace-case-picker select { min-width:180px; max-width:210px; } }
+@media(max-width:740px) {
+  .workspace-case-picker { flex:1; min-width:0; }.workspace-case-picker select { width:100%; min-width:0; max-width:250px; font-size:.8125rem; }
+  .workspace-sidebar nav button { justify-content:center; padding:10px 5px; gap:4px; }.workspace-sidebar nav button svg { display:none; }
+  .workspace-cases>p { font-size:.875rem; }.workspace-case-list>button { gap:12px; padding:17px 2px; }
+  .workspace-activity>div { align-items:flex-start; flex-direction:column; }
+}
+.wa-stale { display:block; padding-top:9px; font-size:.75rem; line-height:1.5; color:#596b61; }
+.workspace-demo-bar { position:sticky; top:0; z-index:30; }
+.workspace-whatsapp { top:54px; }
+.wa-action-context { display:block; padding-top:3px; font-size:.75rem; color:#53635c; }

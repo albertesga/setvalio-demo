@@ -73,7 +73,7 @@ components:
 
 Extensión de la identidad existente: el escritorio ofrece consulta y análisis; la conversación cotidiana ocurre en WhatsApp. La referencia a WhatsApp es explícita en `PRODUCT.md`: un solo contacto FilmPilot, mensajes breves, burbujas y adjuntos. El logotipo y el símbolo proceden del kit existente; no se redibujan ni se sustituyen por texto.
 
-Este documento registra las superficies de `Workspace` y `WorkspaceDashboard`. La portada y la demo anterior conservan su composición. La fuente de los tokens heredados es `src/brand/filmpilot.css`; la identidad completa está en `docs/identidad-filmpilot.md`.
+Este documento registra las superficies de `Workspace`, `WorkspaceDashboard` y `WorkspaceCaseDetail`. La portada y la demo anterior conservan su composición. La fuente de los tokens heredados es `src/brand/filmpilot.css`; la identidad completa está en `docs/identidad-filmpilot.md`.
 
 ## Colors
 
@@ -87,15 +87,17 @@ WhatsApp tiene su propia paleta reconocible: fondo cálido, mensajes entrantes b
 
 Instrument Sans sostiene el escritorio: titulares de peso regular con espaciado negativo, cuerpo legible y controles de peso medio. Los encabezados secundarios miden 17 px y los datos auxiliares, filtros y tablas usan 14 px. Las cifras usan números tabulares para facilitar la comparación.
 
-Geist Mono se conserva como recurso de la marca para etiquetas cortas, estados y cifras de las superficies anteriores; el nuevo escritorio utiliza Instrument Sans. WhatsApp emplea la pila de sistema del canal, con mensajes de 16 px y metadatos de 12 px. Las fuentes de marca están alojadas en el proyecto.
+Geist Mono se conserva como recurso de la marca para etiquetas cortas, estados y cifras de las superficies anteriores y de los bloques reutilizados en el detalle de casos. La consulta general del escritorio utiliza Instrument Sans. WhatsApp emplea la pila de sistema del canal, con mensajes de 16 px y metadatos de 12 px. Las fuentes de marca están alojadas en el proyecto.
 
 ## Layout
 
-El escritorio se organiza en navegación lateral, cabecera de producción y contenido con ancho máximo de 1330 px. Resumen, Presupuesto y Documentos son las tres secciones. La jerarquía depende de títulos, espacio y líneas divisorias; los datos se agrupan en filas y paneles abiertos.
+El escritorio se organiza en navegación lateral, cabecera de producción y contenido con ancho máximo de 1330 px. Casos de uso, Resumen, Presupuesto y Documentos son las cuatro secciones. El catálogo presenta los siete recorridos como filas numeradas con título, descripción y acceso; un selector en la barra superior ofrece los mismos destinos. La jerarquía depende de títulos, espacio y líneas divisorias.
 
 En ventanas desde 1250 px pueden verse escritorio y conversación juntos, con el chat en una columna de 380 px, ampliada a 420 px desde 1600 px. Por debajo de 1250 px se alternan las dos superficies; abrir un destino del chat muestra el escritorio. Hasta 740 px la navegación del escritorio pasa arriba y WhatsApp ocupa el ancho disponible, con entrada de mensajes ajustada al área segura del dispositivo.
 
 **El contenido responde a su contenedor.** El escritorio declara un contenedor de ancho y adapta su interior a 850 y 500 px, también cuando comparte pantalla con WhatsApp. A 850 px el resumen pasa a una columna, los totales reducen columnas y el detalle documental se coloca antes de la lista. A 500 px se apilan encabezados, acciones y datos de caja. Las tablas conservan sus columnas mediante desplazamiento horizontal dentro de su región.
+
+El detalle de casos tiene su propio contenedor, con ajustes a 650 y 420 px para informes, propuestas y decisiones. Muestra el proyecto y el corte de datos sobre una secuencia vertical de bloques; Itsasoa identifica su contexto de desarrollo. Fuentes, criterios y alcance se consultan en un desplegable al final.
 
 ## Elevation & Depth
 
@@ -105,16 +107,18 @@ El movimiento de controles es breve. El indicador de escritura solo aparece dura
 
 ## Shapes
 
-Botones principales y secundarios del escritorio en píldora; filtros, campos y navegación con esquinas discretas. La ficha documental tiene una curva mayor. Las burbujas de WhatsApp mantienen esquinas asimétricas y cola según emisor; avatares y envío son circulares. En móvil desaparece el marco redondeado exterior del chat.
+Botones principales y secundarios de consulta en píldora; filtros, campos y navegación con esquinas discretas. El detalle de casos conserva los controles de los bloques originales y añade botones de navegación de 7 px de radio y paneles de 10 px. La ficha documental tiene una curva mayor. Las burbujas de WhatsApp mantienen esquinas asimétricas y cola según emisor; avatares y envío son circulares. En móvil desaparece el marco redondeado exterior del chat.
 
 ## Components
 
 - **Contacto único.** FilmPilot reúne la conversación; no se introduce una lista de agentes como interlocutores. Las respuestas pueden contener un adjunto, un enlace al escritorio o decisiones concretas.
-- **Enlaces con contexto.** «Ver en escritorio» conserva sección y documento de destino. El adjunto abre su detalle. Las consultas desde el escritorio llevan la pregunta contextual a la misma conversación.
-- **Un mismo estado.** Ambas superficies leen el mismo estado en memoria y envían sus acciones al mismo reductor. Cambiar de vista conserva mensajes y decisiones. Las decisiones resueltas quedan deshabilitadas y muestran confirmación; la actividad permite deshacer la última decisión disponible.
+- **Recorridos.** Selector y catálogo comparten siete casos: dossier diario, informe semanal, facturas, cambios, riesgos, presupuesto de Itsasoa y dossier fiscal. Cada uno ofrece los pasos y decisiones de su escenario original; no crea otro interlocutor.
+- **Enlaces con contexto.** «Ver en escritorio» conserva sección, documento o análisis de destino. El adjunto abre su detalle; los casos abren el contenido completo de la respuesta. Las consultas desde el escritorio llevan la pregunta contextual a la misma conversación.
+- **Un mismo estado.** Ambas superficies leen el mismo estado en memoria y usan el motor y reductor originales mediante el adaptador de casos. Cambiar de vista o caso conserva mensajes y decisiones. La actividad permite deshacer el último cambio reversible disponible.
+- **Análisis vigentes.** Cada detalle conserva su revisión. Si los datos cambian, el escritorio sustituye sus bloques por un aviso y «Actualizar análisis»; el chat deshabilita las decisiones antiguas y explica por qué. Deshacer también avanza la revisión. Las acciones ya resueltas o inválidas se rechazan en el modelo.
 - **Resumen y presupuesto.** Comparación entre presupuesto y previsión, capítulos seleccionables, caja por semana y revisiones pendientes. Las tablas despliegan partidas sin duplicar el origen de los cálculos.
 - **Documentos.** Búsqueda, filtros con recuentos, selección y detalle. La ficha seleccionada recibe foco y entra en la zona visible. El estado vacío ofrece limpiar filtros.
-- **Conversación.** Entrada etiquetada, envío deshabilitado si no hay texto o hay una respuesta pendiente, sugerencias y adjunto de ejemplo. El desplazamiento sigue mensajes nuevos cuando la persona está al final; si está leyendo mensajes anteriores, aparece un acceso a los nuevos.
+- **Conversación.** Entrada etiquetada, envío deshabilitado si no hay texto o hay una respuesta pendiente, sugerencias y adjunto de ejemplo. Se muestran hasta tres acciones por respuesta; «Más opciones» revela el resto. El desplazamiento sigue mensajes nuevos cuando la persona está al final; si está leyendo mensajes anteriores, aparece un acceso a los nuevos.
 - **Accesibilidad.** Foco visible, estados expresados con texto, nombres accesibles para controles de icono, expansiones y selecciones comunicadas semánticamente, anuncios discretos de mensajes y descripciones de las gráficas.
 
 ## Do's and Don'ts
